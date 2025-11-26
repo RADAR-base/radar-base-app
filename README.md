@@ -1,4 +1,4 @@
-# RADARBase App Library
+# RADAR Base App Library
 
 A plugin-based React Native library for health research data collection apps with configuration-driven UI and flexible configuration loading.
 
