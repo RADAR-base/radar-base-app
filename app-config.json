@@ -1,0 +1,137 @@
+{
+    "theme": {
+        "primaryColor": "#2196F3",
+        "secondaryColor": "#757575",
+        "backgroundColor": "#f8f9fa",
+        "surfaceColor": "#ffffff",
+        "textColor": "#212529",
+        "fontFamily": "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+        "fontSize": 16,
+        "spacing": {
+            "xs": 4,
+            "sm": 8,
+            "md": 16,
+            "lg": 24,
+            "xl": 32
+        },
+        "borderRadius": {
+            "sm": 4,
+            "md": 8,
+            "lg": 12
+        },
+        "button": {
+            "borderRadius": 8,
+            "backgroundColor": "#2196F3",
+            "textColor": "#ffffff"
+        },
+        "card": {
+            "backgroundColor": "#ffffff",
+            "borderRadius": 12,
+            "shadowColor": "#000000",
+            "elevation": 2
+        }
+    },
+    "header": {
+        "title": "RADAR Demo App",
+        "showSettings": true,
+        "backgroundColor": "#2196F3",
+        "textColor": "#ffffff"
+    },
+    "tabs": [
+        {
+            "label": "Home",
+            "icon": "home",
+            "screen": "homeScreen"
+        },
+        {
+            "label": "Research",
+            "icon": "clipboard",
+            "screen": "researchScreen"
+        },
+        {
+            "label": "Data",
+            "icon": "chart",
+            "screen": "dataScreen"
+        },
+        {
+            "label": "Profile",
+            "icon": "person",
+            "screen": "profileScreen"
+        }
+    ],
+    "screens": {
+        "homeScreen": {
+            "scrollable": true,
+            "blocks": [
+                {
+                    "type": "QuestionnaireWidget",
+                    "id": "welcome_survey",
+                    "config": {
+                        "presentation": "card",
+                        "questionnaireId": "WELCOME_SURVEY",
+                        "title": "Welcome Survey",
+                        "description": "Help us understand your experience",
+                        "showProgress": true,
+                        "estimatedTime": "3 min"
+                    }
+                },
+                {
+                    "type": "VitalsWidget",
+                    "id": "health_overview",
+                    "config": {
+                        "presentation": "card",
+                        "title": "Health Overview",
+                        "category": "Health Metrics",
+                        "description": "Your recent health data summary"
+                    }
+                }
+            ]
+        },
+        "researchScreen": {
+            "scrollable": true,
+            "blocks": [
+                {
+                    "type": "QuestionnaireWidget",
+                    "id": "daily_checkin",
+                    "config": {
+                        "presentation": "card",
+                        "questionnaireId": "DAILY_CHECKIN",
+                        "title": "Daily Check-in",
+                        "description": "Quick daily mood and activity check",
+                        "showProgress": true
+                    }
+                }
+            ]
+        }
+    },
+    "widgets": [
+        {
+            "type": "QuestionnaireWidget",
+            "name": "Questionnaire",
+            "description": "Interactive questionnaire component",
+            "category": "Assessment",
+            "presentations": [
+                "card",
+                "fullscreen"
+            ],
+            "configSchema": {
+                "questionnaireId": {
+                    "type": "string",
+                    "required": true
+                },
+                "presentation": {
+                    "type": "string",
+                    "enum": [
+                        "card",
+                        "fullscreen"
+                    ],
+                    "default": "card"
+                },
+                "showProgress": {
+                    "type": "boolean",
+                    "default": true
+                }
+            }
+        }
+    ]
+}
