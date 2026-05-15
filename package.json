@@ -1,0 +1,68 @@
+{
+  "name": "@radarbase/app-kit",
+  "version": "0.0.1",
+  "description": "A plugin-based React Native library of widgets, components, and services for building configuration-driven health research apps",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf lib",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "keywords": [
+    "react-native",
+    "health",
+    "research",
+    "plugin",
+    "widget",
+    "configuration-driven",
+    "library"
+  ],
+  "author": "RADAR-Base",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": ">=16.8.0",
+    "react-native": ">=0.60.0",
+    "@react-native-async-storage/async-storage": ">=1.0.0",
+    "@react-native-firebase/analytics": ">=18.0.0",
+    "@react-native-firebase/app": ">=18.0.0",
+    "@react-native-firebase/messaging": ">=18.0.0",
+    "@react-native-firebase/remote-config": ">=18.0.0",
+    "react-native-keychain": ">=8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@react-native-async-storage/async-storage": {
+      "optional": true
+    },
+    "@react-native-firebase/analytics": {
+      "optional": true
+    },
+    "@react-native-firebase/app": {
+      "optional": true
+    },
+    "@react-native-firebase/messaging": {
+      "optional": true
+    },
+    "@react-native-firebase/remote-config": {
+      "optional": true
+    },
+    "react-native-keychain": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "mitt": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/react": "^19.1.10",
+    "@types/react-native": "^0.73.0",
+    "typescript": "~5.8.3"
+  },
+  "files": [
+    "lib",
+    "README.md"
+  ]
+}
