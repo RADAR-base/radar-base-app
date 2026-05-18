@@ -58,6 +58,7 @@ The manifest is the only file the SDUI engine requires at cold start.
   "appName": "RADAR Health",
   "version": "1.0.0",
   "configSchemaVersion": "1",
+  "clinicalTemplate": "hypertension",
   "theme": {
     "primaryColor": "#1976d2",
     "secondaryColor": "#424242",
@@ -84,6 +85,12 @@ The manifest is the only file the SDUI engine requires at cold start.
       "viewPath": "views/tasks.json"
     },
     {
+      "id": "tab_learn",
+      "label": "Learn",
+      "icon": "book-open",
+      "viewPath": "views/learn.json"
+    },
+    {
       "id": "tab_profile",
       "label": "Profile",
       "icon": "user",
@@ -92,7 +99,30 @@ The manifest is the only file the SDUI engine requires at cold start.
   ],
   "secondaryViews": {
     "inbox_history": "views/secondary/inbox-history.json",
-    "questionnaire_full": "views/secondary/questionnaire.json"
+    "questionnaire_full": "views/secondary/questionnaire.json",
+    "health_coach": "views/secondary/health-coach.json",
+    "appointment_booking": "views/secondary/appointment-booking.json"
+  },
+  "alerts": {
+    "enabled": true,
+    "rules": [
+      {
+        "id": "high_bp",
+        "metric": "bloodPressureSystolic",
+        "condition": "gt",
+        "threshold": 140,
+        "severity": "warning",
+        "message": "Blood pressure reading is above normal range"
+      }
+    ]
+  },
+  "roles": {
+    "participant": "views/home.json",
+    "caregiver": "views/caregiver-home.json"
+  },
+  "cms": {
+    "articlesEndpoint": "https://cms.radar-base.org/articles",
+    "cacheTTLMinutes": 60
   }
 }
 ```
@@ -310,16 +340,39 @@ Each node type maps to a registered React Native component in the `WidgetRegistr
 
 ### Feature Nodes (map to Widgets)
 
+#### Monitoring & Data Collection
 | Type | Description | Key Props |
 |---|---|---|
-| `SurveyTaskListNode` | List of questionnaire tasks | `variant` (`singleCard`/`multiCard`), `filter`, `title` |
+| `SurveyTaskListNode` | List of ePRO / questionnaire tasks | `variant` (`singleCard`/`multiCard`), `filter`, `title` |
+| `VitalsChartNode` | Vitals trend chart | `vitalType`, `variant` (`mini`/`detailed`) |
+| `SymptomTrackerNode` | Symptom logging with severity levels | `symptoms[]`, `variant` (`card`/`detailed`) |
+| `MedicationAdherenceNode` | Dose schedule + adherence tracking | `medicationId`, `showStreak` |
 | `RelativeActivityTodayNode` | Today's activity progress ring | — |
+| `AirQualityNode` | Ambient air quality by geolocation | `showMap` |
+
+#### Connectivity
+| Type | Description | Key Props |
+|---|---|---|
 | `ConnectEhrNode` | EHR connection prompt/status | `provider` |
 | `ConnectDevicesMenuNode` | Device pairing menu | — |
+| `HealthCoachNode` | Messaging thread with care team | `variant` (`preview`/`full`) |
+| `AppointmentBookingNode` | Schedule / view upcoming appointments | `calendarIntegration` |
+| ~~`TeleHealthNode`~~ | *(backlog — audio/video call with provider)* | — |
+
+#### Content & Engagement
+| Type | Description | Key Props |
+|---|---|---|
+| `FeaturedArticleNode` | Personalised learning resources from CMS | `category`, `variant` (`card`/`list`) |
+| `CalendarNode` | Schedule calendar view | `variant` (`calendar`/`agenda`) |
 | `InboxItemListCoordinatorNode` | Tabbed inbox container | `isCanvas`, `children` |
 | `InboxItemListNode` | Single category inbox list | `category` |
-| `VitalsChartNode` | Vitals trend chart | `vitalType`, `variant` (`mini`/`detailed`) |
-| `CalendarNode` | Schedule calendar view | `variant` (`calendar`/`agenda`) |
+
+#### Utility
+| Type | Description | Key Props |
+|---|---|---|
+| `AlertBannerNode` | Flagged reading or urgent message | `severity` (`info`/`warning`/`critical`) |
+| `PDFExportNode` | Generate + share PDF health summary | `dataRange`, `sections[]` |
+| `ProxyEntryNode` | Caregiver/proxy data entry mode toggle | `relationship` |
 
 ### Action Types (for `ActionNode`)
 
@@ -329,6 +382,9 @@ Each node type maps to a registered React Native component in the `WidgetRegistr
 | `OpenExternalUrl` | Opens browser to an external URL |
 | `Navigate` | In-app navigation to a tab by `tabId` |
 | `TriggerEvent` | Emits an event on the EventBus by `eventName` |
+| `BookAppointment` | Opens appointment booking flow |
+| `ExportPDF` | Triggers PDF health summary generation |
+| ~~`StartTeleHealth`~~ | *(backlog)* |
 
 ---
 
@@ -462,7 +518,159 @@ The previous single-file YAML approach is superseded by this design. Migration s
 
 ---
 
-## 9. Why This Approach
+## 9. Clinical Templates
+
+Pre-built manifest + blueprint sets for common therapeutic areas. Setting `clinicalTemplate` in the manifest causes the SDUI engine to merge template defaults before applying study-specific overrides (template < study config < runtime config).
+
+| Template ID | Condition | Pre-loaded Node Types |
+|---|---|---|
+| `hypertension` | Hypertension | `VitalsChartNode` (BP), `MedicationAdherenceNode`, `AlertBannerNode` |
+| `oncology` | Cancer / Oncology | `SymptomTrackerNode`, `SurveyTaskListNode` (ePRO), `FeaturedArticleNode` |
+| `copd` | COPD / Asthma | `VitalsChartNode` (SpO2), `AirQualityNode`, `MedicationAdherenceNode` |
+| `diabetes` | Diabetes | `VitalsChartNode` (glucose), `MedicationAdherenceNode`, `RelativeActivityTodayNode` |
+| `post_surgery` | Post-surgical recovery | `SurveyTaskListNode`, `AppointmentBookingNode`, `HealthCoachNode` |
+
+Templates ship as bundled blueprints in the library so a study can go live with zero custom blueprint authoring.
+
+---
+
+## 10. Role-Based Views
+
+The `roles` map in the manifest lets a single deployment serve different home screens to different user types without separate builds.
+
+```json
+"roles": {
+  "participant": "views/home.json",
+  "caregiver": "views/caregiver-home.json",
+  "clinician": "views/clinician-dashboard.json"
+}
+```
+
+The SDUI engine resolves the correct blueprint at login time based on the authenticated user's role from the RADAR-base auth token. Role is re-evaluated on each app foreground in case it changes server-side.
+
+`ProxyEntryNode` can be placed in any blueprint to let a caregiver temporarily submit data on behalf of a participant without switching roles at the account level.
+
+---
+
+## 11. Automated Alerting
+
+Alert rules live in the manifest `alerts.rules[]` array and are evaluated by the SDUI engine after every data submission. Each rule specifies a **condition** and one or more **actions** to execute when that condition is met.
+
+```json
+"alerts": {
+  "enabled": true,
+  "rules": [
+    {
+      "id": "high_bp",
+      "metric": "bloodPressureSystolic",
+      "condition": "gt",
+      "threshold": 140,
+      "actions": [
+        {
+          "type": "ShowBanner",
+          "severity": "warning",
+          "message": "Blood pressure reading is above normal range"
+        },
+        {
+          "type": "SendNotification",
+          "title": "High blood pressure recorded",
+          "body": "Your latest reading was above 140 mmHg."
+        }
+      ]
+    },
+    {
+      "id": "missed_medication",
+      "metric": "medicationAdherence",
+      "condition": "lt",
+      "threshold": 0.7,
+      "windowDays": 7,
+      "actions": [
+        {
+          "type": "ShowBanner",
+          "severity": "info",
+          "message": "Medication adherence has dropped below 70% this week"
+        },
+        {
+          "type": "AddTask",
+          "taskType": "MedicationReview",
+          "title": "Review your medication schedule",
+          "dueOffsetDays": 1
+        }
+      ]
+    },
+    {
+      "id": "low_spo2",
+      "metric": "oxygenSaturation",
+      "condition": "lt",
+      "threshold": 92,
+      "actions": [
+        {
+          "type": "ShowBanner",
+          "severity": "critical",
+          "message": "Oxygen saturation is critically low"
+        },
+        {
+          "type": "SendNotification",
+          "title": "Critical SpO₂ reading",
+          "body": "Please contact your care team immediately."
+        },
+        {
+          "type": "OpenView",
+          "viewUrl": "health_coach"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Alert Action Types
+
+| Type | Description | Key Props |
+|---|---|---|
+| `ShowBanner` | Renders `AlertBannerNode` at top of relevant screen | `severity` (`info`/`warning`/`critical`), `message` |
+| `SendNotification` | Fires a push notification | `title`, `body` |
+| `AddTask` | Creates a new task in the participant's task list | `taskType`, `title`, `dueOffsetDays` |
+| `OpenView` | Navigates to a secondary view | `viewUrl` (key from `manifest.secondaryViews`) |
+| `TriggerEvent` | Emits an event on the EventBus for custom widget handling | `eventName`, `payload` |
+| `FlagForReview` | Marks the submission for clinician review in the portal | `priority` (`routine`/`urgent`) |
+
+Multiple actions can be combined on a single rule — they execute in array order.
+
+Alert rules are intentionally kept declarative (no scripting) to support safe over-the-air updates without code review.
+
+---
+
+## 12. CMS-Driven Content
+
+`FeaturedArticleNode` fetches content from the endpoint defined in `manifest.cms.articlesEndpoint`. Articles are filtered by `category` and personalised by the user's study phase and engagement history.
+
+```json
+"cms": {
+  "articlesEndpoint": "https://cms.radar-base.org/articles",
+  "cacheTTLMinutes": 60
+}
+```
+
+The CMS contract returns a list of article cards:
+```json
+[
+  {
+    "id": "art_001",
+    "title": "Managing Blood Pressure Through Diet",
+    "category": "hypertension",
+    "thumbnailUrl": "...",
+    "readTimeMinutes": 4,
+    "deepLink": "views/secondary/article-art_001.json"
+  }
+]
+```
+
+Article body blueprints follow the same node tree format — meaning rich article layouts (text, images, callout cards, embedded videos) are fully SDUI-rendered without any native code changes.
+
+---
+
+## 13. Why This Approach
 
 | Concern | Single `masterConfig.yaml` | SDUI Multi-file |
 |---|---|---|

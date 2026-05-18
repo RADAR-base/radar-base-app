@@ -143,28 +143,46 @@ This document outlines the detailed implementation plan for converting the RADAR
 - [x] Implement date navigation
 - [ ] Write unit tests
 
-### **3.5 New SDUI Layout Nodes**
+### **3.5 New SDUI Layout & Utility Nodes**
 - [ ] Implement `InboxItemListCoordinatorNode` (tabbed coordinator)
 - [ ] Implement `InboxItemListNode` (per-category list)
 - [ ] Implement `RelativeActivityTodayNode` (activity ring)
-- [ ] Implement `ActionNode` with all action types (`OpenCustomView`, `OpenExternalUrl`, `Navigate`, `TriggerEvent`)
+- [ ] Implement `ActionNode` with all action types (`OpenCustomView`, `OpenExternalUrl`, `Navigate`, `TriggerEvent`, `StartTeleHealth`, `BookAppointment`, `ExportPDF`)
+- [ ] Implement `AlertBannerNode` with `info`/`warning`/`critical` severities
 - [ ] Write unit tests for each node type
+
+### **3.6 Health & Engagement Nodes (Huma-inspired)**
+- [ ] Implement `SymptomTrackerNode` (symptom logging with severity levels)
+- [ ] Implement `MedicationAdherenceNode` (dose schedule + streak tracking)
+- [ ] Implement `FeaturedArticleNode` (personalised CMS-driven learning resources)
+- [ ] Implement `HealthCoachNode` (messaging preview + full thread view)
+- [ ] Implement `AppointmentBookingNode` (upcoming + book new)
+- [ ] Implement `AirQualityNode` (geolocation-based ambient data)
+- [ ] Implement `PDFExportNode` (generate + share health summary report)
+- [ ] Implement `ProxyEntryNode` (caregiver mode toggle)
+- [ ] Write unit tests for each
 
 ## **Phase 4: Data Layer & Integration (Week 7-8)**
 
 ### **4.1 Data Models**
-- [ ] Define questionnaire data models
+- [ ] Define questionnaire / ePRO data models
 - [ ] Create task/schedule data models
-- [ ] Implement user profile models
+- [ ] Implement user profile models (with `role` field: participant / caregiver / clinician)
 - [ ] Add device data models
 - [x] Create vitals data models
+- [ ] Add medication adherence models (dose, schedule, streak)
+- [ ] Add symptom log models (symptom, severity, timestamp)
+- [ ] Add CMS article models (id, title, category, deepLink)
 
 ### **4.2 Data Providers**
-- [ ] Create questionnaire data provider
+- [ ] Create questionnaire / ePRO data provider
 - [ ] Implement task scheduling provider
 - [ ] Add user profile provider
 - [ ] Create device data provider
 - [x] Implement vitals data provider (mock)
+- [ ] Implement medication adherence provider
+- [ ] Implement symptom log provider
+- [ ] Implement CMS articles provider (fetch + cache)
 
 ### **4.3 API Integration**
 - [ ] Integrate with RADAR-base backend APIs
@@ -172,12 +190,31 @@ This document outlines the detailed implementation plan for converting the RADAR
 - [x] Add offline data handling (CacheService)
 - [ ] Create conflict resolution
 - [x] Implement data validation (config/theme)
+- [ ] Integrate CMS endpoint (articles, resources) with TTL caching
 
-### **4.4 File System Integration**
-- [ ] Load questionnaire definitions from files
-- [ ] Load schedule configurations from files
-- [ ] Implement configuration hot-reloading
-- [ ] Add file system watching
+### **4.4 Alert Engine**
+- [ ] Implement alert rule evaluator (reads `manifest.alerts.rules[]`)
+- [ ] Evaluate rules after every data submission
+- [ ] Implement all alert action types:
+  - `ShowBanner` — render `AlertBannerNode` on relevant screen
+  - `SendNotification` — fire push notification via `NotificationService`
+  - `AddTask` — inject a new task into the participant's task list
+  - `OpenView` — navigate to a secondary view
+  - `TriggerEvent` — emit named event on the `EventBus`
+  - `FlagForReview` — mark submission for clinician review via RADAR-base API
+- [ ] Support multiple actions per rule (executed in array order)
+- [ ] Write unit tests for all condition types (`gt`, `lt`, `eq`, `window`) and all action types
+
+### **4.5 Role-Based View Resolution**
+- [ ] Read user role from RADAR-base auth token
+- [ ] Resolve home blueprint from `manifest.roles[role]` at login
+- [ ] Re-evaluate role on app foreground
+- [ ] Implement `ProxyEntryNode` caregiver toggle (session-scoped role switch)
+
+### **4.6 Clinical Templates**
+- [ ] Bundle template manifests + blueprints for: `hypertension`, `copd`, `oncology`, `diabetes`, `post_surgery`
+- [ ] Implement template merge logic (template < study config < runtime config)
+- [ ] Write integration tests for each template
 
 ## **Phase 5: Native Integrations (Week 9-10)**
 
@@ -205,25 +242,24 @@ This document outlines the detailed implementation plan for converting the RADAR
 - [ ] Add notification scheduling
 - [ ] Create notification action handling
 
-## **Phase 6: Widget Library & Admin Interface (Week 11-12)**
+## **Phase 6: Tooling, Compliance & Admin Interface (Week 11-12)**
 
-### **6.1 Widget Catalog**
-- [ ] Create widget library interface
-- [ ] Implement widget search functionality
-- [ ] Add widget categorization
-- [ ] Create widget preview system
+### **6.1 Node / Widget Catalog**
+- [ ] Create node library interface (searchable, categorised)
+- [ ] Implement node preview system (renders live from minimal blueprint)
+- [ ] Document all node types with props, variants, and example blueprints
 
-### **6.2 Configuration Editor**
-- [ ] Create visual configuration editor
-- [ ] Implement drag-and-drop interface
-- [ ] Add real-time preview
-- [ ] Create configuration validation
+### **6.2 Blueprint Editor**
+- [ ] Create visual blueprint editor (node tree + JSON view toggle)
+- [ ] Add real-time preview against live SDUI engine
+- [ ] Implement blueprint validation (Zod + custom constraint checks)
+- [ ] Add alert rule builder UI
 
-### **6.3 Widget Store**
-- [ ] Implement widget marketplace
-- [ ] Add widget installation system
-- [ ] Create widget versioning
-- [ ] Implement widget updates
+### **6.3 PDF Health Summary**
+- [ ] Implement PDF generation from participant data (vitals, tasks, adherence)
+- [ ] Support configurable `sections[]` via `PDFExportNode`
+- [ ] Enable sharing via system share sheet
+
 
 ## **Phase 7: E2E & Performance Testing (Week 13-14)**
 > Unit tests are written alongside each phase (not deferred). This phase covers only E2E and performance profiling.
@@ -347,5 +383,18 @@ This document outlines the detailed implementation plan for converting the RADAR
 - 50% reduction in development time for new features
 - 80% of customizations achievable through configuration
 - 90% code reusability across different studies
-- 100% backward compatibility with existing data 
+- 100% backward compatibility with existing data
+
+---
+
+## **Backlog (Post v1)**
+
+Features deferred from the initial roadmap due to feasibility or priority:
+
+| Feature | Reason deferred | Node / Action |
+|---|---|---|
+| TeleHealth (audio/video calls) | Third-party SDK dependency, platform entitlements, cost | `TeleHealthNode`, `StartTeleHealth` |
+| AI health data summarisation | GenAI infrastructure not yet in RADAR-base | — |
+| Widget marketplace / store | Not needed until ecosystem grows | — |
+| OTA update system | Needs separate infra design | — |
 
