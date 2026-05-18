@@ -10,6 +10,12 @@ This document outlines the detailed implementation plan for converting the RADAR
 - [x] Configure package.json with required dependencies
 - [x] Set up TypeScript configuration with path aliases
 - [x] Create core type definitions
+- [x] Add ESLint + Prettier + `.editorconfig` for consistent style
+- [x] Add Jest + `@testing-library/react-native` for unit testing
+- [x] Add `zod` for config schema validation
+- [x] Create `src/index.ts` barrel export (build validates from day one)
+- [x] Create GitHub Actions CI workflow (typecheck + lint + test on every PR)
+- [x] Pin all dependency versions for reproducible builds
 
 ### **1.2 Core Services Implementation**
 
@@ -50,11 +56,17 @@ This document outlines the detailed implementation plan for converting the RADAR
 - [x] Add notification permission management (iOS request)
 - [ ] Create notification event handlers
 
-### **1.3 Configuration System ✅**
-- [x] Create master configuration YAML structure
-- [x] Implement configuration loader with validation
-- [x] Add theme configuration support
-- [x] Create fallback configuration
+### **1.3 Configuration System — SDUI Multi-File**
+> **Design updated:** see [`SDUI_CONFIG_DESIGN.md`](./SDUI_CONFIG_DESIGN.md). The single `masterConfig.yaml` is replaced by `app-manifest.json` + per-screen blueprint JSON files.
+
+- [x] Design SDUI multi-file config format (manifest + blueprints)
+- [x] Define Zod schemas: `ManifestSchema`, `BlueprintSchema`, `NodeSchema`
+- [ ] Implement `ManifestLoader` with strategy chain (Remote → Bundled → Cache)
+- [ ] Implement `BlueprintLoader` with per-screen lazy fetching and caching
+- [ ] Write unit tests for schema validation (valid + invalid manifests)
+- [ ] Create bundled fallback manifests and blueprints for offline use
+- [ ] Implement `configSchemaVersion` migration handler (v1 → v2 upgrade path)
+- [x] Add theme configuration support (in manifest `theme` block)
 - [x] Introduce strategy-based configuration loader (Local/URL/Server)
 
 ## **Phase 2: Widget System & Plugin Manager (Week 3-4)**
@@ -64,17 +76,25 @@ This document outlines the detailed implementation plan for converting the RADAR
 - [x] Implement dynamic widget loading (lazy registration)
 - [x] Add widget lifecycle management (mount/update/unmount events)
 - [x] Create widget validation system (basic presence validation)
+- [ ] Register all SDUI node types (see node catalog in `SDUI_CONFIG_DESIGN.md`)
 
-### **2.2 Plugin Manager**
-- [x] Implement PluginManager component
+### **2.2 SDUI Engine (Route Resolver + Load & Render)**
+> Replaces the simple `PluginManager` block-renderer with a full SDUI pipeline.
+- [x] Implement PluginManager component (base)
 - [x] Add recursive widget rendering
 - [x] Create widget context provider
-- [x] Implement error boundaries for widgets
+- [x] Implement error boundaries for widgets (per-node `ErrorBoundary`)
+- [ ] Implement `RouteResolver`: maps `tab.viewPath` → fetch blueprint
+- [ ] Implement `NodeRenderer`: walks node tree, resolves type via `WidgetRegistry`
+- [ ] Implement `{{variable}}` template interpolation in node props
+- [ ] Implement secondary view navigation (ActionNode → `OpenCustomView`)
+- [ ] Add blueprint caching (stale-while-revalidate, TTL-based)
+- [ ] Write unit tests for `RouteResolver` and `NodeRenderer`
 
 ### **2.3 Core Components**
 - [x] Create AppShell component
-- [x] Implement Header component
-- [x] Create TabBar component
+- [x] Implement Header component (config from manifest `header` block)
+- [x] Create TabBar component (tabs from manifest `tabs[]`)
 - [x] Add Screen container component
 
 ### **2.4 Theme System**
@@ -85,44 +105,50 @@ This document outlines the detailed implementation plan for converting the RADAR
 
 ## **Phase 3: Core Widgets Implementation (Week 5-6)**
 
-### **3.1 QuestionnaireWidget**
-- [x] Create base QuestionnaireWidget component
-- [x] Implement card presentation mode
-- [x] Add list presentation mode
-- [x] Create fullPage presentation mode
-- [ ] Integrate with questionnaire definitions
+### **3.1 SurveyTaskListNode** (replaces `QuestionnaireWidget`)
+- [x] Create base component (was QuestionnaireWidget)
+- [x] Implement `singleCard` variant
+- [x] Implement `multiCard` variant
+- [x] Create full-page secondary view via `ActionNode`
+- [ ] Wire `filter.status` prop (incomplete/complete/all)
+- [ ] Integrate with questionnaire definitions from data layer
 - [x] Add progress tracking
 - [ ] Implement auto-submit functionality
+- [ ] Write unit tests for all variants
 
-### **3.2 VitalsWidget**
-- [x] Create VitalsWidget component
-- [x] Implement chart rendering (mini and detailed placeholders)
-- [ ] Integrate with health data APIs
+### **3.2 VitalsChartNode** (replaces `VitalsWidget`)
+- [x] Create base component (was VitalsWidget)
+- [x] Implement `mini` variant (inline chart)
+- [x] Implement `detailed` variant (full chart)
+- [ ] Wire `vitalType` prop to health data layer
 - [ ] Add trend analysis
 - [ ] Implement time range filtering
+- [ ] Write unit tests
 
-### **3.3 DeviceStatusWidget**
-- [x] Create DeviceStatusWidget component
+### **3.3 ConnectDevicesMenuNode + ConnectEhrNode** (replaces `DeviceStatusWidget`)
+- [x] Create `ConnectDevicesMenuNode` component
 - [x] Implement device connection status
 - [x] Add sync status display
 - [x] Create auto-refresh functionality
-- [ ] Add device management actions
+- [ ] Add device management actions (pair, forget, reconnect)
+- [ ] Create `ConnectEhrNode` for EHR provider connection
+- [ ] Write unit tests
 
-### **3.4 CalendarWidget**
-- [x] Create CalendarWidget component
-- [ ] Implement calendar presentation mode
-- [x] Add agenda presentation mode
+### **3.4 CalendarNode** (replaces `CalendarWidget`)
+- [x] Create base component
+- [ ] Implement `calendar` variant
+- [x] Implement `agenda` variant
 - [ ] Integrate with task scheduling
 - [ ] Add event filtering
 - [x] Implement date navigation
+- [ ] Write unit tests
 
-### **3.5 TaskListWidget**
-- [x] Create TaskListWidget component
-- [x] Implement list presentation mode
-- [ ] Add grid presentation mode
-- [ ] Create compact presentation mode
-- [ ] Add filtering and sorting
-- [ ] Implement task actions
+### **3.5 New SDUI Layout Nodes**
+- [ ] Implement `InboxItemListCoordinatorNode` (tabbed coordinator)
+- [ ] Implement `InboxItemListNode` (per-category list)
+- [ ] Implement `RelativeActivityTodayNode` (activity ring)
+- [ ] Implement `ActionNode` with all action types (`OpenCustomView`, `OpenExternalUrl`, `Navigate`, `TriggerEvent`)
+- [ ] Write unit tests for each node type
 
 ## **Phase 4: Data Layer & Integration (Week 7-8)**
 
@@ -199,31 +225,22 @@ This document outlines the detailed implementation plan for converting the RADAR
 - [ ] Create widget versioning
 - [ ] Implement widget updates
 
-## **Next Steps**
+## **Phase 7: E2E & Performance Testing (Week 13-14)**
+> Unit tests are written alongside each phase (not deferred). This phase covers only E2E and performance profiling.
 
-### **7.1 Unit Testing**
-- [ ] Write tests for core services
-- [ ] Test widget components
-- [ ] Add configuration validation tests
-- [ ] Create data provider tests
+### **7.1 E2E Testing**
+- [ ] Create user journey tests (questionnaire completion, device pairing)
+- [ ] Test manifest + blueprint loading end-to-end
+- [ ] Test secondary view navigation via `ActionNode`
+- [ ] Validate offline fallback (blueprint cache + bundled fallback)
+- [ ] Test error scenarios (malformed blueprint, missing node type)
 
-### **7.2 Integration Testing**
-- [ ] Test widget communication
-- [ ] Validate API integrations
-- [ ] Test native integrations
-- [ ] Verify data synchronization
-
-### **7.3 E2E Testing**
-- [ ] Create user journey tests
-- [ ] Test configuration loading
-- [ ] Validate widget lifecycle
-- [ ] Test error scenarios
-
-### **7.4 Performance Testing**
-- [ ] Profile widget rendering performance
-- [ ] Test memory usage
-- [ ] Validate app startup time
-- [ ] Optimize bundle size
+### **7.2 Performance Testing**
+- [ ] Profile node tree render time (target: <100ms)
+- [ ] Profile blueprint fetch + parse time
+- [ ] Test memory usage under 150MB
+- [ ] Validate app startup time <3 seconds
+- [ ] Optimize bundle size (<50MB)
 
 ## **Phase 8: Documentation & Deployment (Week 15-16)**
 
@@ -261,12 +278,12 @@ This document outlines the detailed implementation plan for converting the RADAR
    - CalendarWidget
    - TaskListWidget
 
-3. **Configuration System**
-   - YAML-based configuration
-   - Theme configuration
-   - Widget configuration schemas
-   - Configuration validation
-   - Strategy-based configuration loader (Local/URL/Server)
+3. **Configuration System (SDUI)**
+   - `app-manifest.json` (app name, version, theme, tabs, secondary views)
+   - Per-screen blueprint JSON files (node trees, lazy-loaded)
+   - Zod schema validation for manifest and blueprints
+   - Strategy-based blueprint loader (Remote → Bundled → Cache)
+   - `configSchemaVersion` migration handling
 
 4. **Native Integrations**
    - HealthKit/Google Fit integration
