@@ -1,0 +1,100 @@
+{
+  "appName": "RADAR Health Research",
+  "version": "1.0.0",
+  "configSchemaVersion": "1",
+  "clinicalTemplate": null,
+  "theme": {
+    "primaryColor": "#007AFF",
+    "secondaryColor": "#FF9500",
+    "backgroundColor": "#F2F2F7",
+    "surfaceColor": "#FFFFFF",
+    "textColor": "#000000",
+    "textSecondaryColor": "#6D6D80",
+    "fontFamily": "System",
+    "fontSize": 16,
+    "button": {
+      "borderRadius": 8
+    }
+  },
+  "header": {
+    "title": "RADAR Health Research",
+    "backgroundColor": "#007AFF",
+    "textColor": "#FFFFFF",
+    "showBackButton": false,
+    "showSettings": true
+  },
+  "tabs": [
+    {
+      "id": "tab_home",
+      "label": "Dashboard",
+      "icon": "home",
+      "viewPath": "views/home.json"
+    },
+    {
+      "id": "tab_insights",
+      "label": "Insights",
+      "icon": "analytics",
+      "viewPath": "views/insights.json"
+    }
+  ],
+  "secondaryViews": {
+    "daily_questionnaire": "views/secondary/questionnaire.json",
+    "inbox_history": "views/secondary/inbox-history.json"
+  },
+  "widgetsRegistry": [
+    {
+      "type": "CustomDemoNode",
+      "module": "./CustomDemoNode"
+    }
+  ],
+  "alerts": {
+    "enabled": true,
+    "rules": [
+      {
+        "id": "high_bp",
+        "metric": "bloodPressureSystolic",
+        "condition": "gt",
+        "threshold": 140,
+        "actions": [
+          {
+            "type": "ShowBanner",
+            "severity": "warning",
+            "message": "Blood pressure reading is above normal range"
+          },
+          {
+            "type": "SendNotification",
+            "title": "High blood pressure recorded",
+            "body": "Your latest reading was above 140 mmHg."
+          }
+        ]
+      },
+      {
+        "id": "missed_medication",
+        "metric": "medicationAdherence",
+        "condition": "lt",
+        "threshold": 0.7,
+        "windowDays": 7,
+        "actions": [
+          {
+            "type": "ShowBanner",
+            "severity": "info",
+            "message": "Medication adherence has dropped below 70% this week"
+          },
+          {
+            "type": "AddTask",
+            "taskType": "MedicationReview",
+            "title": "Review your medication schedule",
+            "dueOffsetDays": 1
+          }
+        ]
+      }
+    ]
+  },
+  "roles": {
+    "participant": "views/home.json"
+  },
+  "cms": {
+    "articlesEndpoint": "https://cms.radar-base.org/articles",
+    "cacheTTLMinutes": 60
+  }
+}

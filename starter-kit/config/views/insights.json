@@ -1,0 +1,52 @@
+{
+  "blueprintVersion": "1",
+  "root": {
+    "id": "root_insights",
+    "type": "ViewNode",
+    "isCanvas": true,
+    "title": "Health Insights",
+    "children": [
+      {
+        "id": "card_devices",
+        "type": "CardNode",
+        "isCanvas": true,
+        "children": [
+          {
+            "id": "devices_menu",
+            "type": "ConnectDevicesMenuNode"
+          }
+        ]
+      },
+      {
+        "id": "section_vitals_overview",
+        "type": "SectionNode",
+        "title": "Vitals Overview",
+        "children": [
+          {
+            "id": "vitals_heart_rate",
+            "type": "VitalsChartNode",
+            "vitalType": "heart_rate",
+            "variant": "detailed"
+          },
+          {
+            "id": "vitals_sleep",
+            "type": "VitalsChartNode",
+            "vitalType": "sleep_hours",
+            "variant": "detailed"
+          }
+        ]
+      },
+      {
+        "id": "card_activity",
+        "type": "CardNode",
+        "isCanvas": true,
+        "children": [
+          {
+            "id": "activity_today",
+            "type": "RelativeActivityTodayNode"
+          }
+        ]
+      }
+    ]
+  }
+}

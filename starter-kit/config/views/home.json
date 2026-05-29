@@ -1,0 +1,92 @@
+{
+  "blueprintVersion": "1",
+  "root": {
+    "id": "root_home",
+    "type": "ViewNode",
+    "isCanvas": true,
+    "title": "Health Dashboard",
+    "children": [
+      {
+        "id": "section_welcome",
+        "type": "SectionNode",
+        "children": [
+          {
+            "id": "text_greeting",
+            "type": "TextNode",
+            "text": "Welcome back, {{user.firstName}}",
+            "style": "heading2"
+          },
+          {
+            "id": "text_subtitle",
+            "type": "TextNode",
+            "text": "Here's what's on your plate today.",
+            "style": "body"
+          }
+        ]
+      },
+      {
+        "id": "card_daily_check",
+        "type": "CardNode",
+        "isCanvas": true,
+        "children": [
+          {
+            "id": "survey_daily_check",
+            "type": "SurveyTaskListNode",
+            "variant": "singleCard",
+            "title": "Daily Health Check",
+            "filter": { "category": "daily", "status": "incomplete" }
+          },
+          {
+            "id": "action_start_daily_check",
+            "type": "ActionNode",
+            "title": "Start daily check",
+            "action": "OpenCustomView",
+            "viewUrl": "daily_questionnaire",
+            "icon": "play-circle"
+          }
+        ]
+      },
+      {
+        "id": "section_research_tasks",
+        "type": "SectionNode",
+        "title": "Research Tasks",
+        "children": [
+          {
+            "id": "survey_research_tasks",
+            "type": "SurveyTaskListNode",
+            "variant": "multiCard",
+            "filter": { "category": "research", "status": "incomplete" }
+          }
+        ]
+      },
+      {
+        "id": "card_inbox",
+        "type": "CardNode",
+        "isCanvas": true,
+        "children": [
+          {
+            "id": "action_open_inbox",
+            "type": "ActionNode",
+            "title": "View inbox history",
+            "action": "OpenCustomView",
+            "viewUrl": "inbox_history",
+            "icon": "inbox"
+          }
+        ]
+      },
+      {
+        "id": "card_custom_demo",
+        "type": "CardNode",
+        "isCanvas": true,
+        "children": [
+          {
+            "id": "custom_runtime_demo",
+            "type": "CustomDemoNode",
+            "title": "Runtime Registered Widget",
+            "description": "Loaded via manifest widgetsRegistry"
+          }
+        ]
+      }
+    ]
+  }
+}
