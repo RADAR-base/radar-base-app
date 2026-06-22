@@ -24,23 +24,24 @@ const remoteConfig: any = remoteConfigModule?.default || remoteConfigModule || (
   fetchAndActivate: async () => {},
   getValue: (_k: string) => ({ asString: () => '' })
 }));
-import type { 
-  DataService, 
-  EventBus, 
-  ApiService, 
-  AppServerService as IAppServerService, 
-  LoggerService, 
-  LocalizationService, 
-  RemoteConfigService, 
-  SubjectConfigService, 
-  StorageService, 
+import type {
+  DataService,
+  EventBus,
+  ApiService,
+  AppServerService as IAppServerService,
+  LoggerService,
+  LocalizationService,
+  RemoteConfigService,
+  SubjectConfigService,
+  StorageService,
   TokenService,
   AnalyticsService,
   CacheService,
   KafkaService,
   ConfigService,
   AuthService,
-  NotificationService
+  NotificationService,
+  OAuthConfig,
 } from '../types';
 
 // Enhanced no-op implementations to satisfy dependencies; apps can override via a higher-level provider if needed
@@ -135,6 +136,7 @@ export interface CoreServiceOverrides {
   remoteConfig?: RemoteConfigService;
   subjectConfig?: SubjectConfigService;
   storage?: StorageService;
+  authConfig?: OAuthConfig;
 }
 
 interface CoreServicesProviderProps {
@@ -200,6 +202,9 @@ export function CoreServicesProvider({
     logger,
     config,
     subjectConfig,
+    eventBus: eventBus,
+    storage,
+    oauthConfig: overrides.authConfig,
   });
 
   // Create notification service

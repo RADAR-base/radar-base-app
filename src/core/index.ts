@@ -11,6 +11,8 @@ export { cacheServiceFactory, DefaultCacheService } from './CacheService';
 export { kafkaServiceFactory, DefaultKafkaService } from './KafkaService';
 export { configServiceFactory, DefaultConfigService } from './ConfigService';
 export { authServiceFactory, DefaultAuthService } from './AuthService';
+export { useAuth } from './useAuth';
+export type { UseAuthResult } from './useAuth';
 export { notificationServiceFactory, DefaultNotificationService } from './NotificationService';
 
 // Re-export types for convenience

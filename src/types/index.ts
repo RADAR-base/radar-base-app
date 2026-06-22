@@ -123,6 +123,20 @@ export interface DashboardWidgetConfig {
   placeholder?: 'random' | 'none';
 }
 
+// OAuth configuration
+export interface OAuthConfig {
+  clientId: string;
+  clientSecret?: string;
+  endpoint: string;
+  scopes: string;
+  audience: string;
+  redirectUri: string;
+  authPath?: string;
+  tokenPath?: string;
+}
+
+export type AuthStatus = 'unknown' | 'unauthenticated' | 'authenticating' | 'authenticated';
+
 // Scheduling and questionnaire abstractions
 export type AssessmentType = 'SCHEDULED' | 'AD_HOC';
 export type TaskState = 'COMPLETED' | 'PENDING' | 'SKIPPED';
@@ -141,7 +155,7 @@ export interface QuestionnaireService {
 export interface TokenPair { access_token: string; refresh_token?: string }
 export interface TokenService {
   refresh(): Promise<TokenPair>;
-  register(refreshParams: { refresh_token: string }): Promise<void>;
+  register(refreshParams: { refresh_token: string; access_token?: string }): Promise<void>;
   getRefreshParams(refreshToken: string): { refresh_token: string };
   getURI(): Promise<string>;
   setURI(uri: string): Promise<string>;
@@ -208,8 +222,10 @@ export interface AppServerService {
 // New Service Interfaces for RADAR Migration
 
 export interface AuthService {
+  getAuthorizationUrl(): Promise<string>;
+  handleAuthCallback(code: string, state: string): Promise<void>;
   authenticate(credentials: any): Promise<TokenPair>;
-  completeAuthentication(refreshToken: string, baseUrl: string, tokenEndpoint: string): Promise<TokenPair>;
+  completeAuthentication(refreshToken: string, baseUrl: string, tokenEndpoint: string, accessToken?: string): Promise<TokenPair>;
   reset(): Promise<void>;
   isAuthenticated(): Promise<boolean>;
 }

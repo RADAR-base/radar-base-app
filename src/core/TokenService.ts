@@ -76,8 +76,11 @@ export class DefaultTokenService implements TokenService {
     }
   }
 
-  async register(refreshParams: { refresh_token: string }): Promise<void> {
+  async register(refreshParams: { refresh_token: string; access_token?: string }): Promise<void> {
     await this.storage.set(this.TOKEN_STORE.REFRESH_TOKEN, refreshParams.refresh_token);
+    if (refreshParams.access_token) {
+      await this.storage.set(this.TOKEN_STORE.ACCESS_TOKEN, refreshParams.access_token);
+    }
   }
 
   getRefreshParams(refreshToken: string): { refresh_token: string } {

@@ -10,8 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import type { ThemeManifest } from '@radarbase/app-kit';
-import { useAuth } from '../auth';
+import { useAuth, type ThemeManifest } from '@radarbase/app-kit';
 
 export interface LoginScreenProps {
   /** Theme tokens from the loaded manifest's `theme` block. Drives all colors on this screen. */
@@ -38,7 +37,7 @@ export function LoginScreen({
     try {
       await startLogin();
     } catch {
-      // `AuthProvider` already mirrors the error into state; nothing more to do here.
+      // useAuth already mirrors the error into state via EventBus; nothing more to do here.
     }
   };
 

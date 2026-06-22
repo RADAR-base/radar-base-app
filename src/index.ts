@@ -14,6 +14,8 @@ export {
   useAuthService,
   useNotificationService,
 } from './core/CoreServicesContext';
+export { useAuth } from './core/useAuth';
+export type { UseAuthResult } from './core/useAuth';
 export type { CoreServiceOverrides } from './core/CoreServicesContext';
 export { dataService } from './core/DataService';
 export { apiService } from './core/ApiService';
@@ -106,6 +108,8 @@ export type {
   StorageService,
   ObservableLike,
   AuthService,
+  AuthStatus,
+  OAuthConfig,
   AnalyticsService,
   CacheService,
   KafkaService,

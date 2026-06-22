@@ -15,19 +15,13 @@ import {
   SDUIShell,
   createBundledBlueprintSource,
   eventBus,
+  useAuth,
   type CoreServiceOverrides,
   type ThemeManifest,
 } from '@radarbase/app-kit';
 
-import {
-  AuthProvider,
-  DEFAULT_ORY_CONFIG,
-  LoginScreen,
-  createAsyncStorageService,
-  createOryAuthClient,
-  useAuth,
-  type AuthStateStore,
-} from './src';
+import { createAsyncStorageService, LoginScreen } from './src';
+import { DEFAULT_AUTH_CONFIG } from './src/auth';
 
 import appManifest from './config/app-manifest.json';
 import homeBlueprint from './config/views/home.json';
@@ -37,9 +31,6 @@ import questionnaireBlueprint from './config/views/secondary/questionnaire.json'
 
 import CustomDemoNode from './CustomDemoNode';
 
-/** Map every viewPath this app supports to its bundled JSON. Add new entries here when
- * you author a new blueprint. The SDUI engine resolves tabs + secondary views through
- * this map; a remote-fetch source can be swapped in later without touching App.tsx. */
 const BUNDLED_BLUEPRINTS: Record<string, unknown> = {
   'views/home.json': homeBlueprint,
   'views/insights.json': insightsBlueprint,
@@ -47,33 +38,22 @@ const BUNDLED_BLUEPRINTS: Record<string, unknown> = {
   'views/secondary/questionnaire.json': questionnaireBlueprint,
 };
 
-// Register host-defined nodes once at module load. The manifest's `widgetsRegistry`
-// entry for `CustomDemoNode` is just a discovery declaration — the actual component is
-// supplied here so it stays type-checked.
 NodeRegistry.getInstance().register('CustomDemoNode', CustomDemoNode);
 
 const ON_PRIMARY = '#FFFFFF';
 
 export default function App() {
-  // Stable singletons: storage adapter (shared by library services + OAuth state store)
-  // and the OAuth client.
-  const { oryClient, serviceOverrides } = useMemo(() => {
+  const serviceOverrides = useMemo<CoreServiceOverrides>(() => {
     const storage = createAsyncStorageService();
-    const stateStore: AuthStateStore = {
-      get: (key) => storage.get<string>(key),
-      set: (key, value) => storage.set(key, value),
-      remove: (key) => storage.set(key, null),
+    return {
+      storage,
+      authConfig: DEFAULT_AUTH_CONFIG,
     };
-    const client = createOryAuthClient(DEFAULT_ORY_CONFIG, stateStore);
-    const overrides: CoreServiceOverrides = { storage };
-    return { oryClient: client, serviceOverrides: overrides };
   }, []);
 
   return (
     <CoreServicesProvider overrides={serviceOverrides}>
-      <AuthProvider client={oryClient}>
-        <AppRoot serviceOverrides={serviceOverrides} />
-      </AuthProvider>
+      <AppRoot serviceOverrides={serviceOverrides} />
     </CoreServicesProvider>
   );
 }
@@ -127,9 +107,8 @@ function useFirebaseBootstrap() {
     try {
       firebase.app();
     } catch {
-      // The starter does not auto-initialize Firebase with hardcoded credentials. Drop your
-      // google-services.json / GoogleService-Info.plist into the native projects, or call
-      // firebase.initializeApp({...}) here with your own configuration.
+      // Drop your google-services.json / GoogleService-Info.plist into the native projects,
+      // or call firebase.initializeApp({...}) here with your own configuration.
     }
   }, []);
 }
