@@ -1,24 +1,26 @@
 {
-  "appName": "RADAR Health Research",
+  "appName": "RADAR Active App",
   "version": "1.0.0",
   "configSchemaVersion": "1",
   "clinicalTemplate": null,
   "theme": {
-    "primaryColor": "#007AFF",
-    "secondaryColor": "#FF9500",
-    "backgroundColor": "#F2F2F7",
+    "primaryColor": "#1C3549",
+    "secondaryColor": "#8FA764",
+    "backgroundColor": "#EDF1F5",
     "surfaceColor": "#FFFFFF",
-    "textColor": "#000000",
-    "textSecondaryColor": "#6D6D80",
-    "fontFamily": "System",
+    "textColor": "#1C3549",
+    "textSecondaryColor": "#8E8E93",
+    "fontFamily": "Inter, sans-serif",
     "fontSize": 16,
     "button": {
-      "borderRadius": 8
+      "borderRadius": 12
     }
   },
   "header": {
-    "title": "RADAR Health Research",
-    "backgroundColor": "#007AFF",
+    "title": "RADAR Active App",
+    "greeting": "Hello User",
+    "subtitle": "Track your data and complete your daily tasks",
+    "backgroundColor": "#1C3549",
     "textColor": "#FFFFFF",
     "showBackButton": false,
     "showSettings": true
@@ -26,15 +28,27 @@
   "tabs": [
     {
       "id": "tab_home",
-      "label": "Dashboard",
+      "label": "Home",
       "icon": "home",
       "viewPath": "views/home.json"
     },
     {
-      "id": "tab_insights",
-      "label": "Insights",
-      "icon": "analytics",
-      "viewPath": "views/insights.json"
+      "id": "tab_calendar",
+      "label": "Calendar",
+      "icon": "calendar",
+      "viewPath": "views/coming-soon.json"
+    },
+    {
+      "id": "tab_profile",
+      "label": "Profile",
+      "icon": "person",
+      "viewPath": "views/profile.json"
+    },
+    {
+      "id": "tab_more",
+      "label": "More",
+      "icon": "grid",
+      "viewPath": "views/coming-soon.json"
     }
   ],
   "secondaryViews": {

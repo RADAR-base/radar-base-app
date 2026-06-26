@@ -4,7 +4,6 @@ import {
   SafeAreaView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import firebase from '@react-native-firebase/app';
@@ -16,8 +15,10 @@ import {
   createBundledBlueprintSource,
   eventBus,
   useAuth,
+  useScheduleService,
   type CoreServiceOverrides,
   type ThemeManifest,
+  type ProtocolConfig,
 } from '@radarbase/app-kit';
 
 import { createAsyncStorageService, LoginScreen } from './src';
@@ -25,22 +26,23 @@ import { DEFAULT_AUTH_CONFIG } from './src/auth';
 
 import appManifest from './config/app-manifest.json';
 import homeBlueprint from './config/views/home.json';
-import insightsBlueprint from './config/views/insights.json';
+import profileBlueprint from './config/views/profile.json';
 import inboxHistoryBlueprint from './config/views/secondary/inbox-history.json';
 import questionnaireBlueprint from './config/views/secondary/questionnaire.json';
+import comingSoonBlueprint from './config/views/coming-soon.json';
 
 import CustomDemoNode from './CustomDemoNode';
+import protocolConfig from './config/protocol.json';
 
 const BUNDLED_BLUEPRINTS: Record<string, unknown> = {
   'views/home.json': homeBlueprint,
-  'views/insights.json': insightsBlueprint,
+  'views/profile.json': profileBlueprint,
+  'views/coming-soon.json': comingSoonBlueprint,
   'views/secondary/inbox-history.json': inboxHistoryBlueprint,
   'views/secondary/questionnaire.json': questionnaireBlueprint,
 };
 
 NodeRegistry.getInstance().register('CustomDemoNode', CustomDemoNode);
-
-const ON_PRIMARY = '#FFFFFF';
 
 export default function App() {
   const serviceOverrides = useMemo<CoreServiceOverrides>(() => {
@@ -58,9 +60,21 @@ export default function App() {
   );
 }
 
+function useScheduleInit() {
+  const schedule = useScheduleService();
+  useEffect(() => {
+    (async () => {
+      await schedule.init();
+      await schedule.loadProtocol(protocolConfig as ProtocolConfig);
+    })();
+    return () => schedule.destroy();
+  }, [schedule]);
+}
+
 function AppRoot({ serviceOverrides }: { serviceOverrides: CoreServiceOverrides }) {
-  const { status, logout } = useAuth();
+  const { status } = useAuth();
   useFirebaseBootstrap();
+  useScheduleInit();
 
   const theme = appManifest.theme as ThemeManifest;
   const primary = theme.primaryColor;
@@ -90,14 +104,6 @@ function AppRoot({ serviceOverrides }: { serviceOverrides: CoreServiceOverrides 
         serviceOverrides={serviceOverrides}
         eventBus={{ emit: (event, data) => eventBus.emit(event, data) }}
       />
-      <TouchableOpacity
-        accessibilityRole="button"
-        accessibilityLabel="Sign out"
-        onPress={logout}
-        style={[styles.logoutPill, { backgroundColor: primary }]}
-      >
-        <Text style={styles.logoutPillLabel}>Sign out</Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -146,19 +152,5 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     textAlign: 'center',
-  },
-  logoutPill: {
-    position: 'absolute',
-    top: 56,
-    right: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    opacity: 0.85,
-  },
-  logoutPillLabel: {
-    color: ON_PRIMARY,
-    fontSize: 12,
-    fontWeight: '600',
   },
 });

@@ -7,70 +7,54 @@
     "title": "Health Dashboard",
     "children": [
       {
-        "id": "section_welcome",
+        "id": "section_activity",
         "type": "SectionNode",
+        "title": "My Activity",
         "children": [
           {
-            "id": "text_greeting",
-            "type": "TextNode",
-            "text": "Welcome back, {{user.firstName}}",
-            "style": "heading2"
-          },
-          {
-            "id": "text_subtitle",
-            "type": "TextNode",
-            "text": "Here's what's on your plate today.",
-            "style": "body"
+            "id": "activity_today",
+            "type": "RelativeActivityTodayNode"
           }
         ]
       },
       {
-        "id": "card_daily_check",
-        "type": "CardNode",
-        "isCanvas": true,
-        "children": [
-          {
-            "id": "survey_daily_check",
-            "type": "SurveyTaskListNode",
-            "variant": "singleCard",
-            "title": "Daily Health Check",
-            "filter": { "category": "daily", "status": "incomplete" }
-          },
-          {
-            "id": "action_start_daily_check",
-            "type": "ActionNode",
-            "title": "Start daily check",
-            "action": "OpenCustomView",
-            "viewUrl": "daily_questionnaire",
-            "icon": "play-circle"
-          }
-        ]
-      },
-      {
-        "id": "section_research_tasks",
+        "id": "section_tasks",
         "type": "SectionNode",
-        "title": "Research Tasks",
+        "title": "My Tasks",
+        "showSeeAll": true,
+        "seeAllAction": "all_tasks",
         "children": [
           {
-            "id": "survey_research_tasks",
+            "id": "survey_tasks",
             "type": "SurveyTaskListNode",
             "variant": "multiCard",
-            "filter": { "category": "research", "status": "incomplete" }
+            "filter": { "status": "incomplete" }
           }
         ]
       },
       {
-        "id": "card_inbox",
-        "type": "CardNode",
-        "isCanvas": true,
+        "id": "section_data",
+        "type": "SectionNode",
+        "title": "My Data",
+        "layout": "horizontal",
         "children": [
           {
-            "id": "action_open_inbox",
-            "type": "ActionNode",
-            "title": "View inbox history",
-            "action": "OpenCustomView",
-            "viewUrl": "inbox_history",
-            "icon": "inbox"
+            "id": "vitals_sleep",
+            "type": "VitalsChartNode",
+            "vitalType": "sleep_hours",
+            "variant": "compact"
+          },
+          {
+            "id": "vitals_steps",
+            "type": "VitalsChartNode",
+            "vitalType": "steps",
+            "variant": "compact"
+          },
+          {
+            "id": "vitals_stress",
+            "type": "VitalsChartNode",
+            "vitalType": "stress",
+            "variant": "compact"
           }
         ]
       },
