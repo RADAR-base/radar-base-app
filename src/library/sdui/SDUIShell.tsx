@@ -17,19 +17,12 @@ import { registerBuiltInNodes } from './nodes';
 import type { SDUIContext, TemplateContext } from './types';
 
 export interface SDUIShellProps {
-  /** Async source for the manifest (e.g. `async () => bundledManifest`). */
   manifestSource: ManifestSource;
-  /** Async source for blueprints by viewPath. */
   blueprintSource: BlueprintSource;
-  /** Fallback manifest used when the primary source fails validation. */
   manifestFallback?: ManifestSource;
-  /** Fallback blueprint source. */
   blueprintFallback?: BlueprintSource;
-  /** Forwarded into the internal CoreServicesProvider for dependency injection. */
   serviceOverrides?: CoreServiceOverrides;
-  /** Variables available for `{{template}}` interpolation inside node props. */
   templateContext?: TemplateContext;
-  /** Optional EventBus pass-through for nodes that emit events. */
   eventBus?: { emit: (event: string, data?: unknown) => void };
 }
 
@@ -38,14 +31,6 @@ interface SecondaryEntry {
   blueprint: ScreenBlueprint;
 }
 
-/**
- * Top-level SDUI engine component. Responsibilities:
- *   1. Load + validate the manifest at startup.
- *   2. Render header + tab bar from the manifest.
- *   3. Lazy-load + validate the blueprint for each tab the user opens.
- *   4. Walk the blueprint's node tree through `NodeRenderer`.
- *   5. Manage a stack of secondary views opened via `ActionNode` (`OpenCustomView`).
- */
 export function SDUIShell(props: SDUIShellProps) {
   registerBuiltInNodes();
 
@@ -65,7 +50,6 @@ export function SDUIShell(props: SDUIShellProps) {
     [props.blueprintSource, props.blueprintFallback],
   );
 
-  // Load the manifest once at mount.
   useEffect(() => {
     let cancelled = false;
     const loader = new ManifestLoader({
@@ -154,7 +138,7 @@ export function SDUIShell(props: SDUIShellProps) {
       <View
         style={[
           styles.container,
-          { backgroundColor: manifest.theme.backgroundColor ?? '#f8f9fa' },
+          { backgroundColor: manifest.theme.backgroundColor ?? '#EDF1F5' },
         ]}
       >
         <ShellHeader
@@ -162,14 +146,6 @@ export function SDUIShell(props: SDUIShellProps) {
           secondaryTitle={topSecondary ? getNodeTitle(topSecondary.blueprint) : null}
           onBack={topSecondary ? popSecondaryView : null}
         />
-
-        {!topSecondary && (
-          <TabBar
-            manifest={manifest}
-            activeTabId={activeTabId}
-            onSelect={(tabId) => setActiveTabId(tabId)}
-          />
-        )}
 
         <View style={styles.body}>
           {topSecondary ? (
@@ -183,10 +159,20 @@ export function SDUIShell(props: SDUIShellProps) {
             />
           )}
         </View>
+
+        {!topSecondary && (
+          <BottomTabBar
+            manifest={manifest}
+            activeTabId={activeTabId}
+            onSelect={(tabId) => setActiveTabId(tabId)}
+          />
+        )}
       </View>
     </CoreServicesProvider>
   );
 }
+
+/* ─── Header ──────────────────────────────────────────────────────────── */
 
 function ShellHeader({
   manifest,
@@ -198,24 +184,71 @@ function ShellHeader({
   onBack: (() => void) | null;
 }) {
   const { header } = manifest;
-  return (
-    <View style={[styles.header, { backgroundColor: header.backgroundColor ?? manifest.theme.primaryColor }]}>
-      <View style={styles.headerRow}>
-        {onBack && (
+  const bgColor = header.backgroundColor ?? manifest.theme.primaryColor;
+  const textColor = header.textColor ?? '#FFFFFF';
+  const greeting = (header as Record<string, unknown>).greeting as string | undefined;
+  const subtitle = (header as Record<string, unknown>).subtitle as string | undefined;
+
+  if (onBack) {
+    return (
+      <View style={[styles.header, { backgroundColor: bgColor }]}>
+        <View style={styles.headerTopRow}>
           <TouchableOpacity onPress={onBack} accessibilityRole="button" style={styles.backButton}>
-            <Text style={[styles.backButtonText, { color: header.textColor ?? '#fff' }]}>‹ Back</Text>
+            <Text style={[styles.backButtonText, { color: textColor }]}>‹ Back</Text>
           </TouchableOpacity>
-        )}
-        <Text style={[styles.headerTitle, { color: header.textColor ?? '#fff' }]} numberOfLines={1}>
-          {secondaryTitle ?? header.title}
+          <Text style={[styles.secondaryTitle, { color: textColor }]} numberOfLines={1}>
+            {secondaryTitle ?? header.title}
+          </Text>
+          <View style={styles.headerSpacer} />
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.header, { backgroundColor: bgColor }]}>
+      {/* Top row: avatar + sync status + icon buttons */}
+      <View style={styles.headerTopRow}>
+        <View style={styles.avatarCircle}>
+          <Text style={styles.avatarEmoji}>{'\u263A'}</Text>
+        </View>
+        <Text style={styles.syncText}>Last Synced: 12:00</Text>
+        <View style={styles.headerIcons}>
+          <HeaderIconButton icon={'\u21BB'} />
+          <HeaderIconButton icon={'\u25CF'} />
+          <HeaderIconButton icon={'\u2699'} />
+        </View>
+      </View>
+
+      {/* Greeting */}
+      <Text style={[styles.greetingText, { color: textColor }]}>
+        {greeting ?? 'Hello User'}
+      </Text>
+
+      {/* Subtitle + Edit button */}
+      <View style={styles.subtitleRow}>
+        <Text style={[styles.subtitleText, { color: textColor }]} numberOfLines={1}>
+          {subtitle ?? 'Track your data and complete your daily tasks'}
         </Text>
-        <View style={styles.headerSpacer} />
+        <TouchableOpacity style={styles.editPill} accessibilityRole="button">
+          <Text style={styles.editPillText}>Edit</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-function TabBar({
+function HeaderIconButton({ icon }: { icon: string }) {
+  return (
+    <View style={styles.headerIconBtn}>
+      <Text style={styles.headerIconText}>{icon}</Text>
+    </View>
+  );
+}
+
+/* ─── Bottom Tab Bar ──────────────────────────────────────────────────── */
+
+function BottomTabBar({
   manifest,
   activeTabId,
   onSelect,
@@ -224,41 +257,86 @@ function TabBar({
   activeTabId: string;
   onSelect: (tabId: string) => void;
 }) {
+  const primary = manifest.theme.primaryColor;
   return (
-    <View style={[styles.tabBar, { backgroundColor: manifest.theme.surfaceColor ?? '#fff' }]}>
-      {manifest.tabs.map((tab: TabManifest) => {
-        const isActive = tab.id === activeTabId;
-        return (
-          <TouchableOpacity
-            key={tab.id}
-            accessibilityRole="tab"
-            onPress={() => onSelect(tab.id)}
-            style={[
-              styles.tab,
-              isActive && {
-                borderBottomWidth: 2,
-                borderBottomColor: manifest.theme.primaryColor,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.tabLabel,
-                {
-                  color: isActive
-                    ? manifest.theme.primaryColor
-                    : manifest.theme.textSecondaryColor ?? '#6D6D80',
-                },
-              ]}
+    <View style={styles.tabBarOuter}>
+      <View style={[styles.tabBar, { backgroundColor: primary }]}>
+        {manifest.tabs.map((tab: TabManifest) => {
+          const isActive = tab.id === activeTabId;
+          return (
+            <TouchableOpacity
+              key={tab.id}
+              accessibilityRole="tab"
+              onPress={() => onSelect(tab.id)}
+              style={[styles.tab, isActive && styles.tabActive]}
             >
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
+              <TabIcon name={tab.icon ?? 'home'} active={isActive} />
+            </TouchableOpacity>
+          );
+        })}
+      </View>
     </View>
   );
 }
+
+function TabIcon({ name, active }: { name: string; active: boolean }) {
+  const opacity = active ? 1 : 0.45;
+  switch (name) {
+    case 'home':
+      return (
+        <View style={[iconStyles.container, { opacity }]}>
+          {/* House: triangle roof + square body */}
+          <View style={iconStyles.homeRoof} />
+          <View style={iconStyles.homeBody} />
+        </View>
+      );
+    case 'calendar':
+      return (
+        <View style={[iconStyles.container, { opacity }]}>
+          {/* Calendar: bordered square with horizontal line */}
+          <View style={iconStyles.calendarOuter}>
+            <View style={iconStyles.calendarLine} />
+            <View style={iconStyles.calendarDots}>
+              <View style={iconStyles.calendarDot} />
+              <View style={iconStyles.calendarDot} />
+              <View style={iconStyles.calendarDot} />
+              <View style={iconStyles.calendarDot} />
+            </View>
+          </View>
+        </View>
+      );
+    case 'person':
+      return (
+        <View style={[iconStyles.container, { opacity }]}>
+          {/* Person: circle head + arc body */}
+          <View style={iconStyles.personHead} />
+          <View style={iconStyles.personBody} />
+        </View>
+      );
+    case 'grid':
+      return (
+        <View style={[iconStyles.container, { opacity }]}>
+          {/* Grid: 2x2 rounded squares */}
+          <View style={iconStyles.gridRow}>
+            <View style={iconStyles.gridSquare} />
+            <View style={iconStyles.gridSquare} />
+          </View>
+          <View style={iconStyles.gridRow}>
+            <View style={iconStyles.gridSquare} />
+            <View style={iconStyles.gridSquare} />
+          </View>
+        </View>
+      );
+    default:
+      return (
+        <View style={[iconStyles.container, { opacity }]}>
+          <View style={iconStyles.defaultDot} />
+        </View>
+      );
+  }
+}
+
+/* ─── Tab Content ─────────────────────────────────────────────────────── */
 
 function TabView({
   activeTabId,
@@ -332,19 +410,89 @@ function getNodeTitle(blueprint: ScreenBlueprint): string | null {
   return typeof title === 'string' ? title : null;
 }
 
+/* ─── Styles ──────────────────────────────────────────────────────────── */
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  /* Header */
   header: {
-    paddingTop: 50,
-    paddingBottom: 14,
-    paddingHorizontal: 16,
+    paddingTop: 54,
+    paddingBottom: 18,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
-  headerRow: {
+  headerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 14,
   },
+  avatarCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#A8C96A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarEmoji: {
+    fontSize: 18,
+    color: '#FFFFFF',
+  },
+  syncText: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.6)',
+    fontWeight: '500',
+  },
+  headerIcons: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  headerIconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerIconText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+  },
+  greetingText: {
+    fontSize: 28,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  subtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  subtitleText: {
+    fontSize: 13,
+    opacity: 0.75,
+    flex: 1,
+    marginRight: 10,
+  },
+  editPill: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+  },
+  editPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  /* Secondary header (back navigation) */
   backButton: {
     paddingRight: 8,
     paddingVertical: 4,
@@ -353,32 +501,41 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  headerTitle: {
+  secondaryTitle: {
     flex: 1,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
   },
   headerSpacer: {
-    width: 60,
+    width: 50,
   },
-  tabBar: {
-    flexDirection: 'row',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#dee2e6',
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  tabLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  /* Body */
   body: {
     flex: 1,
   },
+  /* Bottom tab bar */
+  tabBarOuter: {
+    paddingHorizontal: 24,
+    paddingBottom: 30,
+    paddingTop: 6,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    borderRadius: 28,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  tabActive: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  /* Shared */
   centered: {
     flex: 1,
     alignItems: 'center',
@@ -400,5 +557,94 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 13,
     color: '#6c757d',
+  },
+});
+
+const iconStyles = StyleSheet.create({
+  container: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  /* Home icon */
+  homeRoof: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 10,
+    borderRightWidth: 10,
+    borderBottomWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#FFFFFF',
+    marginBottom: -1,
+  },
+  homeBody: {
+    width: 14,
+    height: 10,
+    backgroundColor: '#FFFFFF',
+    borderBottomLeftRadius: 2,
+    borderBottomRightRadius: 2,
+  },
+  /* Calendar icon */
+  calendarOuter: {
+    width: 18,
+    height: 18,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  calendarLine: {
+    height: 1.5,
+    backgroundColor: '#FFFFFF',
+    marginTop: 4,
+  },
+  calendarDots: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 1.5,
+    gap: 2,
+    marginTop: 1,
+  },
+  calendarDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  /* Person icon */
+  personHead: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 2,
+  },
+  personBody: {
+    width: 16,
+    height: 8,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+  /* Grid icon */
+  gridRow: {
+    flexDirection: 'row',
+    gap: 3,
+  },
+  gridSquare: {
+    width: 8,
+    height: 8,
+    borderRadius: 2,
+    backgroundColor: '#FFFFFF',
+    margin: 1,
+  },
+  /* Default */
+  defaultDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#FFFFFF',
   },
 });
