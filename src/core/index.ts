@@ -14,6 +14,8 @@ export { authServiceFactory, DefaultAuthService } from './AuthService';
 export { useAuth } from './useAuth';
 export type { UseAuthResult } from './useAuth';
 export { notificationServiceFactory, DefaultNotificationService } from './NotificationService';
+export { scheduleServiceFactory, DefaultScheduleService } from './ScheduleService';
+export { questionnaireDataServiceFactory, DefaultQuestionnaireDataService } from './QuestionnaireDataService';
 
 // Re-export types for convenience
 export type {
@@ -25,5 +27,7 @@ export type {
   AuthService,
   NotificationService,
   NotificationActionType,
+  ScheduleService,
+  QuestionnaireDataService,
   Subject,
 } from '../types';

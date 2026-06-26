@@ -89,6 +89,13 @@ export const EVENTS = {
   WIDGET_UNMOUNTED: 'widgetUnmounted',
   WIDGET_CONFIG_CHANGED: 'widgetConfigChanged',
   
+  // Schedule Events
+  SCHEDULE_UPDATED: 'scheduleUpdated',
+  TASK_OVERDUE: 'taskOverdue',
+
+  // Questionnaire Events
+  QUESTIONNAIRE_COMPLETED: 'questionnaireCompleted',
+
   // App Events
   APP_STATE_CHANGED: 'appStateChanged',
   THEME_CHANGED: 'themeChanged',

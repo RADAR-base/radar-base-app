@@ -2,7 +2,7 @@ import React, { createContext, useContext, ReactNode } from 'react';
 import { dataService } from './DataService';
 import { eventBus } from './EventBus';
 import { apiService } from './ApiService';
-import { 
+import {
   appServerServiceFactory,
   tokenServiceFactory,
   analyticsServiceFactory,
@@ -10,7 +10,9 @@ import {
   kafkaServiceFactory,
   configServiceFactory,
   authServiceFactory,
-  notificationServiceFactory
+  notificationServiceFactory,
+  scheduleServiceFactory,
+  questionnaireDataServiceFactory,
 } from './index';
 
 let remoteConfigModule: any;
@@ -41,6 +43,8 @@ import type {
   ConfigService,
   AuthService,
   NotificationService,
+  ScheduleService,
+  QuestionnaireDataService,
   OAuthConfig,
 } from '../types';
 
@@ -112,7 +116,7 @@ interface CoreServices {
   eventBus: EventBus;
   api: ApiService;
   appServer: IAppServerService;
-  
+
   // New services migrated from RADAR-Questionnaire
   token: TokenService;
   analytics: AnalyticsService;
@@ -121,6 +125,8 @@ interface CoreServices {
   config: ConfigService;
   auth: AuthService;
   notifications: NotificationService;
+  schedule: ScheduleService;
+  questionnaireData: QuestionnaireDataService;
 }
 
 const CoreServicesContext = createContext<CoreServices | null>(null);
@@ -148,6 +154,13 @@ export function CoreServicesProvider({
   children,
   overrides = {},
 }: CoreServicesProviderProps) {
+  // If already inside a CoreServicesProvider, reuse the parent context
+  // instead of creating duplicate service instances (avoids double-init issues).
+  const parentContext = useContext(CoreServicesContext);
+  if (parentContext) {
+    return <>{children}</>;
+  }
+
   // Use provided overrides or fall back to no-op implementations
   const logger = overrides.logger || noopLogger;
   const localization = overrides.localization || noopLocalization;
@@ -226,6 +239,21 @@ export function CoreServicesProvider({
     token,
   });
 
+  // Create schedule service
+  const schedule = scheduleServiceFactory({
+    storage,
+    logger,
+    eventBus: eventBus,
+    appServer,
+  });
+
+  // Create questionnaire data service
+  const questionnaireData = questionnaireDataServiceFactory({
+    storage,
+    logger,
+    eventBus: eventBus,
+  });
+
   // Inject auth token provider into ApiService
   apiService.setAuthTokenProvider(async () => {
     try {
@@ -251,6 +279,8 @@ export function CoreServicesProvider({
     config,
     auth,
     notifications,
+    schedule,
+    questionnaireData,
   };
 
   return (
@@ -279,4 +309,6 @@ export const useCacheService = () => useCoreServices().cache;
 export const useKafkaService = () => useCoreServices().kafka;
 export const useConfigService = () => useCoreServices().config;
 export const useAuthService = () => useCoreServices().auth;
-export const useNotificationService = () => useCoreServices().notifications; 
+export const useNotificationService = () => useCoreServices().notifications;
+export const useScheduleService = () => useCoreServices().schedule;
+export const useQuestionnaireDataService = () => useCoreServices().questionnaireData;

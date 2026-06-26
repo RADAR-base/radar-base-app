@@ -13,6 +13,8 @@ export {
   useConfigService,
   useAuthService,
   useNotificationService,
+  useScheduleService,
+  useQuestionnaireDataService,
 } from './core/CoreServicesContext';
 export { useAuth } from './core/useAuth';
 export type { UseAuthResult } from './core/useAuth';
@@ -22,6 +24,8 @@ export { apiService } from './core/ApiService';
 export { eventBus } from './core/EventBus';
 export { appServerServiceFactory } from './core/AppServerService';
 export { AppserverScheduleService } from './core/AppserverScheduleService';
+export { scheduleServiceFactory } from './core/ScheduleService';
+export { questionnaireDataServiceFactory } from './core/QuestionnaireDataService';
 
 // SDUI engine — the primary public surface
 export {
@@ -55,6 +59,14 @@ export {
   TextNode,
   ViewNode,
   VitalsChartNode,
+  RadioInput,
+  CheckboxInput,
+  RangeInput,
+  SliderInput,
+  TextQuestionInput,
+  InfoScreen,
+  QuestionRenderer,
+  evaluateBranchingLogic,
 } from './library/sdui';
 export type {
   SDUIShellProps,
@@ -89,6 +101,11 @@ export type {
   DataService,
   QuestionnaireConfig,
   Question,
+  SelectChoice,
+  QuestionRange,
+  Answer,
+  QuestionTimestamp,
+  QuestionnaireResult,
   TaskListConfig,
   Task,
   DashboardWidgetConfig,
@@ -97,6 +114,7 @@ export type {
   DashboardDataSourceConfig,
   DataExportConfig,
 } from './types';
+export { QUESTION_TYPES } from './types';
 export type {
   AppServerService,
   TokenService,
@@ -115,6 +133,17 @@ export type {
   KafkaService,
   ConfigService,
   NotificationService,
+  ScheduleService,
+  QuestionnaireDataService,
+  ProtocolConfig,
+  AssessmentConfig,
+  AssessmentProtocol,
+  TimeInterval,
+  RepeatQuestionnaire,
+  MultiLanguageText,
+  QuestionnaireMetadata,
+  TaskInstance,
+  TaskInstanceState,
 } from './types';
 
 // Architecture-aligned namespace entry points

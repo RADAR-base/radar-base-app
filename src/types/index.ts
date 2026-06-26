@@ -23,19 +23,78 @@ export interface QuestionnaireConfig {
   questions: Question[];
 }
 
+// REDCap-compatible question format (matching RADAR-Questionnaire)
+
+export interface SelectChoice {
+  code: string;
+  label: string;
+}
+
+export interface QuestionRange {
+  min: number;
+  max: number;
+  step?: number;
+  labelLeft?: string;
+  labelRight?: string;
+}
+
+export const QUESTION_TYPES = {
+  radio: 'radio',
+  checkbox: 'checkbox',
+  range: 'range',
+  slider: 'slider',
+  sliderVertical: 'slider-vertical',
+  text: 'text',
+  yesno: 'yesno',
+  info: 'info',
+  descriptive: 'descriptive',
+  audio: 'audio',
+  timed: 'timed',
+  matrixRadio: 'matrix-radio',
+  healthkit: 'healthkit',
+} as const;
+
 export interface Question {
+  field_name?: string;
+  field_label?: string;
+  field_type?: string;
+  form_name?: string;
+  section_header?: string;
+  select_choices_or_calculations?: SelectChoice[];
+  branching_logic?: string;
+  evaluated_logic?: string;
+  required_field?: string;
+  text_validation_type_or_show_slider_number?: string;
+  text_validation_min?: string;
+  text_validation_max?: string;
+  matrix_group_name?: string;
+  matrix_ranking?: string;
+  field_annotation?: any;
+  field_note?: string;
+  range?: QuestionRange;
+  isAutoNext?: boolean;
+  identifier?: string;
+  custom_alignment?: string;
+  question_number?: string;
+}
+
+export interface Answer {
   id: string;
-  type: 'scale' | 'number' | 'multiple_choice' | 'text';
-  question: string;
-  scale?: {
-    min: number;
-    max: number;
-    labels: string[];
-  };
-  min?: number;
-  max?: number;
-  options?: string[];
-  required?: boolean;
+  value: any;
+  type: string;
+}
+
+export interface QuestionTimestamp {
+  startTime: number;
+  endTime: number;
+}
+
+export interface QuestionnaireResult {
+  assessmentName: string;
+  answers: Record<string, any>;
+  timestamps: Record<string, QuestionTimestamp>;
+  startTime: number;
+  endTime: number;
 }
 
 export interface TaskListConfig {
@@ -299,4 +358,132 @@ export interface ConfigService {
   sendCachedData(): Promise<{ successKeys: string[]; failedKeys: string[] }>;
   getKafkaService(): KafkaService;
   sendConfigChangeEvent(type: string, previous?: any, current?: any, error?: any, data?: any): void;
+}
+
+// ---------------------------------------------------------------------------
+// Schedule & Protocol (RADAR-Questionnaire compatible)
+// ---------------------------------------------------------------------------
+
+export interface MultiLanguageText {
+  [lang: string]: string;
+}
+
+export interface TimeInterval {
+  unit?: string;
+  amount?: number;
+}
+
+export interface RepeatQuestionnaire {
+  unit: string;
+  unitsFromZero: number[];
+}
+
+export interface Reminder {
+  offset: TimeInterval;
+  notification?: ProtocolNotification;
+}
+
+export interface Reminders extends TimeInterval {
+  repeat?: number;
+}
+
+export interface ProtocolNotification {
+  title?: MultiLanguageText;
+  text?: MultiLanguageText;
+  vibrate?: boolean;
+  sound?: boolean;
+}
+
+/** Schedule definition within an assessment (`protocol` field in each assessment entry). */
+export interface AssessmentProtocol {
+  notification?: ProtocolNotification;
+  repeatProtocol: TimeInterval;
+  repeatQuestionnaire: RepeatQuestionnaire;
+  reminders?: Reminder[] | Reminders;
+  completionWindow?: TimeInterval;
+  referenceTimestamp?: string;
+}
+
+export interface QuestionnaireMetadata {
+  repository?: string;
+  name: string;
+  avsc?: string;
+  type?: string;
+  format?: string;
+}
+
+/** A single assessment entry in the top-level `protocols` array. */
+export interface AssessmentConfig {
+  name: string;
+  questionnaire?: QuestionnaireMetadata;
+  estimatedCompletionTime?: number;
+  protocol: AssessmentProtocol;
+  startText?: MultiLanguageText;
+  endText?: MultiLanguageText;
+  warn?: MultiLanguageText;
+  showIntroduction?: boolean;
+  isDemo?: boolean;
+  showInCalendar?: boolean;
+  order?: number;
+  requiresInClinicCompletion?: boolean;
+}
+
+/** Top-level protocol.json format (RADAR-Questionnaire compatible). */
+export interface ProtocolConfig {
+  version: string;
+  schemaVersion?: string;
+  name: string;
+  healthIssues?: string[];
+  protocols: AssessmentConfig[];
+}
+
+export type TaskInstanceState = 'pending' | 'completed' | 'skipped' | 'overdue' | 'expired';
+
+export interface TaskInstance {
+  /** Unique: `${name}_${timestamp}` */
+  instanceId: string;
+  /** Assessment name from protocol */
+  name: string;
+  /** Display title */
+  title: string;
+  /** Display description (from assessment startText or warn) */
+  description: string;
+  /** Epoch ms of the scheduled start time */
+  timestamp: number;
+  /** Completion window in ms */
+  completionWindow: number;
+  estimatedCompletionTime?: number;
+  state: TaskInstanceState;
+  /** ISO timestamp of last state change */
+  stateChangedAt: string;
+  showInCalendar: boolean;
+  isDemo: boolean;
+  order: number;
+  warning?: string;
+  syncedToServer: boolean;
+}
+
+export interface ScheduleService {
+  init(): Promise<void>;
+  loadProtocol(protocol: ProtocolConfig, referenceTimestamp?: number): Promise<void>;
+  getTasksForDate(date: Date): Promise<TaskInstance[]>;
+  getTasksForRange(startDate: Date, endDate: Date): Promise<TaskInstance[]>;
+  getUpcomingTasks(limit?: number): Promise<TaskInstance[]>;
+  getPendingCount(): Promise<number>;
+  completeTask(instanceId: string): Promise<TaskInstance>;
+  skipTask(instanceId: string): Promise<TaskInstance>;
+  refreshStates(): Promise<void>;
+  toSDUITask(instance: TaskInstance): Task;
+  destroy(): void;
+}
+
+export interface QuestionnaireDataService {
+  /** Load questionnaire definitions for all assessments in a protocol. */
+  loadDefinitions(protocol: ProtocolConfig, language?: string): Promise<void>;
+  /** Register locally bundled questionnaire definitions. */
+  registerBundled(assessmentName: string, questions: Question[]): void;
+  /** Get questions for a specific assessment by name. */
+  getQuestions(assessmentName: string): Promise<Question[]>;
+  /** Submit completed questionnaire result. */
+  submitResult(result: QuestionnaireResult): Promise<void>;
 }
