@@ -66,6 +66,7 @@
     "zod": "3.23.8"
   },
   "devDependencies": {
+    "@react-native-async-storage/async-storage": "^1.24.0",
     "@types/jest": "29.5.14",
     "@types/js-yaml": "4.0.9",
     "@types/react": "19.1.10",
