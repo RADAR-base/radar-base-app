@@ -1,22 +1,57 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { Node } from '../../contracts/NodeSchema';
 import type { NodeProps } from '../types';
 
 /**
- * Logical grouping with an optional header. Visually similar to a card but without
- * elevation — best for related items that should read as one unit but don't need a
- * surface treatment (e.g. a "Research Tasks" subgroup on the home screen).
+ * Logical grouping with an optional header and optional "See All" link.
+ * Supports `layout: "horizontal"` for a horizontally scrolling row of children.
  */
 export function SectionNode({ node, context, render }: NodeProps) {
   const title = typeof node.title === 'string' ? node.title : undefined;
+  const showSeeAll = node.showSeeAll === true;
+  const layout = node.layout === 'horizontal' ? 'horizontal' : 'vertical';
   const theme = context.theme;
+
+  const children = asNodeArray(node.children);
+
   return (
     <View style={styles.container}>
       {title && (
-        <Text style={[styles.title, { color: theme.textColor ?? '#000' }]}>{title}</Text>
+        <View style={styles.headerRow}>
+          <Text style={[styles.title, { color: theme.textColor ?? '#1C3549' }]}>{title}</Text>
+          {showSeeAll && (
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={() => {
+                if (typeof node.seeAllAction === 'string') {
+                  context.dispatch({
+                    type: 'OpenCustomView',
+                    viewUrl: node.seeAllAction as string,
+                  });
+                }
+              }}
+            >
+              <View style={styles.seeAllPill}>
+                <Text style={[styles.seeAllText, { color: theme.textSecondaryColor ?? '#8E8E93' }]}>
+                  See All
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        </View>
       )}
-      <View>{render(asNodeArray(node.children))}</View>
+      {layout === 'horizontal' ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.horizontalContent}
+        >
+          {render(children)}
+        </ScrollView>
+      ) : (
+        <View>{render(children)}</View>
+      )}
     </View>
   );
 }
@@ -27,13 +62,30 @@ function asNodeArray(value: unknown): Node[] | undefined {
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 16,
+    marginBottom: 20,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   title: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  },
+  seeAllPill: {
+    borderWidth: 1,
+    borderColor: '#C8CDD3',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  seeAllText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  horizontalContent: {
+    paddingRight: 16,
   },
 });

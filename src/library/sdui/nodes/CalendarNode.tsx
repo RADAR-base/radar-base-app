@@ -1,29 +1,42 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCoreServices } from '../../../core/CoreServicesContext';
+import { EVENTS } from '../../../core/EventBus';
+import type { TaskInstance } from '../../../types';
 import type { NodeProps } from '../types';
 
+interface CalendarEvent {
+  time: string;
+  title: string;
+  state: string;
+}
+
 /**
- * Calendar / agenda view. Two variants are planned (`calendar`, `agenda`); the MVP
- * always renders the agenda variant. The grid `calendar` variant will land alongside
- * task scheduling (Phase 3.4). Events are currently demo data; future iterations will
- * pull from a TaskScheduleService.
+ * Calendar / agenda view. Pulls real task data from `ScheduleService`;
+ * shows an empty state when no protocol is loaded.
  */
 export function CalendarNode({ node, context }: NodeProps) {
+  const { schedule, eventBus } = useCoreServices();
   const title = typeof node.title === 'string' ? node.title : 'Calendar';
   const [date, setDate] = useState<Date>(new Date());
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
 
-  const sampleEvents = useMemo<Record<string, { time: string; title: string }[]>>(
-    () => ({
-      [new Date().toDateString()]: [
-        { time: '09:00', title: 'Morning Vitals' },
-        { time: '13:00', title: 'Study Survey' },
-        { time: '18:00', title: 'Medication Log' },
-      ],
-    }),
-    [],
-  );
+  const loadEvents = useCallback(async () => {
+    try {
+      const instances = await schedule.getTasksForDate(date);
+      setEvents(instances.map(toCalendarEvent));
+    } catch {
+      setEvents([]);
+    }
+  }, [schedule, date]);
 
-  const events = sampleEvents[date.toDateString()] ?? [];
+  useEffect(() => { loadEvents(); }, [loadEvents]);
+
+  useEffect(() => {
+    const handler = () => { loadEvents(); };
+    eventBus.on(EVENTS.SCHEDULE_UPDATED, handler);
+    return () => eventBus.off(EVENTS.SCHEDULE_UPDATED, handler);
+  }, [eventBus, loadEvents]);
 
   const shiftDay = (delta: number) =>
     setDate((current) => {
@@ -73,13 +86,32 @@ export function CalendarNode({ node, context }: NodeProps) {
         events.map((event, index) => (
           <View key={`${event.time}-${index}`} style={styles.row}>
             <Text style={[styles.time, { color: textSecondary }]}>{event.time}</Text>
-            <Text style={{ color: text }}>{event.title}</Text>
+            <Text style={[styles.eventTitle, { color: text }]}>{event.title}</Text>
+            <Text style={[styles.state, { color: STATE_COLORS[event.state] ?? textSecondary }]}>
+              {event.state}
+            </Text>
           </View>
         ))
       )}
     </View>
   );
 }
+
+function toCalendarEvent(instance: TaskInstance): CalendarEvent {
+  return {
+    time: new Date(instance.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    title: instance.title,
+    state: instance.state,
+  };
+}
+
+const STATE_COLORS: Record<string, string> = {
+  pending: '#856404',
+  completed: '#155724',
+  overdue: '#721c24',
+  expired: '#999',
+  skipped: '#6D6D80',
+};
 
 const styles = StyleSheet.create({
   container: { borderWidth: 1, padding: 12, marginBottom: 12 },
@@ -90,5 +122,7 @@ const styles = StyleSheet.create({
   sub: { fontSize: 13, fontWeight: '600' },
   row: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   time: { width: 54, fontSize: 12 },
+  eventTitle: { flex: 1, fontSize: 13 },
+  state: { fontSize: 11, fontWeight: '600', marginLeft: 8 },
   empty: { fontStyle: 'italic' },
 });

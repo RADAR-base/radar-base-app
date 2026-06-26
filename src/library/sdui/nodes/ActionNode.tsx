@@ -2,22 +2,38 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 import type { ActionPayload, NodeProps } from '../types';
 
-const ON_PRIMARY = '#FFFFFF';
-
 /**
- * Tappable button. Building an `ActionPayload` from the node's props and dispatching it
- * through the engine's `ActionDispatcher`. The dispatcher handles `OpenCustomView` (push
- * onto the secondary-view stack), `Navigate` (switch active tab), `OpenExternalUrl`, and
- * `TriggerEvent` (host EventBus).
+ * Tappable button. Supports two visual variants:
+ *   - `filled` (default) — solid primary background
+ *   - `outline` — bordered with transparent background
  */
 export function ActionNode({ node, context }: NodeProps) {
   const title = typeof node.title === 'string' ? node.title : 'Action';
   const action = typeof node.action === 'string' ? node.action : 'TriggerEvent';
+  const variant = node.variant === 'outline' ? 'outline' : 'filled';
   const theme = context.theme;
 
   const onPress = () => {
     context.dispatch(buildAction(action, node));
   };
+
+  const radius = theme.button?.borderRadius ?? 12;
+
+  if (variant === 'outline') {
+    return (
+      <TouchableOpacity
+        accessibilityRole="button"
+        onPress={onPress}
+        style={[
+          styles.button,
+          styles.outlineButton,
+          { borderColor: theme.primaryColor, borderRadius: radius },
+        ]}
+      >
+        <Text style={[styles.label, { color: theme.primaryColor }]}>{title}</Text>
+      </TouchableOpacity>
+    );
+  }
 
   return (
     <TouchableOpacity
@@ -25,13 +41,10 @@ export function ActionNode({ node, context }: NodeProps) {
       onPress={onPress}
       style={[
         styles.button,
-        {
-          backgroundColor: theme.primaryColor,
-          borderRadius: theme.button?.borderRadius ?? 8,
-        },
+        { backgroundColor: theme.primaryColor, borderRadius: radius },
       ]}
     >
-      <Text style={styles.label}>{title}</Text>
+      <Text style={[styles.label, { color: '#FFFFFF' }]}>{title}</Text>
     </TouchableOpacity>
   );
 }
@@ -69,8 +82,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 4,
   },
+  outlineButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+  },
   label: {
-    color: ON_PRIMARY,
     fontSize: 15,
     fontWeight: '600',
   },

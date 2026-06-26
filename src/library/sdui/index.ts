@@ -52,3 +52,15 @@ export {
   ViewNode,
   VitalsChartNode,
 } from './nodes';
+
+// Questionnaire sub-components (for custom questionnaire UIs)
+export {
+  RadioInput,
+  CheckboxInput,
+  RangeInput,
+  SliderInput,
+  TextQuestionInput,
+  InfoScreen,
+  QuestionRenderer,
+  evaluateBranchingLogic,
+} from './nodes/questionnaire';

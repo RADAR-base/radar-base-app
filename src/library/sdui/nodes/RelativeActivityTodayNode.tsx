@@ -3,37 +3,61 @@ import { StyleSheet, Text, View } from 'react-native';
 import type { NodeProps } from '../types';
 
 /**
- * Activity ring showing today's progress relative to a goal. MVP renders a placeholder
- * card with synthesized progress; a future iteration will plug in HealthKit / Google Fit
- * step counts via the data layer (Phase 5).
+ * Activity summary grid matching the Figma "My Activity" design.
+ * Shows daily check-in count, current streak, and longest streak
+ * in a card grid layout.
  */
 export function RelativeActivityTodayNode({ node, context }: NodeProps) {
   const goalSteps = typeof node.goalSteps === 'number' ? node.goalSteps : 10000;
-  // Demo: pick a deterministic-ish "today" value so the UI is stable across renders.
   const stepsSoFar = useTodayDemoSteps(goalSteps);
-  const progress = Math.min(1, stepsSoFar / goalSteps);
+  const checkIns = Math.max(1, Math.floor(stepsSoFar / 3000));
   const theme = context.theme;
+  const secondary = theme.secondaryColor ?? '#8FA764';
+  const text = theme.textColor ?? '#1C3549';
+  const textSec = theme.textSecondaryColor ?? '#8E8E93';
+  const surface = theme.surfaceColor ?? '#fff';
+  const radius = theme.button?.borderRadius ?? 12;
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.surfaceColor ?? '#fff' }]}>
-      <Text style={[styles.title, { color: theme.textColor ?? '#000' }]}>Activity today</Text>
-      <View style={styles.barTrack}>
-        <View
-          style={[
-            styles.barFill,
-            { width: `${progress * 100}%`, backgroundColor: theme.primaryColor },
-          ]}
-        />
+    <View style={styles.container}>
+      <View style={styles.row}>
+        {/* Daily Check-ins — tall left card */}
+        <View style={[styles.cardTall, { backgroundColor: surface, borderRadius: radius }]}>
+          <View style={styles.cardHeader}>
+            <Text style={[styles.cardLabel, { color: text }]}>Daily Check-ins</Text>
+            <View style={[styles.iconCircle, { backgroundColor: '#E8F0E0' }]}>
+              <Text style={styles.iconEmoji}>{'\u2705'}</Text>
+            </View>
+          </View>
+          <Text style={[styles.bigNumber, { color: text }]}>{checkIns}</Text>
+          <View style={[styles.badge, { backgroundColor: '#E8F0E0' }]}>
+            <Text style={[styles.badgeText, { color: secondary }]}>Keep it up!</Text>
+          </View>
+        </View>
+
+        {/* Right column — two stacked cards */}
+        <View style={styles.rightColumn}>
+          <View style={[styles.cardSmall, { backgroundColor: surface, borderRadius: radius }]}>
+            <Text style={[styles.cardLabel, { color: textSec }]}>Current Streak</Text>
+            <View style={styles.streakRow}>
+              <Text style={[styles.streakNumber, { color: text }]}>2</Text>
+              <Text style={styles.streakIcon}>{'\u{1F525}'}</Text>
+            </View>
+          </View>
+          <View style={[styles.cardSmall, { backgroundColor: surface, borderRadius: radius }]}>
+            <Text style={[styles.cardLabel, { color: textSec }]}>Longest Streak</Text>
+            <View style={styles.streakRow}>
+              <Text style={[styles.streakNumber, { color: text }]}>2</Text>
+              <Text style={styles.streakIcon}>{'\u{1F3C5}'}</Text>
+            </View>
+          </View>
+        </View>
       </View>
-      <Text style={[styles.body, { color: theme.textSecondaryColor ?? '#6D6D80' }]}>
-        {stepsSoFar.toLocaleString()} / {goalSteps.toLocaleString()} steps ({Math.round(progress * 100)}%)
-      </Text>
     </View>
   );
 }
 
 function useTodayDemoSteps(goal: number): number {
-  // Use the day of year as a stable seed so a single session sees consistent demo data.
   const day = new Date().getDate();
   const fraction = ((day * 37) % 100) / 100;
   return Math.round(goal * (0.3 + fraction * 0.7));
@@ -41,26 +65,80 @@ function useTodayDemoSteps(goal: number): number {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-  title: {
-    fontSize: 14,
-    fontWeight: '600',
     marginBottom: 8,
   },
-  barTrack: {
-    height: 10,
-    backgroundColor: '#e9ecef',
-    borderRadius: 5,
-    overflow: 'hidden',
-    marginBottom: 6,
+  row: {
+    flexDirection: 'row',
+    gap: 10,
   },
-  barFill: {
-    height: '100%',
+  cardTall: {
+    flex: 1,
+    padding: 14,
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+    minHeight: 140,
   },
-  body: {
+  rightColumn: {
+    flex: 1,
+    gap: 10,
+  },
+  cardSmall: {
+    flex: 1,
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cardLabel: {
     fontSize: 12,
+    fontWeight: '600',
+  },
+  iconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconEmoji: {
+    fontSize: 14,
+  },
+  bigNumber: {
+    fontSize: 36,
+    fontWeight: '700',
+  },
+  badge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  streakRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginTop: 4,
+  },
+  streakNumber: {
+    fontSize: 28,
+    fontWeight: '700',
+  },
+  streakIcon: {
+    fontSize: 22,
   },
 });

@@ -4,8 +4,8 @@ import type { Node } from '../../contracts/NodeSchema';
 import type { NodeProps } from '../types';
 
 /**
- * Elevated surface holding one or more child nodes. Use this when the children should
- * read as a discrete unit (e.g. a daily-check prompt with an action button).
+ * Elevated surface holding one or more child nodes. Rounded corners and
+ * soft shadow matching the Figma card style.
  */
 export function CardNode({ node, context, render }: NodeProps) {
   const theme = context.theme;
@@ -15,7 +15,7 @@ export function CardNode({ node, context, render }: NodeProps) {
         styles.card,
         {
           backgroundColor: theme.surfaceColor ?? '#fff',
-          borderRadius: theme.button?.borderRadius ?? 8,
+          borderRadius: theme.button?.borderRadius ?? 12,
         },
       ]}
     >
@@ -30,12 +30,12 @@ function asNodeArray(value: unknown): Node[] | undefined {
 
 const styles = StyleSheet.create({
   card: {
-    padding: 14,
+    padding: 16,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
     elevation: 2,
   },
 });

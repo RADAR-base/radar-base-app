@@ -2,16 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { NodeProps } from '../types';
 
-const ON_PRIMARY = '#FFFFFF';
-const CONNECTED_COLOR = '#4CAF50';
-const DISCONNECTED_COLOR = '#F44336';
-const ERROR_COLOR = '#dc3545';
-
 /**
- * Surfaces the device connection status panel. Currently a demo implementation that
- * toggles a mocked connection state every 5 seconds; a future iteration will integrate
- * with the wearable device data layer (Phase 5) and accept `providers[]` /
- * `mode: 'menu' | 'card' | 'auto'` per the SDUI catalog.
+ * Device connection status indicator. Matches the Figma header sync style
+ * with a cleaner, more compact layout.
  */
 export function ConnectDevicesMenuNode({ node, context }: NodeProps) {
   const title = typeof node.title === 'string' ? node.title : 'Connected Devices';
@@ -53,45 +46,60 @@ export function ConnectDevicesMenuNode({ node, context }: NodeProps) {
 
   const theme = context.theme;
   const surface = theme.surfaceColor ?? '#FFFFFF';
-  const text = theme.textColor ?? '#000';
-  const textSecondary = theme.textSecondaryColor ?? '#6D6D80';
-  const primary = theme.primaryColor;
-  const radius = theme.button?.borderRadius ?? 8;
+  const text = theme.textColor ?? '#1C3549';
+  const textSecondary = theme.textSecondaryColor ?? '#8E8E93';
+  const secondary = theme.secondaryColor ?? '#8FA764';
+  const radius = theme.button?.borderRadius ?? 12;
 
   return (
-    <View
-      style={[
-        styles.container,
-        { backgroundColor: surface, borderColor: primary, borderRadius: radius },
-      ]}
-    >
-      <Text style={[styles.title, { color: text }]}>{title}</Text>
-      <Text
-        style={[styles.statusLine, { color: connected ? CONNECTED_COLOR : DISCONNECTED_COLOR }]}
-      >
-        {connected ? 'Connected' : 'Disconnected'}
-      </Text>
+    <View style={[styles.container, { backgroundColor: surface, borderRadius: radius }]}>
+      <View style={styles.headerRow}>
+        <View style={[styles.statusDot, { backgroundColor: connected ? '#4CAF50' : '#F44336' }]} />
+        <Text style={[styles.title, { color: text }]}>{title}</Text>
+      </View>
       <Text style={[styles.description, { color: textSecondary }]}>{description}</Text>
       <Text style={[styles.lastSync, { color: textSecondary }]}>Last sync: {lastSync}</Text>
-      {lastError && <Text style={styles.error}>Last error: {lastError}</Text>}
+      {lastError && <Text style={styles.error}>{lastError}</Text>}
       <TouchableOpacity
         accessibilityRole="button"
         onPress={syncNow}
-        style={[styles.syncBtn, { backgroundColor: primary, borderRadius: radius }]}
+        style={[styles.syncBtn, { backgroundColor: secondary, borderRadius: radius }]}
       >
-        <Text style={[styles.syncBtnText, { color: ON_PRIMARY }]}>Sync now</Text>
+        <Text style={styles.syncBtnText}>Sync now</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { borderWidth: 1, padding: 12, marginBottom: 12 },
-  title: { fontSize: 15, fontWeight: '700', marginBottom: 6 },
-  statusLine: { fontWeight: '700', marginBottom: 4 },
+  container: {
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  statusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 8,
+  },
+  title: { fontSize: 15, fontWeight: '700' },
   description: { fontSize: 12, opacity: 0.9, marginBottom: 4 },
   lastSync: { fontSize: 12, opacity: 0.8 },
-  error: { color: ERROR_COLOR, marginTop: 4, fontSize: 12 },
-  syncBtn: { marginTop: 8, paddingHorizontal: 14, paddingVertical: 8, alignSelf: 'flex-start' },
-  syncBtnText: { fontWeight: '600', fontSize: 12 },
+  error: { color: '#dc3545', marginTop: 4, fontSize: 12 },
+  syncBtn: {
+    marginTop: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    alignSelf: 'flex-start',
+  },
+  syncBtnText: { fontWeight: '600', fontSize: 13, color: '#FFFFFF' },
 });

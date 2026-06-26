@@ -9,23 +9,16 @@ import { BarChart, Sparkline } from '../Charts';
 import { useDashboardData } from '../useDashboardData';
 import type { NodeProps } from '../types';
 
-const ON_PRIMARY = '#FFFFFF';
-
 /**
- * Renders a vitals chart for a single metric. Two visual variants:
- *   - `mini`     — sparkline only, no title or range pills (suitable as a card body).
- *   - `detailed` — bar chart with title, description, and optional range pills.
- *
- * Data resolution falls through (in order of precedence):
- *   1. inline `values` declared in the blueprint,
- *   2. an API `dataSource` (uses `useDashboardData` under the hood),
- *   3. randomized placeholder data when `placeholder: 'random'`.
- *
- * Until the health data layer lands (Phase 4), most authors will use inline `values`.
+ * Renders a vitals chart for a single metric. Three visual variants:
+ *   - `mini`     — sparkline only.
+ *   - `compact`  — card for horizontal "My Data" row (ring or bar chart).
+ *   - `detailed` — full bar chart with title, description, and range pills.
  */
 export function VitalsChartNode({ node, context }: NodeProps) {
   const vitalType = typeof node.vitalType === 'string' ? node.vitalType : 'metric';
-  const variant: 'mini' | 'detailed' = node.variant === 'mini' ? 'mini' : 'detailed';
+  const variant: 'mini' | 'compact' | 'detailed' =
+    node.variant === 'mini' ? 'mini' : node.variant === 'compact' ? 'compact' : 'detailed';
   const inlineValues = Array.isArray(node.values)
     ? (node.values as number[]).filter((v) => typeof v === 'number')
     : undefined;
@@ -64,37 +57,57 @@ export function VitalsChartNode({ node, context }: NodeProps) {
   );
 
   const theme = context.theme;
-  const primary = theme.primaryColor;
+  const secondary = theme.secondaryColor ?? '#8FA764';
   const surface = theme.surfaceColor ?? '#FFFFFF';
-  const text = theme.textColor ?? '#000';
-  const textSecondary = theme.textSecondaryColor ?? '#6D6D80';
-  const background = theme.backgroundColor ?? '#F2F2F7';
-  const radius = theme.button?.borderRadius ?? 8;
+  const text = theme.textColor ?? '#1C3549';
+  const textSecondary = theme.textSecondaryColor ?? '#8E8E93';
+  const background = theme.backgroundColor ?? '#EDF1F5';
+  const radius = theme.button?.borderRadius ?? 12;
 
   const values = useMemo(() => {
     if (!resolved) return [];
     return activeRange ? resolved.values.slice(-activeRange.bucketCount) : resolved.values;
   }, [resolved, activeRange]);
   const lastValue = values.length > 0 ? values[values.length - 1] : null;
-  const chartColor = resolved?.color ?? primary;
+  const chartColor = resolved?.color ?? secondary;
 
+  // Color overrides for specific vital types
+  const ringColor = vitalType === 'stress' ? '#C9A96E' : chartColor;
+
+  // ── Compact: card for horizontal "My Data" scroll ──
+  if (variant === 'compact') {
+    const useBarChart = vitalType === 'steps';
+    const score = lastValue ?? (values.length > 0 ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : 70);
+
+    return (
+      <View style={[styles.compactCard, { backgroundColor: surface, borderRadius: radius }]}>
+        <View style={styles.compactHeader}>
+          <Text style={[styles.compactLabel, { color: text }]}>{label}</Text>
+          <Text style={[styles.compactArrow, { color: textSecondary }]}>{'\u2192'}</Text>
+        </View>
+        {useBarChart ? (
+          <View style={styles.compactChartArea}>
+            <BarChart values={values.length > 0 ? values.slice(-7) : [40, 65, 50, 70, 80, 45, 60]} height={50} color={chartColor} />
+          </View>
+        ) : (
+          <View style={styles.ringContainer}>
+            <CircleProgress size={80} strokeWidth={8} progress={Math.min(1, score / 100)} color={ringColor} />
+            <Text style={[styles.ringValue, { color: text }]}>{Math.round(score)}</Text>
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  // ── Detailed: full-width card ──
   return (
-    <View
-      style={[
-        styles.container,
-        { backgroundColor: surface, borderColor: primary, borderRadius: radius },
-      ]}
-    >
-      {variant === 'detailed' && (
-        <>
-          <Text style={[styles.title, { color: text }]}>{label}</Text>
-          {description && (
-            <Text style={[styles.description, { color: textSecondary }]}>{description}</Text>
-          )}
-        </>
+    <View style={[styles.container, { backgroundColor: surface, borderRadius: radius }]}>
+      <Text style={[styles.title, { color: text }]}>{label}</Text>
+      {description && (
+        <Text style={[styles.description, { color: textSecondary }]}>{description}</Text>
       )}
 
-      {variant === 'detailed' && ranges.length > 0 && (
+      {ranges.length > 0 && (
         <View style={styles.rangeRow}>
           {ranges.map((range) => {
             const isActive = range.id === activeRangeId;
@@ -106,11 +119,11 @@ export function VitalsChartNode({ node, context }: NodeProps) {
                 onPress={() => setActiveRangeId(range.id)}
                 style={[
                   styles.rangePill,
-                  { backgroundColor: isActive ? primary : background },
+                  { backgroundColor: isActive ? secondary : background },
                 ]}
               >
                 <Text
-                  style={[styles.rangeText, { color: isActive ? ON_PRIMARY : textSecondary }]}
+                  style={[styles.rangeText, { color: isActive ? '#FFFFFF' : textSecondary }]}
                 >
                   {range.label}
                 </Text>
@@ -127,7 +140,7 @@ export function VitalsChartNode({ node, context }: NodeProps) {
 
       {values.length > 0 && (
         <>
-          {lastValue !== null && variant === 'detailed' && (
+          {lastValue !== null && (
             <Text style={[styles.lastValue, { color: textSecondary }]}>
               {formatNumber(lastValue)}
               {unit ? ` ${unit}` : ''}
@@ -148,42 +161,106 @@ export function VitalsChartNode({ node, context }: NodeProps) {
   );
 }
 
+/**
+ * Minimal circular progress ring using bordered Views.
+ */
+function CircleProgress({
+  size,
+  strokeWidth,
+  progress,
+  color,
+}: {
+  size: number;
+  strokeWidth: number;
+  progress: number;
+  color: string;
+}) {
+  const trackColor = '#E8F0E0';
+  const r = size / 2;
+  return (
+    <View style={{ width: size, height: size }}>
+      {/* Track */}
+      <View
+        style={{
+          position: 'absolute',
+          width: size,
+          height: size,
+          borderRadius: r,
+          borderWidth: strokeWidth,
+          borderColor: trackColor,
+        }}
+      />
+      {/* Fill — right half */}
+      <View style={{ position: 'absolute', width: size, height: size, overflow: 'hidden' }}>
+        <View style={{ position: 'absolute', width: r, height: size, left: r, overflow: 'hidden' }}>
+          <View
+            style={{
+              width: size,
+              height: size,
+              borderRadius: r,
+              borderWidth: strokeWidth,
+              borderColor: color,
+              right: r,
+              transform: [{ rotate: `${Math.min(progress, 0.5) * 360}deg` }],
+            }}
+          />
+        </View>
+        {progress > 0.5 && (
+          <View style={{ position: 'absolute', width: r, height: size, overflow: 'hidden' }}>
+            <View
+              style={{
+                width: size,
+                height: size,
+                borderRadius: r,
+                borderWidth: strokeWidth,
+                borderColor: color,
+                transform: [{ rotate: `${(progress - 0.5) * 360}deg` }],
+              }}
+            />
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
 function formatNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function labelForVital(vital: string): string {
   switch (vital) {
-    case 'heart_rate':
-      return 'Heart Rate';
+    case 'heart_rate': return 'Heart Rate';
     case 'sleep_minutes':
-      return 'Sleep';
-    case 'steps':
-      return 'Steps';
-    case 'spo2':
-      return 'Blood Oxygen';
-    default:
-      return vital.replace(/_/g, ' ');
+    case 'sleep_hours': return 'Sleep';
+    case 'steps': return 'Steps';
+    case 'spo2': return 'Blood Oxygen';
+    case 'stress': return 'Stress';
+    default: return vital.replace(/_/g, ' ');
   }
 }
 
 function unitForVital(vital: string): string | undefined {
   switch (vital) {
-    case 'heart_rate':
-      return 'bpm';
-    case 'sleep_minutes':
-      return 'min';
-    case 'steps':
-      return 'steps';
-    case 'spo2':
-      return '%';
-    default:
-      return undefined;
+    case 'heart_rate': return 'bpm';
+    case 'sleep_minutes': return 'min';
+    case 'steps': return 'steps';
+    case 'spo2': return '%';
+    default: return undefined;
   }
 }
 
 const styles = StyleSheet.create({
-  container: { borderWidth: 1, padding: 12, marginBottom: 12 },
+  /* Detailed */
+  container: {
+    padding: 14,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
   title: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
   description: { fontSize: 12, marginBottom: 10 },
   rangeRow: { flexDirection: 'row', marginBottom: 12, flexWrap: 'wrap', gap: 6 },
@@ -192,4 +269,35 @@ const styles = StyleSheet.create({
   lastValue: { fontSize: 12, marginBottom: 6 },
   statusText: { fontSize: 13, fontStyle: 'italic', marginVertical: 6 },
   errorText: { fontSize: 13, color: '#dc3545', marginVertical: 6 },
+  /* Compact */
+  compactCard: {
+    width: 145,
+    padding: 12,
+    marginRight: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  compactHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  compactLabel: { fontSize: 13, fontWeight: '600' },
+  compactArrow: { fontSize: 16 },
+  compactChartArea: {
+    paddingTop: 4,
+  },
+  ringContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ringValue: {
+    position: 'absolute',
+    fontSize: 22,
+    fontWeight: '700',
+  },
 });

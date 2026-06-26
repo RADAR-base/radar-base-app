@@ -5,9 +5,9 @@ import type { NodeProps } from '../types';
 type Severity = 'info' | 'warning' | 'critical';
 
 const TONES: Record<Severity, { bg: string; border: string; text: string }> = {
-  info: { bg: '#e7f1ff', border: '#007AFF', text: '#0b5394' },
-  warning: { bg: '#fff8e1', border: '#FF9500', text: '#8a6d00' },
-  critical: { bg: '#fdecea', border: '#FF3B30', text: '#a3201a' },
+  info: { bg: '#E8F0E0', border: '#8FA764', text: '#4A5D35' },
+  warning: { bg: '#FFF3E0', border: '#E8A838', text: '#7A5B1E' },
+  critical: { bg: '#FDECEA', border: '#E05A4F', text: '#8B2E26' },
 };
 
 /**
@@ -32,8 +32,8 @@ export function AlertBannerNode({ node }: NodeProps) {
 const styles = StyleSheet.create({
   container: {
     borderLeftWidth: 4,
-    borderRadius: 6,
-    padding: 12,
+    borderRadius: 12,
+    padding: 14,
     marginBottom: 10,
   },
   title: {
