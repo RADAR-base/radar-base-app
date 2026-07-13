@@ -34,6 +34,9 @@ export { BarChart, Sparkline } from './Charts';
 export type { ChartProps } from './Charts';
 export { useDashboardData } from './useDashboardData';
 export type { ResolvedSeries, DashboardDataState } from './useDashboardData';
+export type { StatCardType, StatCardSize } from './nodes/card/StatCardNode';
+export type { TaskCardType } from './nodes/card/TaskCardNode';
+export type { DataWheelSize } from './nodes/card/DataWheelCardNode';
 
 export {
   registerBuiltInNodes,
@@ -41,9 +44,17 @@ export {
   AlertBannerNode,
   CalendarNode,
   CardNode,
+  StatCardNode,
+  TaskCardNode,
+  ToDoStatusNode,
+  DataWheelCardNode,
+  CardSectionNode,
+  TaskListSectionNode,
   ConnectDevicesMenuNode,
+  HeaderNode,
   InboxItemListCoordinatorNode,
   InboxItemListNode,
+  NavbarNode,
   QuestionnaireNode,
   RelativeActivityTodayNode,
   SectionNode,

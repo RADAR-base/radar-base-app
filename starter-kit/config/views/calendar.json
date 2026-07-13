@@ -1,0 +1,24 @@
+{
+  "blueprintVersion": "1",
+  "root": {
+    "id": "root_calendar",
+    "type": "ViewNode",
+    "isCanvas": true,
+    "title": "Calendar",
+    "children": [
+      {
+        "id": "card_study_info",
+        "type": "CardNode",
+        "isCanvas": true,
+        "children": [
+          {
+            "id": "text_study_title",
+            "type": "TextNode",
+            "text": "Calendar",
+            "style": "heading3"
+          }
+        ]
+      }
+    ]
+  }
+}

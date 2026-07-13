@@ -1,5 +1,6 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { layout as layoutTokens } from '../../../theme/theme';
 import type { Node } from '../../contracts/NodeSchema';
 import type { NodeProps } from '../types';
 
@@ -50,7 +51,7 @@ export function SectionNode({ node, context, render }: NodeProps) {
           {render(children)}
         </ScrollView>
       ) : (
-        <View>{render(children)}</View>
+        <View style={styles.verticalContent}>{render(children)}</View>
       )}
     </View>
   );
@@ -61,9 +62,10 @@ function asNodeArray(value: unknown): Node[] | undefined {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    marginBottom: 20,
-  },
+  // No marginBottom here — spacing between top-level sections comes from the parent
+  // `ViewNode`'s `childrenList` gap, so it's consistent across every section-like node
+  // (this, `CardSectionNode`, etc.) regardless of which one a blueprint uses.
+  container: {},
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -86,6 +88,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   horizontalContent: {
+    gap: layoutTokens.gap,
     paddingRight: 16,
+  },
+  verticalContent: {
+    gap: layoutTokens.gap,
   },
 });

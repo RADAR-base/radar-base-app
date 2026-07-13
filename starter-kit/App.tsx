@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import firebase from '@react-native-firebase/app';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import {
   CoreServicesProvider,
@@ -30,6 +31,7 @@ import profileBlueprint from './config/views/profile.json';
 import inboxHistoryBlueprint from './config/views/secondary/inbox-history.json';
 import questionnaireBlueprint from './config/views/secondary/questionnaire.json';
 import comingSoonBlueprint from './config/views/coming-soon.json';
+import calendarBlueprint from './config/views/calendar.json';
 
 import CustomDemoNode from './CustomDemoNode';
 import protocolConfig from './config/protocol.json';
@@ -40,6 +42,7 @@ const BUNDLED_BLUEPRINTS: Record<string, unknown> = {
   'views/coming-soon.json': comingSoonBlueprint,
   'views/secondary/inbox-history.json': inboxHistoryBlueprint,
   'views/secondary/questionnaire.json': questionnaireBlueprint,
+  'views/calendar.json': calendarBlueprint,
 };
 
 NodeRegistry.getInstance().register('CustomDemoNode', CustomDemoNode);
@@ -54,9 +57,11 @@ export default function App() {
   }, []);
 
   return (
-    <CoreServicesProvider overrides={serviceOverrides}>
-      <AppRoot serviceOverrides={serviceOverrides} />
-    </CoreServicesProvider>
+    <SafeAreaProvider>
+      <CoreServicesProvider overrides={serviceOverrides}>
+        <AppRoot serviceOverrides={serviceOverrides} />
+      </CoreServicesProvider>
+    </SafeAreaProvider>
   );
 }
 
@@ -92,7 +97,10 @@ function AppRoot({ serviceOverrides }: { serviceOverrides: CoreServiceOverrides 
     );
   }
 
-  if (status === 'unauthenticated' || status === 'authenticating') {
+  // TEMPORARY: bypass login to preview SDUI views without a working OAuth endpoint.
+  // Restore this check once DEFAULT_AUTH_CONFIG.endpoint points at a reachable Hydra instance.
+  const bypassLogin = true;
+  if (!bypassLogin && (status === 'unauthenticated' || status === 'authenticating')) {
     return <LoginScreen theme={theme} />;
   }
 
@@ -103,6 +111,12 @@ function AppRoot({ serviceOverrides }: { serviceOverrides: CoreServiceOverrides 
         blueprintSource={createBundledBlueprintSource(BUNDLED_BLUEPRINTS)}
         serviceOverrides={serviceOverrides}
         eventBus={{ emit: (event, data) => eventBus.emit(event, data) }}
+        // TEMPORARY placeholder: `useAuth()` doesn't expose any profile data yet (no
+        // firstName/name field), so there's nothing real to source this from. Replace
+        // with actual session/profile data once that's available — e.g. decoded from
+        // the OAuth access token or a profile-fetch call — for `header.showName` to
+        // show a real user rather than this static value.
+        templateContext={{ user: { firstName: 'User' } }}
       />
     </View>
   );

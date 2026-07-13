@@ -112,6 +112,8 @@ export interface Task {
   timestamp?: number; // epoch ms start time
   completionWindow?: number; // ms window length
   completed?: boolean;
+  /** Epoch ms of the protocol-configured reminder, if any — see `TaskInstance.reminderTimestamp`. */
+  reminderTimestamp?: number;
 }
 
 export interface DataExportConfig {
@@ -461,6 +463,13 @@ export interface TaskInstance {
   order: number;
   warning?: string;
   syncedToServer: boolean;
+  /**
+   * Epoch ms the assessment's own `protocol.reminders` puts before `timestamp` (e.g.
+   * `{ unit: "hour", amount: 2 }` → 2 hours before the task is due). `undefined` when the
+   * assessment has no `reminders` configured. Computed once at generation time in
+   * `ScheduleService.buildTasksForAssessment` — see `reminderOffsetMillis`.
+   */
+  reminderTimestamp?: number;
 }
 
 export interface ScheduleService {

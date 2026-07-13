@@ -7,28 +7,63 @@
     "title": "Health Dashboard",
     "children": [
       {
-        "id": "section_activity",
-        "type": "SectionNode",
+        "id": "section_card_activity",
+        "type": "CardSectionNode",
         "title": "My Activity",
+        "layout": "grid",
         "children": [
           {
-            "id": "activity_today",
-            "type": "RelativeActivityTodayNode"
+            "id": "card_check_in",
+            "type": "StatCardNode",
+            "statsType": "checkIn",
+            "value": 12,
+            "size": "small"
+          },
+          {
+            "id": "card_current_streak",
+            "type": "StatCardNode",
+            "statsType": "currentStreak",
+            "value": 4,
+            "size": "large"
+          },
+          {
+            "id": "card_longest_streak",
+            "type": "StatCardNode",
+            "statsType": "longestStreak",
+            "value": 7,
+            "size": "small"
+          }        
+        ]
+      },
+      {
+        "id": "section_todo",
+        "type": "SectionNode",
+        "title": "To Do",
+        "showSeeAll": true,
+        "seeAllAction": "views/calendar.json",
+        "children": [
+          {
+            "id": "todo_list",
+            "type": "TaskListSectionNode",
+            "variant": "multiCard",
+            "filter": { "status": "incomplete" }
           }
         ]
       },
       {
-        "id": "section_tasks",
+        "id": "section_data_wheel",
         "type": "SectionNode",
-        "title": "My Tasks",
-        "showSeeAll": true,
-        "seeAllAction": "all_tasks",
+        "title": "My Data",
+        "layout": "horizontal",
         "children": [
           {
-            "id": "survey_tasks",
-            "type": "SurveyTaskListNode",
-            "variant": "multiCard",
-            "filter": { "status": "incomplete" }
+            "id": "wheel_steps",
+            "type": "DataWheelCardNode",
+            "size": "small",
+            "title": "Steps Goal",
+            "metric": "steps_goal_percent",
+            "value": 5000,
+            "target": 10000
           }
         ]
       },

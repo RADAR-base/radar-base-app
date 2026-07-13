@@ -13,8 +13,8 @@ interface FilterShape {
 const TASK_ICONS: Record<string, { symbol: string; bg: string }> = {
   default: { symbol: '\u{1F4CB}', bg: '#D6E4F0' },
   mood: { symbol: '\u{1F60A}', bg: '#D6E4F0' },
-  blood: { symbol: '\u2764', bg: '#F0D6D6' },
-  pressure: { symbol: '\u2764', bg: '#F0D6D6' },
+  blood: { symbol: '❤', bg: '#F0D6D6' },
+  pressure: { symbol: '❤', bg: '#F0D6D6' },
   medication: { symbol: '\u{1F48A}', bg: '#D6F0D6' },
   voice: { symbol: '\u{1F3A4}', bg: '#E0D6F0' },
   phq: { symbol: '\u{1F4DD}', bg: '#E0D6F0' },

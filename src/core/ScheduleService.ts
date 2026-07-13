@@ -6,6 +6,8 @@ import type {
   TaskInstance,
   TaskInstanceState,
   Task,
+  Reminder,
+  Reminders,
   StorageService,
   LoggerService,
   EventBus,
@@ -19,7 +21,12 @@ const STORAGE_KEYS = {
 };
 
 const DEFAULT_COMPLETION_WINDOW_MS = 86_400_000; // 1 day
-const DEFAULT_SCHEDULE_YEAR_COVERAGE = 1;
+// How far ahead to generate task instances. Was 1 *year* — for a handful of daily/weekly
+// protocols that's 300+ persisted instances after just one load, regenerated (and
+// re-merged, see `mergeInstances`) on every app start. A rolling 2-week window is plenty
+// for "today" + "upcoming" without the unbounded growth that was blowing past browser
+// localStorage's quota (`QuotaExceededError`) after repeated reloads/protocol edits.
+const DEFAULT_SCHEDULE_DAYS_COVERAGE = 14;
 const REFRESH_INTERVAL_MS = 60_000;
 
 export class DefaultScheduleService implements ScheduleService {
@@ -47,6 +54,16 @@ export class DefaultScheduleService implements ScheduleService {
     if (savedProtocol) this.protocol = savedProtocol;
     if (savedInstances) this.instances = savedInstances;
 
+    // Diagnostic: confirms whether storage restore actually found anything, and how many
+    // were already completed/skipped — if `restoredCompleted` is 0 right after a reload
+    // where you'd completed tasks, the write in `persist()` didn't make it to storage.
+    const restoredCompleted = (savedInstances ?? []).filter(
+      (i) => i.state === 'completed' || i.state === 'skipped',
+    ).length;
+    console.log(
+      `[ScheduleService] init: restored ${savedInstances?.length ?? 0} instance(s) (${restoredCompleted} completed/skipped), protocol=${savedProtocol ? 'found' : 'none'}`,
+    );
+
     this.refreshTimer = setInterval(() => this.refreshStates(), REFRESH_INTERVAL_MS);
 
     await this.refreshStates();
@@ -60,7 +77,15 @@ export class DefaultScheduleService implements ScheduleService {
 
     const refTimestamp = referenceTimestamp ?? setDateTimeToMidnightEpoch(new Date());
     const generated = generateAllInstances(protocol, refTimestamp);
+    const before = this.instances.filter((i) => i.state === 'completed' || i.state === 'skipped').length;
     this.instances = mergeInstances(this.instances, generated);
+    const after = this.instances.filter((i) => i.state === 'completed' || i.state === 'skipped').length;
+    // Diagnostic: `after` should be >= `before` — if it drops, `mergeInstances` failed to
+    // match up `instanceId`s against the freshly generated instances (e.g. because
+    // `refTimestamp` came out different this run, producing different instanceIds).
+    console.log(
+      `[ScheduleService] loadProtocol: refTimestamp=${new Date(refTimestamp).toISOString()} generated=${generated.length} completed/skipped before=${before} after=${after}`,
+    );
 
     await this.persist();
     await this.refreshStates();
@@ -176,6 +201,7 @@ export class DefaultScheduleService implements ScheduleService {
       timestamp: instance.timestamp,
       completionWindow: instance.completionWindow,
       completed: instance.state === 'completed',
+      reminderTimestamp: instance.reminderTimestamp,
     };
   }
 
@@ -191,7 +217,17 @@ export class DefaultScheduleService implements ScheduleService {
   // ---------------------------------------------------------------------------
 
   private async persist(): Promise<void> {
-    await this.storage.set(STORAGE_KEYS.INSTANCES, this.instances);
+    try {
+      await this.storage.set(STORAGE_KEYS.INSTANCES, this.instances);
+      // Diagnostic: confirms the write itself didn't throw. Doesn't prove the browser
+      // actually committed it to disk (e.g. IndexedDB/localStorage quota or a web
+      // AsyncStorage shim issue could still silently no-op), but rules out this code path
+      // never running at all.
+      console.log(`[ScheduleService] persist: wrote ${this.instances.length} instance(s)`);
+    } catch (err) {
+      console.log('[ScheduleService] persist FAILED:', err);
+      throw err;
+    }
   }
 
   private syncTaskState(instance: TaskInstance): void {
@@ -239,17 +275,18 @@ function buildTasksForAssessment(
   const tasks: TaskInstance[] = [];
   const today = setDateTimeToMidnightEpoch(new Date());
 
-  const { repeatProtocol: repeatP, repeatQuestionnaire: repeatQ, completionWindow: completionWindowInterval } = assessment.protocol;
+  const { repeatProtocol: repeatP, repeatQuestionnaire: repeatQ, completionWindow: completionWindowInterval, reminders } = assessment.protocol;
 
   const completionWindow = completionWindowInterval
     ? timeIntervalToMillis(completionWindowInterval)
     : DEFAULT_COMPLETION_WINDOW_MS;
+  const reminderOffsetMs = reminderOffsetMillis(reminders);
 
   let refTime = assessment.protocol.referenceTimestamp
     ? setDateTimeToMidnightEpoch(new Date(assessment.protocol.referenceTimestamp))
     : defaultRefTimestamp;
 
-  const endTime = advanceRepeat(refTime, { unit: 'year', amount: DEFAULT_SCHEDULE_YEAR_COVERAGE });
+  const endTime = advanceRepeat(refTime, { unit: 'day', amount: DEFAULT_SCHEDULE_DAYS_COVERAGE });
 
   const title = assessment.name;
   const description = chooseText(assessment.startText) || chooseText(assessment.warn) || '';
@@ -273,6 +310,7 @@ function buildTasksForAssessment(
         order: assessment.order ?? (indexOffset + tasks.length),
         warning: chooseText(assessment.warn),
         syncedToServer: false,
+        reminderTimestamp: reminderOffsetMs != null ? taskTime - reminderOffsetMs : undefined,
       });
     }
 
@@ -285,8 +323,22 @@ function buildTasksForAssessment(
 }
 
 /** Merge newly generated instances with existing ones, preserving completed/skipped state. */
+// How long to keep an `existing` instance around after it drops out of the freshly
+// `generated` set (e.g. protocol.json changed, or it's aged past the generation window).
+// Bounds storage growth — without this, every instance ever generated across every past
+// `loadProtocol()` call stuck around forever, which is what silently grew to 300+
+// persisted instances and blew past localStorage's quota on web.
+const STALE_INSTANCE_RETENTION_MS = 2 * 86_400_000; // 2 days
+
 function mergeInstances(existing: TaskInstance[], generated: TaskInstance[]): TaskInstance[] {
-  const existingMap = new Map(existing.map(i => [i.instanceId, i]));
+  const generatedIds = new Set(generated.map((i) => i.instanceId));
+  const cutoff = Date.now() - STALE_INSTANCE_RETENTION_MS;
+
+  const existingMap = new Map(
+    existing
+      .filter((inst) => generatedIds.has(inst.instanceId) || inst.timestamp >= cutoff)
+      .map((i) => [i.instanceId, i]),
+  );
 
   for (const inst of generated) {
     const prev = existingMap.get(inst.instanceId);
@@ -320,7 +372,10 @@ function advanceRepeat(timestamp: number, interval: TimeInterval): number {
     case 'year':
       return result.setFullYear(date.getFullYear() + (interval.amount ?? 0));
     default:
-      return result.setFullYear(date.getFullYear() + DEFAULT_SCHEDULE_YEAR_COVERAGE);
+      // Defensive fallback for an unrecognized interval unit — unrelated to how far ahead
+      // the schedule generates (see `DEFAULT_SCHEDULE_DAYS_COVERAGE`), just a sane no-op-ish
+      // advance so a malformed `TimeInterval` doesn't loop forever.
+      return result.setFullYear(date.getFullYear() + 1);
   }
 }
 
@@ -337,6 +392,19 @@ function timeIntervalToMillis(interval: TimeInterval): number {
   const unit = interval.unit && interval.unit in MILLIS ? interval.unit : 'day';
   const amount = interval.amount ?? 1;
   return amount * MILLIS[unit];
+}
+
+/**
+ * How far before the task's due time (`timestamp`) its reminder fires, in ms — e.g.
+ * `{ unit: "hour", amount: 2 }` → 2 hours before. `assessment.protocol.reminders` is
+ * either a single `Reminders` object (itself a `TimeInterval` — `protocol.json`'s actual
+ * shape today) or a `Reminder[]` (each with its own `offset: TimeInterval`), in which
+ * case the first entry's offset is used. `undefined` when no reminder is configured.
+ */
+function reminderOffsetMillis(reminders: Reminder[] | Reminders | undefined): number | undefined {
+  if (!reminders) return undefined;
+  const offset = Array.isArray(reminders) ? reminders[0]?.offset : reminders;
+  return offset ? timeIntervalToMillis(offset) : undefined;
 }
 
 function setDateTimeToMidnightEpoch(date: Date): number {

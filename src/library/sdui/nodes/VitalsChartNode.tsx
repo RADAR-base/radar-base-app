@@ -273,7 +273,6 @@ const styles = StyleSheet.create({
   compactCard: {
     width: 145,
     padding: 12,
-    marginRight: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,

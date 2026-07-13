@@ -49,9 +49,17 @@ export {
   AlertBannerNode,
   CalendarNode,
   CardNode,
+  StatCardNode,
+  TaskCardNode,
+  ToDoStatusNode,
+  DataWheelCardNode,
+  CardSectionNode,
+  TaskListSectionNode,
   ConnectDevicesMenuNode,
+  HeaderNode,
   InboxItemListCoordinatorNode,
   InboxItemListNode,
+  NavbarNode,
   QuestionnaireNode,
   RelativeActivityTodayNode,
   SectionNode,
@@ -80,6 +88,10 @@ export type {
   ChartProps,
   ResolvedSeries,
   DashboardDataState,
+  StatCardType,
+  StatCardSize,
+  TaskCardType,
+  DataWheelSize,
 } from './library/sdui';
 
 // SDUI contracts

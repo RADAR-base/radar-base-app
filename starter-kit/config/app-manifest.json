@@ -4,25 +4,12 @@
   "configSchemaVersion": "1",
   "clinicalTemplate": null,
   "theme": {
-    "primaryColor": "#1C3549",
-    "secondaryColor": "#8FA764",
-    "backgroundColor": "#EDF1F5",
-    "surfaceColor": "#FFFFFF",
-    "textColor": "#1C3549",
-    "textSecondaryColor": "#8E8E93",
-    "fontFamily": "Inter, sans-serif",
-    "fontSize": 16,
-    "button": {
-      "borderRadius": 12
-    }
   },
   "header": {
-    "title": "RADAR Active App",
-    "greeting": "Hello User",
+    "title": "Hello",
     "subtitle": "Track your data and complete your daily tasks",
-    "backgroundColor": "#1C3549",
-    "textColor": "#FFFFFF",
-    "showBackButton": false,
+    "showName": true,
+    "profileIcon": true,
     "showSettings": true
   },
   "tabs": [
@@ -36,7 +23,7 @@
       "id": "tab_calendar",
       "label": "Calendar",
       "icon": "calendar",
-      "viewPath": "views/coming-soon.json"
+      "viewPath": "views/calendar.json"
     },
     {
       "id": "tab_profile",

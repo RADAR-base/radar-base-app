@@ -27,14 +27,20 @@ export const HeaderSchema = z
     textColor: z.string().optional(),
     showBackButton: z.boolean().optional(),
     showSettings: z.boolean().optional(),
+    /** Leading header icon: `true` (default) shows the profile picture, `false` the RadarBase wordmark. */
+    profileIcon: z.boolean().optional(),
+    /** When true, appends the signed-in user's name (from `SDUIContext.template.user`) after `title`. */
+    showName: z.boolean().optional(),
   })
   .passthrough();
 
 export const TabConfigSchema = z.object({
   id: z.string(),
-  label: z.string(),
+  label: z.string().optional(),
   icon: z.string().optional(),
   viewPath: z.string(),
+  /** Per-tab override for NavbarNode's showLabels; falls back to the navbar-wide default when unset. */
+  showLabel: z.boolean().optional(),
 });
 
 export const WidgetRegistryEntrySchema = z.object({

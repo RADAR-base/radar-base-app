@@ -164,6 +164,25 @@ Validation against the Zod schemas runs on every load; invalid blueprints throw 
 | `InboxItemListNode`               | Filtered inbox list (stub until data layer lands)                       |
 | `RelativeActivityTodayNode`       | Activity progress ring (stub demo data)                                 |
 | `AlertBannerNode`                 | Inline banner (`info` / `warning` / `critical`)                         |
+| `StatCardNode`                    | Engagement stat card (check-in / streak / active days)                  |
+| `TaskCardNode`                    | Single task pill (questionnaire / speech / physical / medication)       |
+| `ToDoStatusNode`                  | End-of-day status banner, derived from completed/total counts           |
+| `DataWheelCardNode`                | Circular progress ring for a wearable metric (`small` / `large`)        |
+| `CardSectionNode`                 | Generic titled card list — vertical, horizontal-scroll, or 2-col grid   |
+| `TaskListSectionNode`             | `ScheduleService`-driven task list, rendered as `TaskCardNode`s          |
+| `HeaderNode`                       | Dashboard header — logo/avatar, sync/notifications/settings, greeting   |
+| `NavbarNode`                       | Floating bottom tab bar, driven by the manifest's `tabs`                |
+
+### New node props
+
+- **`StatCardNode`** — `statsType` (`checkIn`/`activeDays`/`currentStreak`/`longestStreak`), `size` (`large`/`small`), `value`, `label`, `showKeepItUp`, `keepItUpLabel`
+- **`TaskCardNode`** — `taskType` (`questionnaire`/`speech`/`physical`/`medication`), `taskName`, `time`, `expirationTime`, `duration`, `questionNumber`, `medicationQuantity`, `medicationDose`, `reminder`, `reminderTime`
+- **`ToDoStatusNode`** — `completed`, `total` (numbers; the banner state is derived from these, not set directly)
+- **`DataWheelCardNode`** — `size` (`small`/`large`), `title`, `description` (large only), `value`/`values`, `target`, `metric`/`unit`/`dataSource` (wires to a real wearable API via `useDashboardData`), `viewPath`
+- **`CardSectionNode`** — `title`, `showSeeAll`, `viewPath`, `layout` (`vertical`/`horizontal`/`grid`), `children`
+- **`TaskListSectionNode`** — `title`, `showSeeAll`, `viewPath`, `variant` (`singleCard`/`multiCard`), `filter` (`{ status, category }`)
+- **`HeaderNode`** — `title`, `name`, `showName`, `description`, `profileIcon` (avatar vs. RadarBase logo), `showActions`, `lastSyncedLabel`, `notificationCount`, `showEditButton`, `editLabel`, plus `*Color`/`*EventName` overrides for styling and the sync/notifications/settings/edit action hooks
+- **`NavbarNode`** — `tabs` (usually sourced from the manifest, not hand-written per screen), `selectedTabId`, `showLabels`, plus `backgroundColor`/`selectedBackgroundColor`/`textColor`/`selectedTextColor`/`borderColor` overrides
 
 ## Development
 

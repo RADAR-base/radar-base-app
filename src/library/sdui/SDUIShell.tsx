@@ -4,17 +4,24 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useColorScheme,
   View,
 } from 'react-native';
 import { CoreServicesProvider, type CoreServiceOverrides } from '../../core/CoreServicesContext';
 import type { AppManifest, TabManifest } from '../contracts/ManifestSchema';
 import type { ScreenBlueprint } from '../contracts/BlueprintSchema';
+import type { Node } from '../contracts/NodeSchema';
 import { BlueprintLoader, type BlueprintSource } from './BlueprintLoader';
 import { ManifestLoader, type ManifestSource } from './ManifestLoader';
 import { NodeRenderer } from './NodeRenderer';
 import { createActionDispatcher } from './ActionDispatcher';
 import { registerBuiltInNodes } from './nodes';
+import { HeaderNode } from './nodes/header/HeaderNode';
+import { NavbarNode } from './nodes/navbar/NavbarNode';
+import { navbarLayout, layout as layoutTokens } from '../../theme/theme';
 import type { SDUIContext, TemplateContext } from './types';
+
+const noopRender = () => null;
 
 export interface SDUIShellProps {
   manifestSource: ManifestSource;
@@ -34,6 +41,7 @@ interface SecondaryEntry {
 export function SDUIShell(props: SDUIShellProps) {
   registerBuiltInNodes();
 
+  const colorScheme = useColorScheme();
   const [manifest, setManifest] = useState<AppManifest | null>(null);
   const [manifestError, setManifestError] = useState<string | null>(null);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
@@ -55,6 +63,7 @@ export function SDUIShell(props: SDUIShellProps) {
     const loader = new ManifestLoader({
       source: props.manifestSource,
       fallback: props.manifestFallback,
+      mode: colorScheme ?? 'light',
       onValidationError: (err) => console.warn('[SDUI] Manifest validation failed:', err),
     });
     loader
@@ -71,7 +80,10 @@ export function SDUIShell(props: SDUIShellProps) {
     return () => {
       cancelled = true;
     };
-  }, [props.manifestSource, props.manifestFallback]);
+    // Re-parses on colorScheme change so unconfigured theme fields — including the
+    // shell's own background below — track dark/light instead of being stuck with
+    // whatever mode was active on first load.
+  }, [props.manifestSource, props.manifestFallback, colorScheme]);
 
   const openSecondaryView = useCallback(
     async (viewUrl: string) => {
@@ -128,6 +140,7 @@ export function SDUIShell(props: SDUIShellProps) {
     template: props.templateContext ?? {},
     dispatch,
     theme: manifest.theme,
+    colorScheme: colorScheme ?? 'light',
     eventBus: props.eventBus,
   };
 
@@ -143,6 +156,7 @@ export function SDUIShell(props: SDUIShellProps) {
       >
         <ShellHeader
           manifest={manifest}
+          context={context}
           secondaryTitle={topSecondary ? getNodeTitle(topSecondary.blueprint) : null}
           onBack={topSecondary ? popSecondaryView : null}
         />
@@ -160,13 +174,7 @@ export function SDUIShell(props: SDUIShellProps) {
           )}
         </View>
 
-        {!topSecondary && (
-          <BottomTabBar
-            manifest={manifest}
-            activeTabId={activeTabId}
-            onSelect={(tabId) => setActiveTabId(tabId)}
-          />
-        )}
+        <BottomTabBar manifest={manifest} activeTabId={activeTabId} context={context} />
       </View>
     </CoreServicesProvider>
   );
@@ -176,27 +184,27 @@ export function SDUIShell(props: SDUIShellProps) {
 
 function ShellHeader({
   manifest,
+  context,
   secondaryTitle,
   onBack,
 }: {
   manifest: AppManifest;
+  context: SDUIContext;
   secondaryTitle: string | null;
   onBack: (() => void) | null;
 }) {
   const { header } = manifest;
-  const bgColor = header.backgroundColor ?? manifest.theme.primaryColor;
-  const textColor = header.textColor ?? '#FFFFFF';
-  const greeting = (header as Record<string, unknown>).greeting as string | undefined;
-  const subtitle = (header as Record<string, unknown>).subtitle as string | undefined;
 
   if (onBack) {
+    const backButtonBg = header.backgroundColor ?? manifest.theme.primaryColor;
+    const backButtonText = header.textColor ?? '#FFFFFF';
     return (
-      <View style={[styles.header, { backgroundColor: bgColor }]}>
+      <View style={[styles.header, { backgroundColor: backButtonBg }]}>
         <View style={styles.headerTopRow}>
           <TouchableOpacity onPress={onBack} accessibilityRole="button" style={styles.backButton}>
-            <Text style={[styles.backButtonText, { color: textColor }]}>‹ Back</Text>
+            <Text style={[styles.backButtonText, { color: backButtonText }]}>‹ Back</Text>
           </TouchableOpacity>
-          <Text style={[styles.secondaryTitle, { color: textColor }]} numberOfLines={1}>
+          <Text style={[styles.secondaryTitle, { color: backButtonText }]} numberOfLines={1}>
             {secondaryTitle ?? header.title}
           </Text>
           <View style={styles.headerSpacer} />
@@ -205,45 +213,52 @@ function ShellHeader({
     );
   }
 
-  return (
-    <View style={[styles.header, { backgroundColor: bgColor }]}>
-      {/* Top row: avatar + sync status + icon buttons */}
-      <View style={styles.headerTopRow}>
-        <View style={styles.avatarCircle}>
-          <Text style={styles.avatarEmoji}>{'\u263A'}</Text>
-        </View>
-        <Text style={styles.syncText}>Last Synced: 12:00</Text>
-        <View style={styles.headerIcons}>
-          <HeaderIconButton icon={'\u21BB'} />
-          <HeaderIconButton icon={'\u25CF'} />
-          <HeaderIconButton icon={'\u2699'} />
-        </View>
-      </View>
+  const headerRecord = header as Record<string, unknown>;
+  const subtitle = typeof headerRecord.subtitle === 'string' ? headerRecord.subtitle : undefined;
+  const lastSyncedLabel =
+    typeof headerRecord.lastSyncedLabel === 'string'
+      ? headerRecord.lastSyncedLabel
+      : 'Last Synced: 12:00';
 
-      {/* Greeting */}
-      <Text style={[styles.greetingText, { color: textColor }]}>
-        {greeting ?? 'Hello User'}
-      </Text>
+  const username = header.showName ? getUsername(context) : undefined;
 
-      {/* Subtitle + Edit button */}
-      <View style={styles.subtitleRow}>
-        <Text style={[styles.subtitleText, { color: textColor }]} numberOfLines={1}>
-          {subtitle ?? 'Track your data and complete your daily tasks'}
-        </Text>
-        <TouchableOpacity style={styles.editPill} accessibilityRole="button">
-          <Text style={styles.editPillText}>Edit</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+  const headerNode: Node = {
+    id: 'shell-header',
+    type: 'HeaderNode',
+    // Only forward these when the manifest actually configures them — leaving them
+    // `undefined` otherwise lets HeaderNode fall back to its own dark/light-aware
+    // `theme.ts` tokens instead of always being pinned to the (dark-mode-unaware)
+    // static manifest theme.
+    backgroundColor: header.backgroundColor,
+    textColor: header.textColor,
+    title: header.title,
+    // Raw username only — HeaderTextNode decides whether to append it next to `title`
+    // based on `showName`, rather than us pre-concatenating strings here.
+    name: username,
+    showName: header.showName === true,
+    description: subtitle ?? 'Track your data and complete your daily tasks',
+    showActions: header.showSettings !== false,
+    lastSyncedLabel,
+    profileIcon: header.profileIcon,
+  };
+
+  return <HeaderNode node={headerNode} context={context} render={noopRender} />;
 }
 
-function HeaderIconButton({ icon }: { icon: string }) {
-  return (
-    <View style={styles.headerIconBtn}>
-      <Text style={styles.headerIconText}>{icon}</Text>
-    </View>
-  );
+/**
+ * Reads the signed-in user's display name off `SDUIContext.template.user`, checked for
+ * `header.showName`. Hosts populate `template.user` via `SDUIShell`'s `templateContext`
+ * prop; this is intentionally lenient about the field name since that shape isn't
+ * standardized across apps.
+ */
+function getUsername(context: SDUIContext): string | undefined {
+  // Populate this by passing `templateContext={{ user: { firstName: 'Ada' } }}` (or
+  // `.name` / `.displayName`) to <SDUIShell> from the host app — e.g. from `useAuth()`'s
+  // session data. Nothing sets this by default, so `showName` is a no-op until a host does.
+  const user = context.template.user;
+  if (!user) return undefined;
+  const candidate = user.firstName ?? user.name ?? user.displayName;
+  return typeof candidate === 'string' ? candidate : undefined;
 }
 
 /* ─── Bottom Tab Bar ──────────────────────────────────────────────────── */
@@ -251,89 +266,29 @@ function HeaderIconButton({ icon }: { icon: string }) {
 function BottomTabBar({
   manifest,
   activeTabId,
-  onSelect,
+  context,
 }: {
   manifest: AppManifest;
   activeTabId: string;
-  onSelect: (tabId: string) => void;
+  context: SDUIContext;
 }) {
-  const primary = manifest.theme.primaryColor;
+  const navbarNode: Node = {
+    id: 'shell-navbar',
+    type: 'NavbarNode',
+    tabs: manifest.tabs.map((tab: TabManifest) => ({
+      id: tab.id,
+      label: tab.label,
+      icon: tab.icon,
+      showLabel: tab.showLabel,
+    })),
+    selectedTabId: activeTabId,
+  };
+
   return (
     <View style={styles.tabBarOuter}>
-      <View style={[styles.tabBar, { backgroundColor: primary }]}>
-        {manifest.tabs.map((tab: TabManifest) => {
-          const isActive = tab.id === activeTabId;
-          return (
-            <TouchableOpacity
-              key={tab.id}
-              accessibilityRole="tab"
-              onPress={() => onSelect(tab.id)}
-              style={[styles.tab, isActive && styles.tabActive]}
-            >
-              <TabIcon name={tab.icon ?? 'home'} active={isActive} />
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      <NavbarNode node={navbarNode} context={context} render={noopRender} />
     </View>
   );
-}
-
-function TabIcon({ name, active }: { name: string; active: boolean }) {
-  const opacity = active ? 1 : 0.45;
-  switch (name) {
-    case 'home':
-      return (
-        <View style={[iconStyles.container, { opacity }]}>
-          {/* House: triangle roof + square body */}
-          <View style={iconStyles.homeRoof} />
-          <View style={iconStyles.homeBody} />
-        </View>
-      );
-    case 'calendar':
-      return (
-        <View style={[iconStyles.container, { opacity }]}>
-          {/* Calendar: bordered square with horizontal line */}
-          <View style={iconStyles.calendarOuter}>
-            <View style={iconStyles.calendarLine} />
-            <View style={iconStyles.calendarDots}>
-              <View style={iconStyles.calendarDot} />
-              <View style={iconStyles.calendarDot} />
-              <View style={iconStyles.calendarDot} />
-              <View style={iconStyles.calendarDot} />
-            </View>
-          </View>
-        </View>
-      );
-    case 'person':
-      return (
-        <View style={[iconStyles.container, { opacity }]}>
-          {/* Person: circle head + arc body */}
-          <View style={iconStyles.personHead} />
-          <View style={iconStyles.personBody} />
-        </View>
-      );
-    case 'grid':
-      return (
-        <View style={[iconStyles.container, { opacity }]}>
-          {/* Grid: 2x2 rounded squares */}
-          <View style={iconStyles.gridRow}>
-            <View style={iconStyles.gridSquare} />
-            <View style={iconStyles.gridSquare} />
-          </View>
-          <View style={iconStyles.gridRow}>
-            <View style={iconStyles.gridSquare} />
-            <View style={iconStyles.gridSquare} />
-          </View>
-        </View>
-      );
-    default:
-      return (
-        <View style={[iconStyles.container, { opacity }]}>
-          <View style={iconStyles.defaultDot} />
-        </View>
-      );
-  }
 }
 
 /* ─── Tab Content ─────────────────────────────────────────────────────── */
@@ -429,76 +384,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 14,
   },
-  avatarCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#A8C96A',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarEmoji: {
-    fontSize: 18,
-    color: '#FFFFFF',
-  },
-  syncText: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.6)',
-    fontWeight: '500',
-  },
-  headerIcons: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  headerIconBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerIconText: {
-    fontSize: 16,
-    color: '#FFFFFF',
-  },
-  greetingText: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  subtitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  subtitleText: {
-    fontSize: 13,
-    opacity: 0.75,
-    flex: 1,
-    marginRight: 10,
-  },
-  editPill: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.5)',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 4,
-  },
-  editPillText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
   /* Secondary header (back navigation) */
   backButton: {
     paddingRight: 8,
     paddingVertical: 4,
   },
   backButtonText: {
-    fontSize: 16,
+    fontSize: layoutTokens.headingFontSize,
     fontWeight: '600',
   },
   secondaryTitle: {
@@ -516,24 +408,13 @@ const styles = StyleSheet.create({
   },
   /* Bottom tab bar */
   tabBarOuter: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     paddingHorizontal: 24,
-    paddingBottom: 30,
-    paddingTop: 6,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    borderRadius: 28,
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  tabActive: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    paddingBottom: navbarLayout.outerPaddingBottom,
+    paddingTop: navbarLayout.outerPaddingTop,
   },
   /* Shared */
   centered: {
@@ -543,7 +424,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   errorTitle: {
-    fontSize: 16,
+    fontSize: layoutTokens.headingFontSize,
     fontWeight: '700',
     color: '#dc3545',
     marginBottom: 6,
@@ -560,91 +441,3 @@ const styles = StyleSheet.create({
   },
 });
 
-const iconStyles = StyleSheet.create({
-  container: {
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  /* Home icon */
-  homeRoof: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 10,
-    borderRightWidth: 10,
-    borderBottomWidth: 8,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderBottomColor: '#FFFFFF',
-    marginBottom: -1,
-  },
-  homeBody: {
-    width: 14,
-    height: 10,
-    backgroundColor: '#FFFFFF',
-    borderBottomLeftRadius: 2,
-    borderBottomRightRadius: 2,
-  },
-  /* Calendar icon */
-  calendarOuter: {
-    width: 18,
-    height: 18,
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  calendarLine: {
-    height: 1.5,
-    backgroundColor: '#FFFFFF',
-    marginTop: 4,
-  },
-  calendarDots: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 1.5,
-    gap: 2,
-    marginTop: 1,
-  },
-  calendarDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  /* Person icon */
-  personHead: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#FFFFFF',
-    marginBottom: 2,
-  },
-  personBody: {
-    width: 16,
-    height: 8,
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-  },
-  /* Grid icon */
-  gridRow: {
-    flexDirection: 'row',
-    gap: 3,
-  },
-  gridSquare: {
-    width: 8,
-    height: 8,
-    borderRadius: 2,
-    backgroundColor: '#FFFFFF',
-    margin: 1,
-  },
-  /* Default */
-  defaultDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#FFFFFF',
-  },
-});
