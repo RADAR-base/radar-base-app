@@ -157,6 +157,7 @@ export function SDUIShell(props: SDUIShellProps) {
         <ShellHeader
           manifest={manifest}
           context={context}
+          activeTabId={activeTabId}
           secondaryTitle={topSecondary ? getNodeTitle(topSecondary.blueprint) : null}
           onBack={topSecondary ? popSecondaryView : null}
         />
@@ -185,11 +186,13 @@ export function SDUIShell(props: SDUIShellProps) {
 function ShellHeader({
   manifest,
   context,
+  activeTabId,
   secondaryTitle,
   onBack,
 }: {
   manifest: AppManifest;
   context: SDUIContext;
+  activeTabId: string;
   secondaryTitle: string | null;
   onBack: (() => void) | null;
 }) {
@@ -222,6 +225,12 @@ function ShellHeader({
 
   const username = header.showName ? getUsername(context) : undefined;
 
+  // The first tab is the "home" dashboard — it keeps the greeting header ("Hello <name>" +
+  // subtitle + Edit). Every other navbar tab shows that tab's label as a plain page title
+  // (no greeting name, subtitle, or Edit affordance), so the header names the page you're on.
+  const isHomeTab = activeTabId === manifest.tabs[0]?.id;
+  const activeTab = manifest.tabs.find((tab: TabManifest) => tab.id === activeTabId);
+
   const headerNode: Node = {
     id: 'shell-header',
     type: 'HeaderNode',
@@ -231,12 +240,13 @@ function ShellHeader({
     // static manifest theme.
     backgroundColor: header.backgroundColor,
     textColor: header.textColor,
-    title: header.title,
+    title: isHomeTab ? header.title : activeTab?.label ?? header.title,
     // Raw username only — HeaderTextNode decides whether to append it next to `title`
     // based on `showName`, rather than us pre-concatenating strings here.
-    name: username,
-    showName: header.showName === true,
-    description: subtitle ?? 'Track your data and complete your daily tasks',
+    name: isHomeTab ? username : undefined,
+    showName: isHomeTab && header.showName === true,
+    description: isHomeTab ? subtitle ?? 'Track your data and complete your daily tasks' : '',
+    showEditButton: isHomeTab ? undefined : false,
     showActions: header.showSettings !== false,
     lastSyncedLabel,
     profileIcon: header.profileIcon,

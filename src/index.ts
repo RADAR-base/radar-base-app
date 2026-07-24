@@ -66,7 +66,7 @@ export {
   SurveyTaskListNode,
   TextNode,
   ViewNode,
-  VitalsChartNode,
+  GraphDataNode,
   RadioInput,
   CheckboxInput,
   RangeInput,

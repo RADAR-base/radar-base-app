@@ -32,7 +32,7 @@
             "statsType": "longestStreak",
             "value": 7,
             "size": "small"
-          }        
+          }
         ]
       },
       {
@@ -40,7 +40,7 @@
         "type": "SectionNode",
         "title": "To Do",
         "showSeeAll": true,
-        "seeAllAction": "views/calendar.json",
+        "seeAllTab": "tab_calendar",
         "children": [
           {
             "id": "todo_list",
@@ -54,16 +54,61 @@
         "id": "section_data_wheel",
         "type": "SectionNode",
         "title": "My Data",
-        "layout": "horizontal",
+        "layout": "vertical",
         "children": [
           {
             "id": "wheel_steps",
             "type": "DataWheelCardNode",
-            "size": "small",
+            "size": "large",
             "title": "Steps Goal",
             "metric": "steps_goal_percent",
-            "value": 5000,
+            "value": 4000,
             "target": 10000
+          },
+          {
+            "id": "graph_heart_rate",
+            "type": "LineGraphCardNode",
+            "title": "Heart Rate",
+            "metric": "heart_rate",
+            "unit": "bpm",
+            "xAxis": "day",
+            "values": [62, 64, 61, 68, 72, 88, 95, 84, 79, 74, 70, 76, 90, 102, 96, 85, 80, 77, 73, 69, 66, 64, 63, 61]
+          },
+          {
+            "id": "bars_steps_small",
+            "type": "BarChartCardNode",
+            "size": "small",
+            "title": "Steps",
+            "metric": "steps_daily",
+            "unit": "steps",
+            "values": [62, 81, 74, 98, 112, 86, 62]
+          },
+          {
+            "id": "bars_steps_large",
+            "type": "BarChartCardNode",
+            "size": "large",
+            "title": "Average",
+            "description": "Your daily steps across the last week.",
+            "metric": "steps_daily",
+            "unit": "steps",
+            "values": [62, 81, 74, 9, 112, 86, 62]
+          },
+          {
+            "id": "arc_readiness",
+            "type": "ArcDataCardNode",
+            "title": "Readiness",
+            "metric": "readiness_score",
+            "value": 82,
+            "target": 100
+          },
+          {
+            "id": "arc_resting_hr",
+            "type": "ArcDataCardNode",
+            "title": "Resting Heart Rate",
+            "metric": "resting_hr",
+            "value": 58,
+            "target": 120,
+            "reverse": true
           }
         ]
       },
@@ -75,20 +120,20 @@
         "children": [
           {
             "id": "vitals_sleep",
-            "type": "VitalsChartNode",
-            "vitalType": "sleep_hours",
+            "type": "GraphDataNode",
+            "graphType": "sleep_hours",
             "variant": "compact"
           },
           {
             "id": "vitals_steps",
-            "type": "VitalsChartNode",
-            "vitalType": "steps",
+            "type": "GraphDataNode",
+            "graphType": "steps",
             "variant": "compact"
           },
           {
             "id": "vitals_stress",
-            "type": "VitalsChartNode",
-            "vitalType": "stress",
+            "type": "GraphDataNode",
+            "graphType": "stress",
             "variant": "compact"
           }
         ]

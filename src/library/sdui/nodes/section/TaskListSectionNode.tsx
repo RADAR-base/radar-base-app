@@ -162,7 +162,7 @@ export function TaskListSectionNode({ node, context }: NodeProps) {
               duration: task.estimated_minutes > 0 ? `${task.estimated_minutes} min` : undefined,
               expirationTime: formatExpiration(task),
               // The reminder pill reflects the protocol's own configured reminder
-              // (`assessment.protocol.reminders`, an offset before the due time) rather than
+              // (`assessment.protocol.reminders`, an offset after the due time) rather than
               // task status — only shown when that protocol actually configures one.
               reminder: task.reminderTimestamp != null,
               reminderTime: task.reminderTimestamp != null ? formatTimestamp(task.reminderTimestamp) : undefined,
@@ -226,9 +226,18 @@ function formatDuration(ms: number): string {
   return `${hours}H ${String(mins).padStart(2, '0')}M`;
 }
 
-/** Format a raw epoch-ms timestamp for display (e.g. "9:00 AM") — used for `reminderTimestamp`. */
+/**
+ * Format a raw epoch-ms timestamp for display (e.g. "9:00 AM") — used for `reminderTimestamp`.
+ * Builds the AM/PM suffix manually (rather than relying on `toLocaleTimeString`'s locale
+ * default, which omits AM/PM entirely on 24-hour-locale devices) to match `formatDueTime`.
+ */
 function formatTimestamp(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const date = new Date(ms);
+  const hour = date.getHours();
+  const min = String(date.getMinutes()).padStart(2, '0');
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const h = hour % 12 || 12;
+  return `${h}:${min} ${ampm}`;
 }
 
 /** Format the due time for the card's `time` field (e.g. "9:00 AM"). */
@@ -247,7 +256,7 @@ function formatDueTime(task: Task): string {
     return task.dueTime;
   }
   if (task.timestamp) {
-    return new Date(task.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    return formatTimestamp(task.timestamp);
   }
   return '--:--';
 }

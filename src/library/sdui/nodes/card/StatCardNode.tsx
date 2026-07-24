@@ -133,19 +133,18 @@ export function StatCardNode({ node, context }: NodeProps) {
       </View>
 
       {size === 'large' ? (
-        <Text style={[styles.valueLarge, { color: textColor }]}>{value}</Text>
+        <View style={styles.valuePillWrapper}>
+          <Text style={[styles.valueLarge, { color: textColor }]}>{value}</Text>
+          {showKeepItUp && (
+            <View style={[styles.pill, { backgroundColor: badgeColor, alignSelf: 'flex-start' }]}>
+              <Text style={[styles.pillText, { color: iconColor }]}>{keepItUpLabel}</Text>
+            </View>
+          )}
+        </View>
       ) : (
         <View style={styles.valueRowSmall}>
-          <View style={styles.valueSmallWrapper}>
-            <Text style={[styles.valueSmall, { color: textColor }]}>{value}</Text>
-          </View>
+          <Text style={[styles.valueSmall, { color: textColor }]}>{value}</Text>
           {badge}
-        </View>
-      )}
-
-      {size === 'large' && showKeepItUp && (
-        <View style={[styles.pill, { backgroundColor: badgeColor, alignSelf: 'flex-start' }]}>
-          <Text style={[styles.pillText, { color: iconColor }]}>{keepItUpLabel}</Text>
         </View>
       )}
     </View>
@@ -156,6 +155,11 @@ const styles = StyleSheet.create({
   card: {
     padding: layoutTokens.cardPadding,
     borderRadius: layoutTokens.radiusCard,
+    shadowColor: '#085041',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 2,
   },
   // 195 is deliberate, not arbitrary: two stacked small cards (93) plus the 9px gap
   // between them (in CardSectionNode's grid layout) sum to exactly 195 — cardLarge's
@@ -164,7 +168,7 @@ const styles = StyleSheet.create({
   // all sides without overflowing into (and visually shrinking) the bottom padding.
   cardLarge: {
     height: 195,
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
   },
   cardSmall: {
     height: 93,
@@ -185,6 +189,11 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     letterSpacing: layoutTokens.letterSpacing,
   },
+  valuePillWrapper: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    gap: layoutTokens.gap,
+  },
   valueLarge: {
     fontSize: 64,
     lineHeight: 64,
@@ -197,20 +206,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     width: '100%',
   },
-  // A fixed-height wrapper + justifyContent: 'center' avoids relying on `lineHeight` to
-  // control vertical space — iOS's native Text adds extra leading above/below the glyph
-  // based on the font's ascender/descender metrics that `lineHeight` alone doesn't
-  // suppress, which otherwise reads as visually off-center next to the 36-tall badge
-  // (same fix as `NavbarItemNode`'s label).
-  valueSmallWrapper: {
-    height: 36,
-    justifyContent: 'center',
-  },
   valueSmall: {
     fontSize: 36,
-    lineHeight: 36,
     fontWeight: 'bold',
     letterSpacing: layoutTokens.letterSpacing,
+    // Center the digit's own line box against the 36-tall badge: `alignItems: 'center'` on
+    // the row centers the boxes, and trimming Android's extra font padding makes the box hug
+    // the glyph so its optical center matches. (iOS/web ignore the flag but don't add that
+    // padding in the first place.)
+    includeFontPadding: false,
   },
   badge: {
     width: 36,

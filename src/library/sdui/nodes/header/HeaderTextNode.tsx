@@ -54,9 +54,11 @@ export function HeaderTextNode({ node, context }: NodeProps) {
         )}
       </View>
       <View style={styles.subRow}>
-        <Text style={[styles.description, { color: descriptionColor }]} numberOfLines={1}>
-          {description}
-        </Text>
+        {description !== '' && (
+          <Text style={[styles.description, { color: descriptionColor }]} numberOfLines={1}>
+            {description}
+          </Text>
+        )}
         {showEditButton && (
           <TouchableOpacity
             accessibilityRole="button"

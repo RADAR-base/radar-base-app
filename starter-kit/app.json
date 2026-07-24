@@ -4,13 +4,13 @@
     "slug": "radar-base-starter",
     "version": "0.1.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "plugins": [],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "org.radarbase.starter",
-      "scheme": "org.radarbase.starter"
+      "scheme": "com.radarbase.starter"
     },
     "android": {
       "edgeToEdgeEnabled": true,
@@ -21,7 +21,8 @@
           "autoVerify": true,
           "data": [
             {
-              "scheme": "org.radarbase.starter"
+              "scheme": "com.radarbase.starter",
+              "host": "enrol"
             }
           ],
           "category": [

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { navbarLayout, layout as layoutTokens } from '../../../theme/theme';
+import { ScrollLockContext } from '../ScrollLockContext';
 import type { NodeProps } from '../types';
 
 /** The floating navbar's total footprint (pill + its wrapper's padding), excluding the safe-area inset. */
@@ -22,14 +23,21 @@ const NAVBAR_FOOTPRINT =
  */
 export function ViewNode({ node, render }: NodeProps) {
   const insets = useSafeAreaInsets();
+  // A descendant (e.g. a graph being dragged) can lock scrolling via ScrollLockContext so
+  // the page doesn't scroll along with the gesture.
+  const [scrollEnabled, setScrollEnabled] = useState(true);
+  const scrollLock = useMemo(() => ({ setLocked: (locked: boolean) => setScrollEnabled(!locked) }), []);
   return (
-    <ScrollView
-      style={styles.scroll}
-      contentContainerStyle={[styles.content, { paddingBottom: NAVBAR_FOOTPRINT + insets.bottom }]}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.childrenList}>{render(asNodeArray(node.children))}</View>
-    </ScrollView>
+    <ScrollLockContext.Provider value={scrollLock}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, { paddingBottom: NAVBAR_FOOTPRINT + insets.bottom }]}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={scrollEnabled}
+      >
+        <View style={styles.childrenList}>{render(asNodeArray(node.children))}</View>
+      </ScrollView>
+    </ScrollLockContext.Provider>
   );
 }
 

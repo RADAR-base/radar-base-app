@@ -25,7 +25,12 @@ export function SectionNode({ node, context, render }: NodeProps) {
             <TouchableOpacity
               accessibilityRole="button"
               onPress={() => {
-                if (typeof node.seeAllAction === 'string') {
+                // `seeAllTab` switches to a primary tab (same result as tapping that tab in
+                // the navbar — full header, tab highlighted). `seeAllAction` instead opens a
+                // blueprint as a pushed secondary/detail view (Back button, current tab kept).
+                if (typeof node.seeAllTab === 'string') {
+                  context.dispatch({ type: 'Navigate', tabId: node.seeAllTab as string });
+                } else if (typeof node.seeAllAction === 'string') {
                   context.dispatch({
                     type: 'OpenCustomView',
                     viewUrl: node.seeAllAction as string,

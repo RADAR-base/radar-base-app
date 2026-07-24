@@ -91,6 +91,42 @@ export interface ColorTokens {
     someMissed: string;
     allMissed: string;
   };
+  /**
+   * `DataWheelCardNode`'s ring fill states. No light/dark variant — same hex in both
+   * `lightTheme` and `darkTheme` below. `bad`/`good` reuse `button.error`/`toDoStatus.allCompleted`
+   * (already identical across themes), but `neutral` needs its own fixed token: the closest
+   * existing amber (`card.engagement.streakIcon`) is an icon-on-badge contrast color that
+   * intentionally swaps with `streakBadge` between themes, so it isn't actually fixed.
+   */
+  dataWheel: {
+    bad: string;
+    neutral: string;
+    good: string;
+  };
+  /**
+   * `BarChartCardNode`'s weekly-bar colors (node 2250:2687). Fixed brand hues taken
+   * straight from the Figma palette (teal/600 bar fill over a 25% teal track, sky/600
+   * average marker, green/200 current-day label) — no light/dark variant, same hex in
+   * both themes like `dataWheel`.
+   */
+  barChart: {
+    bar: string;
+    barTrack: string;
+    average: string;
+    averageLabel: string;
+    currentDay: string;
+  };
+  /**
+   * `LineGraphCardNode`'s plot colors (node 3049:792). Fixed brand hues — the green line and
+   * the gradient beneath it, plus the navy drag crosshair/dot — same in both themes like
+   * `dataWheel`/`barChart`. The scrub tooltip reuses `card.hint`.
+   */
+  graph: {
+    line: string;
+    area: string;
+    dot: string;
+    crosshair: string;
+  };
 }
 
 export const darkTheme: ColorTokens = {
@@ -173,6 +209,24 @@ export const darkTheme: ColorTokens = {
     someMissed: '#4A708A',
     allMissed: '#52ADD1',
   },
+  dataWheel: {
+    bad: '#C0312D',
+    neutral: '#F9A825',
+    good: '#9CB167',
+  },
+  barChart: {
+    bar: '#1D9E75',
+    barTrack: 'rgba(29, 158, 117, 0.25)',
+    average: '#1778A0',
+    averageLabel: '#FFFFFF',
+    currentDay: '#9CB167',
+  },
+  graph: {
+    line: '#1D9E75',
+    area: '#1D9E75',
+    dot: '#1D3557',
+    crosshair: '#1D3557',
+  },
 };
 
 export const lightTheme: ColorTokens = {
@@ -254,6 +308,24 @@ export const lightTheme: ColorTokens = {
     allCompleted: '#9CB167',
     someMissed: '#4A708A',
     allMissed: '#52ADD1',
+  },
+  dataWheel: {
+    bad: '#C0312D',
+    neutral: '#F9A825',
+    good: '#9CB167',
+  },
+  barChart: {
+    bar: '#1D9E75',
+    barTrack: 'rgba(29, 158, 117, 0.25)',
+    average: '#1778A0',
+    averageLabel: '#FFFFFF',
+    currentDay: '#9CB167',
+  },
+  graph: {
+    line: '#1D9E75',
+    area: '#1D9E75',
+    dot: '#1D3557',
+    crosshair: '#1D3557',
   },
 };
 

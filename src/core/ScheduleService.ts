@@ -310,7 +310,7 @@ function buildTasksForAssessment(
         order: assessment.order ?? (indexOffset + tasks.length),
         warning: chooseText(assessment.warn),
         syncedToServer: false,
-        reminderTimestamp: reminderOffsetMs != null ? taskTime - reminderOffsetMs : undefined,
+        reminderTimestamp: reminderOffsetMs != null ? taskTime + reminderOffsetMs : undefined,
       });
     }
 
@@ -395,8 +395,8 @@ function timeIntervalToMillis(interval: TimeInterval): number {
 }
 
 /**
- * How far before the task's due time (`timestamp`) its reminder fires, in ms — e.g.
- * `{ unit: "hour", amount: 2 }` → 2 hours before. `assessment.protocol.reminders` is
+ * How far after the task's due time (`timestamp`) its reminder fires, in ms — e.g.
+ * `{ unit: "hour", amount: 2 }` → 2 hours after. `assessment.protocol.reminders` is
  * either a single `Reminders` object (itself a `TimeInterval` — `protocol.json`'s actual
  * shape today) or a `Reminder[]` (each with its own `offset: TimeInterval`), in which
  * case the first entry's offset is used. `undefined` when no reminder is configured.

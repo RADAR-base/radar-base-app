@@ -10,27 +10,27 @@ import { useDashboardData } from '../useDashboardData';
 import type { NodeProps } from '../types';
 
 /**
- * Renders a vitals chart for a single metric. Three visual variants:
+ * Renders a graph for a single metric. Three visual variants:
  *   - `mini`     — sparkline only.
  *   - `compact`  — card for horizontal "My Data" row (ring or bar chart).
  *   - `detailed` — full bar chart with title, description, and range pills.
  */
-export function VitalsChartNode({ node, context }: NodeProps) {
-  const vitalType = typeof node.vitalType === 'string' ? node.vitalType : 'metric';
+export function GraphDataNode({ node, context }: NodeProps) {
+  const graphType = typeof node.graphType === 'string' ? node.graphType : 'metric';
   const variant: 'mini' | 'compact' | 'detailed' =
     node.variant === 'mini' ? 'mini' : node.variant === 'compact' ? 'compact' : 'detailed';
   const inlineValues = Array.isArray(node.values)
     ? (node.values as number[]).filter((v) => typeof v === 'number')
     : undefined;
-  const label = typeof node.title === 'string' ? node.title : labelForVital(vitalType);
+  const label = typeof node.title === 'string' ? node.title : labelForGraph(graphType);
   const description = typeof node.description === 'string' ? node.description : undefined;
-  const unit = typeof node.unit === 'string' ? node.unit : unitForVital(vitalType);
+  const unit = typeof node.unit === 'string' ? node.unit : unitForGraph(graphType);
 
   const config: DashboardWidgetConfig = useMemo(
     () => ({
       series: [
         {
-          id: vitalType,
+          id: graphType,
           label,
           chartType: variant === 'mini' ? 'sparkline' : 'bar',
           unit,
@@ -43,7 +43,7 @@ export function VitalsChartNode({ node, context }: NodeProps) {
           : undefined,
       placeholder: inlineValues && inlineValues.length > 0 ? 'none' : 'random',
     }),
-    [variant, label, unit, vitalType, inlineValues, node.ranges],
+    [variant, label, unit, graphType, inlineValues, node.ranges],
   );
 
   const { loading, error, series } = useDashboardData(config);
@@ -71,12 +71,12 @@ export function VitalsChartNode({ node, context }: NodeProps) {
   const lastValue = values.length > 0 ? values[values.length - 1] : null;
   const chartColor = resolved?.color ?? secondary;
 
-  // Color overrides for specific vital types
-  const ringColor = vitalType === 'stress' ? '#C9A96E' : chartColor;
+  // Color overrides for specific graph types
+  const ringColor = graphType === 'stress' ? '#C9A96E' : chartColor;
 
   // ── Compact: card for horizontal "My Data" scroll ──
   if (variant === 'compact') {
-    const useBarChart = vitalType === 'steps';
+    const useBarChart = graphType === 'steps';
     const score = lastValue ?? (values.length > 0 ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : 70);
 
     return (
@@ -228,20 +228,20 @@ function formatNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
-function labelForVital(vital: string): string {
-  switch (vital) {
+function labelForGraph(graph: string): string {
+  switch (graph) {
     case 'heart_rate': return 'Heart Rate';
     case 'sleep_minutes':
     case 'sleep_hours': return 'Sleep';
     case 'steps': return 'Steps';
     case 'spo2': return 'Blood Oxygen';
     case 'stress': return 'Stress';
-    default: return vital.replace(/_/g, ' ');
+    default: return graph.replace(/_/g, ' ');
   }
 }
 
-function unitForVital(vital: string): string | undefined {
-  switch (vital) {
+function unitForGraph(graph: string): string | undefined {
+  switch (graph) {
     case 'heart_rate': return 'bpm';
     case 'sleep_minutes': return 'min';
     case 'steps': return 'steps';

@@ -16,24 +16,28 @@
     {
       "id": "tab_home",
       "label": "Home",
+      "showLabel": true,
       "icon": "home",
       "viewPath": "views/home.json"
     },
     {
       "id": "tab_calendar",
       "label": "Calendar",
+      "showLabel": true,  
       "icon": "calendar",
       "viewPath": "views/calendar.json"
     },
     {
       "id": "tab_profile",
       "label": "Profile",
+      "showLabel": true,
       "icon": "person",
       "viewPath": "views/profile.json"
     },
     {
       "id": "tab_more",
       "label": "More",
+      "showLabel": true,
       "icon": "grid",
       "viewPath": "views/coming-soon.json"
     }

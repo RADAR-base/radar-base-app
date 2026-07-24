@@ -97,13 +97,6 @@ function AppRoot({ serviceOverrides }: { serviceOverrides: CoreServiceOverrides 
     );
   }
 
-  // TEMPORARY: bypass login to preview SDUI views without a working OAuth endpoint.
-  // Restore this check once DEFAULT_AUTH_CONFIG.endpoint points at a reachable Hydra instance.
-  const bypassLogin = true;
-  if (!bypassLogin && (status === 'unauthenticated' || status === 'authenticating')) {
-    return <LoginScreen theme={theme} />;
-  }
-
   return (
     <View style={styles.shellWrapper}>
       <SDUIShell

@@ -8,6 +8,9 @@ import { StatCardNode } from './card/StatCardNode';
 import { TaskCardNode } from './card/TaskCardNode';
 import { ToDoStatusNode } from './card/ToDoStatusNode';
 import { DataWheelCardNode } from './card/DataWheelCardNode';
+import { BarChartCardNode } from './card/BarChartCardNode';
+import { ArcDataCardNode } from './card/ArcDataCardNode';
+import { LineGraphCardNode } from './card/LineGraphCardNode';
 import { CardSectionNode } from './section/CardSectionNode';
 import { TaskListSectionNode } from './section/TaskListSectionNode';
 import { ConnectDevicesMenuNode } from './ConnectDevicesMenuNode';
@@ -21,7 +24,7 @@ import { SectionNode } from './SectionNode';
 import { SurveyTaskListNode } from './SurveyTaskListNode';
 import { TextNode } from './TextNode';
 import { ViewNode } from './ViewNode';
-import { VitalsChartNode } from './VitalsChartNode';
+import { GraphDataNode } from './GraphDataNode';
 
 /**
  * Idempotently register every built-in node type in the `NodeRegistry` singleton. The
@@ -41,6 +44,9 @@ export function registerBuiltInNodes(): void {
   registry.register('TaskCardNode', TaskCardNode);
   registry.register('ToDoStatusNode', ToDoStatusNode);
   registry.register('DataWheelCardNode', DataWheelCardNode);
+  registry.register('BarChartCardNode', BarChartCardNode);
+  registry.register('ArcDataCardNode', ArcDataCardNode);
+  registry.register('LineGraphCardNode', LineGraphCardNode);
   registry.register('CardSectionNode', CardSectionNode);
   registry.register('TaskListSectionNode', TaskListSectionNode);
 
@@ -59,7 +65,7 @@ export function registerBuiltInNodes(): void {
   // Feature nodes
   registry.register('SurveyTaskListNode', SurveyTaskListNode);
   registry.register('QuestionnaireNode', QuestionnaireNode);
-  registry.register('VitalsChartNode', VitalsChartNode);
+  registry.register('GraphDataNode', GraphDataNode);
   registry.register('ConnectDevicesMenuNode', ConnectDevicesMenuNode);
   registry.register('CalendarNode', CalendarNode);
 
@@ -81,6 +87,9 @@ export {
   TaskCardNode,
   ToDoStatusNode,
   DataWheelCardNode,
+  BarChartCardNode,
+  ArcDataCardNode,
+  LineGraphCardNode,
   CardSectionNode,
   TaskListSectionNode,
   ConnectDevicesMenuNode,
@@ -94,5 +103,5 @@ export {
   SurveyTaskListNode,
   TextNode,
   ViewNode,
-  VitalsChartNode,
+  GraphDataNode,
 };

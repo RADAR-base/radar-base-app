@@ -37,6 +37,8 @@ export type { ResolvedSeries, DashboardDataState } from './useDashboardData';
 export type { StatCardType, StatCardSize } from './nodes/card/StatCardNode';
 export type { TaskCardType } from './nodes/card/TaskCardNode';
 export type { DataWheelSize } from './nodes/card/DataWheelCardNode';
+export type { BarChartSize } from './nodes/card/BarChartCardNode';
+export type { LineGraphXAxis } from './nodes/card/LineGraphCardNode';
 
 export {
   registerBuiltInNodes,
@@ -48,6 +50,9 @@ export {
   TaskCardNode,
   ToDoStatusNode,
   DataWheelCardNode,
+  BarChartCardNode,
+  ArcDataCardNode,
+  LineGraphCardNode,
   CardSectionNode,
   TaskListSectionNode,
   ConnectDevicesMenuNode,
@@ -61,7 +66,7 @@ export {
   SurveyTaskListNode,
   TextNode,
   ViewNode,
-  VitalsChartNode,
+  GraphDataNode,
 } from './nodes';
 
 // Questionnaire sub-components (for custom questionnaire UIs)

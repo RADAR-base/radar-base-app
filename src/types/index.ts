@@ -130,7 +130,7 @@ export interface ApiService {
   post<T = any>(path: string, body: unknown, options?: RequestInit): Promise<T>;
 }
 
-// Generic dashboard data shape — drives nodes like `VitalsChartNode`. Each series renders
+// Generic dashboard data shape — drives nodes like `GraphDataNode`. Each series renders
 // one chart; its values can be supplied inline (`values`), pulled from a configurable API
 // endpoint (`responseField` + `dataSource`), or synthesized as a placeholder for previews.
 

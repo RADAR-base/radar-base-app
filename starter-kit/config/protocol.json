@@ -22,8 +22,8 @@
       "estimatedCompletionTime": 2,
       "protocol": {
         "repeatProtocol": {
-          "unit": "min",
-          "amount": 10
+          "unit": "day",
+          "amount": 1
         },
         "repeatQuestionnaire": {
           "unit": "min",

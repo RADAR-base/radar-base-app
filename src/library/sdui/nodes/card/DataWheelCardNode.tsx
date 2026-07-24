@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Circle } from 'react-native-svg';
+import ArrowRightIcon from '../../../../theme/icons/arrowright.svg';
 import { getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
 import { useDashboardData } from '../../useDashboardData';
 import type { DashboardWidgetConfig } from '../../../../types';
@@ -10,19 +11,22 @@ export type DataWheelSize = 'small' | 'large';
 type WheelState = 'bad' | 'neutral' | 'good';
 
 const RING_SIZE = 134;
-const RING_STROKE = 14;
+const RING_STROKE = 18;
 const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
 /**
  * <34% filled → red ("bad"); 34–66% → amber ("neutral"); >66% → green ("good"), per the
  * card's spec. Thresholds are otherwise arbitrary — adjust here if a real wearable metric
- * needs different bands.
+ * needs different bands. `reverse` swaps the low/high ends (high → "bad", low → "good") for
+ * metrics where "less is better", matching `ArcDataCardNode`'s `reverse`.
  */
-function stateForPercent(percent: number): WheelState {
-  if (percent < 34) return 'bad';
+function stateForPercent(percent: number, reverse: boolean): WheelState {
+  const low: WheelState = reverse ? 'good' : 'bad';
+  const high: WheelState = reverse ? 'bad' : 'good';
+  if (percent < 34) return low;
   if (percent <= 66) return 'neutral';
-  return 'good';
+  return high;
 }
 
 /**
@@ -32,7 +36,7 @@ function stateForPercent(percent: number): WheelState {
  * fill percentage (see `stateForPercent`) rather than taken as a direct prop, matching
  * the card's actual behavior — it's a status indicator, not a free color choice.
  *
- * Reads its stat via `useDashboardData` (the same resolution `VitalsChartNode` uses for
+ * Reads its stat via `useDashboardData` (the same resolution `GraphDataNode` uses for
  * wearable-sourced metrics: inline `values`, a `dataSource` API fetch, or synthesized
  * placeholder data), so it can be wired to a real wearable API the same way any other
  * dashboard widget is, instead of only accepting a pre-computed number.
@@ -44,6 +48,7 @@ export function DataWheelCardNode({ node, context }: NodeProps) {
   const metric = typeof node.metric === 'string' ? node.metric : 'wearable_metric';
   const unit = typeof node.unit === 'string' ? node.unit : undefined;
   const target = typeof node.target === 'number' && node.target > 0 ? node.target : 100;
+  const reverse = node.reverse === true;
   const viewPath = typeof node.viewPath === 'string' ? node.viewPath : undefined;
   const inlineValue = typeof node.value === 'number' ? node.value : undefined;
   const inlineValues = Array.isArray(node.values)
@@ -64,14 +69,10 @@ export function DataWheelCardNode({ node, context }: NodeProps) {
   const statValue = resolvedValues.length > 0 ? resolvedValues[resolvedValues.length - 1] : 0;
 
   const percent = Math.max(0, Math.min(100, (statValue / target) * 100));
-  const wheelState = stateForPercent(percent);
+  const wheelState = stateForPercent(percent, reverse);
 
   const tokens = getColorTokens(context.colorScheme ?? 'light');
-  const ringColor = {
-    bad: tokens.button.error,
-    neutral: tokens.card.engagement.streakIcon,
-    good: tokens.toDoStatus.allCompleted,
-  }[wheelState];
+  const ringColor = tokens.dataWheel[wheelState];
   const dashOffset = RING_CIRCUMFERENCE * (1 - percent / 100);
 
   const wheel = (
@@ -112,15 +113,7 @@ export function DataWheelCardNode({ node, context }: NodeProps) {
       onPress={() => viewPath && context.dispatch({ type: 'OpenCustomView', viewUrl: viewPath })}
       style={[styles.openBadge, { backgroundColor: tokens.card.stats.openBadge }]}
     >
-      <Svg width={12} height={12} viewBox="0 0 12 12" fill="none">
-        <Path
-          d="M2.5 6H9.5M9.5 6L6.5 3M9.5 6L6.5 9"
-          stroke={tokens.card.stats.openIcon}
-          strokeWidth={1.4}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </Svg>
+      <ArrowRightIcon width={12} height={12} color={tokens.card.stats.openIcon} />
     </TouchableOpacity>
   );
 
@@ -162,11 +155,12 @@ export function DataWheelCardNode({ node, context }: NodeProps) {
 const styles = StyleSheet.create({
   card: {
     borderRadius: layoutTokens.radiusCard,
-    padding: layoutTokens.gap,
+    padding: layoutTokens.cardPadding,
+    gap: layoutTokens.gap,
     shadowColor: '#085041',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.09,
-    shadowRadius: 6,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
     elevation: 2,
   },
   cardSmall: {
@@ -174,9 +168,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cardLarge: {
-    width: 352,
-    height: 176,
-    justifyContent: 'center',
+    width: '100%',
   },
   headerRow: {
     flexDirection: 'row',
