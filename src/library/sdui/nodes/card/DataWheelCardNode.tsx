@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import ArrowRightIcon from '../../../../theme/icons/arrowright.svg';
-import { getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
+import { tracking, fontFamily, getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
 import { useDashboardData } from '../../useDashboardData';
 import type { DashboardWidgetConfig } from '../../../../types';
 import type { NodeProps } from '../../types';
@@ -71,7 +71,7 @@ export function DataWheelCardNode({ node, context }: NodeProps) {
   const percent = Math.max(0, Math.min(100, (statValue / target) * 100));
   const wheelState = stateForPercent(percent, reverse);
 
-  const tokens = getColorTokens(context.colorScheme ?? 'light');
+  const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
   const ringColor = tokens.dataWheel[wheelState];
   const dashOffset = RING_CIRCUMFERENCE * (1 - percent / 100);
 
@@ -202,20 +202,28 @@ const styles = StyleSheet.create({
   },
   ringValue: {
     fontSize: 24,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     fontWeight: '700',
-    letterSpacing: layoutTokens.letterSpacing,
+    letterSpacing: tracking.bold,
   },
   titleSmall: {
     flexShrink: 1,
     fontSize: 12,
-    letterSpacing: layoutTokens.letterSpacing,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
+    letterSpacing: tracking.regular,
   },
   titleLarge: {
     fontSize: layoutTokens.headingFontSize,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     fontWeight: '700',
   },
   description: {
     fontSize: 12,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
     width: 128,
   },
   openBadge: {

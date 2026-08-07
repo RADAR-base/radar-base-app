@@ -5,6 +5,7 @@ import type { Answer, Question, QuestionnaireResult, QuestionTimestamp } from '.
 import type { NodeProps } from '../types';
 import { QuestionRenderer } from './questionnaire/QuestionRenderer';
 import { evaluateBranchingLogic } from './questionnaire/branchingLogic';
+import { fontFamily } from '../../../theme/theme';
 
 const ON_PRIMARY = '#FFFFFF';
 
@@ -269,7 +270,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
-  progressText: { fontSize: 12, fontWeight: '600', marginRight: 10 },
+  progressText: { fontSize: 12, fontWeight: '600', marginRight: 10, fontFamily: fontFamily.semiBold, includeFontPadding: false },
   progressBar: {
     flex: 1,
     height: 6,
@@ -278,11 +279,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: { height: '100%', borderRadius: 3 },
-  title: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
-  introText: { fontSize: 14, lineHeight: 20, marginBottom: 20 },
-  doneText: { fontSize: 14, lineHeight: 20, marginBottom: 8 },
-  doneSubtext: { fontSize: 12, fontStyle: 'italic' },
-  emptyText: { fontSize: 13, fontStyle: 'italic', marginTop: 8 },
+  title: { fontSize: 18, fontWeight: '700', marginBottom: 8, fontFamily: fontFamily.bold, includeFontPadding: false },
+  introText: { fontSize: 14, lineHeight: 20, marginBottom: 20, fontFamily: fontFamily.regular, includeFontPadding: false },
+  doneText: { fontSize: 14, lineHeight: 20, marginBottom: 8, fontFamily: fontFamily.regular, includeFontPadding: false },
+  doneSubtext: { fontSize: 12, fontStyle: 'italic', fontFamily: fontFamily.regular, includeFontPadding: false },
+  emptyText: { fontSize: 13, fontStyle: 'italic', marginTop: 8, fontFamily: fontFamily.regular, includeFontPadding: false },
   questionArea: { maxHeight: 400 },
   questionContent: { paddingBottom: 8 },
   navRow: {
@@ -296,7 +297,7 @@ const styles = StyleSheet.create({
   },
   navButton: { paddingVertical: 10, paddingHorizontal: 16 },
   navButtonDisabled: { opacity: 0.4 },
-  navButtonText: { fontSize: 14, fontWeight: '600' },
+  navButtonText: { fontSize: 14, fontWeight: '600', fontFamily: fontFamily.semiBold, includeFontPadding: false },
   primaryButton: {
     paddingVertical: 12,
     paddingHorizontal: 24,
@@ -304,6 +305,8 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: ON_PRIMARY,
     fontSize: 15,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
     fontWeight: '600',
     textAlign: 'center',
   },

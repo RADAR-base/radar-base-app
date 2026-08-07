@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import DoneIcon from '../../../../theme/icons/done.svg';
 import CheckIcon from '../../../../theme/icons/check.svg';
 import MissedIcon from '../../../../theme/icons/missed.svg';
-import { getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
+import { tracking, fontFamily, getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
 import type { NodeProps } from '../../types';
 
 type ToDoStatus = 'allCompleted' | 'someMissed' | 'allMissed';
@@ -61,7 +61,7 @@ export function ToDoStatusNode({ node, context }: NodeProps) {
   const total = typeof node.total === 'number' ? node.total : 0;
   const status = deriveStatus(completed, total);
 
-  const tokens = getColorTokens(context.colorScheme ?? 'light');
+  const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
   const backgroundColor = tokens.toDoStatus[status];
   const foreground = tokens.card.task.background;
   const copy = COPY[status];
@@ -112,14 +112,18 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: layoutTokens.headingFontSize,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     lineHeight: 20,
     fontWeight: '700',
-    letterSpacing: layoutTokens.letterSpacing,
+    letterSpacing: tracking.bold,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: layoutTokens.captionFontSize,
-    letterSpacing: layoutTokens.letterSpacing,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
+    letterSpacing: tracking.regular,
     textAlign: 'center',
   },
 });

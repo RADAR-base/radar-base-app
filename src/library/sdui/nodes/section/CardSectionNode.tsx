@@ -1,6 +1,6 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
+import { tracking, fontFamily, getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
 import type { Node } from '../../../contracts/NodeSchema';
 import type { NodeProps } from '../../types';
 
@@ -88,7 +88,7 @@ export function CardSectionNode({ node, context, render }: NodeProps) {
   const children = asNodeArray(node.children);
   const [gridColumn0, gridColumn1] = layout === 'grid' ? packGrid(children ?? []) : [[], []];
 
-  const tokens = getColorTokens(context.colorScheme ?? 'light');
+  const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
 
   return (
     <View style={styles.container}>
@@ -140,9 +140,11 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: layoutTokens.headingFontSize,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     lineHeight: layoutTokens.headingFontSize,
     fontWeight: '700',
-    letterSpacing: layoutTokens.letterSpacing,
+    letterSpacing: tracking.bold,
   },
   seeAllPill: {
     height: 18,
@@ -155,8 +157,10 @@ const styles = StyleSheet.create({
   },
   seeAllText: {
     fontSize: layoutTokens.captionFontSize,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
     lineHeight: layoutTokens.captionFontSize,
-    letterSpacing: layoutTokens.letterSpacing,
+    letterSpacing: tracking.regular,
   },
   horizontalContent: {
     gap: layoutTokens.gap,

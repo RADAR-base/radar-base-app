@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { SelectChoice } from '../../../../types';
+import { fontFamily } from '../../../../theme/theme';
 
 interface CheckboxInputProps {
   choices: SelectChoice[];
@@ -62,6 +63,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 10,
   },
-  checkmark: { fontSize: 13, fontWeight: '700' },
-  label: { fontSize: 14, flex: 1 },
+  checkmark: { fontSize: 13, fontWeight: '700', fontFamily: fontFamily.bold, includeFontPadding: false },
+  label: { fontSize: 14, flex: 1, fontFamily: fontFamily.regular, includeFontPadding: false },
 });

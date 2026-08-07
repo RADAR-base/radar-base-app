@@ -12,7 +12,7 @@ import DurationIcon from '../../../../theme/icons/duration.svg';
 import QuantityIcon from '../../../../theme/icons/quantity.svg';
 import MedicineQuantityIcon from '../../../../theme/icons/medicinequantitiy.svg';
 import MedicineDoseIcon from '../../../../theme/icons/medicinedose.svg';
-import { getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
+import { tracking, fontFamily, getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
 import type { NodeProps } from '../../types';
 
 export type TaskCardType = 'questionnaire' | 'speech' | 'physical' | 'medication';
@@ -64,7 +64,7 @@ export function TaskCardNode({ node, context }: NodeProps) {
   const reminder = node.reminder === true && SUPPORTS_REMINDER[taskType];
   const reminderTime = typeof node.reminderTime === 'string' ? node.reminderTime : '12:00 PM';
 
-  const tokens = getColorTokens(context.colorScheme ?? 'light');
+  const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
   const tokenKey: TaskTypeTokenKey = taskType;
   const typeTokens = tokens.card.task.taskType[tokenKey];
   const badgeColor = typeTokens.badge;
@@ -152,7 +152,9 @@ const styles = StyleSheet.create({
     fontSize: layoutTokens.headingFontSize,
     lineHeight: 20,
     fontWeight: '700',
-    letterSpacing: layoutTokens.letterSpacing,
+    fontFamily: fontFamily.bold,
+    letterSpacing: tracking.bold,
+    includeFontPadding: false,
   },
   reminderPill: {
     flexDirection: 'row',
@@ -190,6 +192,8 @@ const styles = StyleSheet.create({
   },
   pillText: {
     fontSize: layoutTokens.captionFontSize,
-    letterSpacing: layoutTokens.letterSpacing,
+    fontFamily: fontFamily.regular,
+    letterSpacing: tracking.regular,
+    includeFontPadding: false,
   },
 });

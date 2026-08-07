@@ -22,7 +22,7 @@ import type { NodeProps } from '../../types';
  */
 export function HeaderNode({ node, context, render }: NodeProps) {
   const insets = useSafeAreaInsets();
-  const tokens = getColorTokens(context.colorScheme ?? 'light');
+  const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
   const backgroundColor =
     typeof node.backgroundColor === 'string' ? node.backgroundColor : tokens.header.headerBackground;
   const showProfileIcon = node.profileIcon !== false;

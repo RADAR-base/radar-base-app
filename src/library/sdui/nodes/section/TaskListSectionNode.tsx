@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useCoreServices } from '../../../../core/CoreServicesContext';
 import { EVENTS } from '../../../../core/EventBus';
 import type { Task } from '../../../../types';
-import { getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
+import { tracking, fontFamily, getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
 import { TaskCardNode, type TaskCardType } from '../card/TaskCardNode';
 import { ToDoStatusNode } from '../card/ToDoStatusNode';
 import type { Node } from '../../../contracts/NodeSchema';
@@ -95,7 +95,7 @@ export function TaskListSectionNode({ node, context }: NodeProps) {
     }
   };
 
-  const tokens = getColorTokens(context.colorScheme ?? 'light');
+  const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
 
   // Counts driving both the visible list and `ToDoStatusNode`'s state — computed off
   // `allTasks` (the whole day), not the possibly `filter`-narrowed `tasks`, so an
@@ -169,9 +169,14 @@ export function TaskListSectionNode({ node, context }: NodeProps) {
             };
 
             return (
-              <TouchableOpacity key={task.id} accessibilityRole="button" onPress={() => handleTaskPress(task.id)}>
+              <Pressable
+                key={task.id}
+                accessibilityRole="button"
+                onPress={() => handleTaskPress(task.id)}
+                style={({ pressed }) => (pressed ? styles.taskPressed : null)}
+              >
                 <TaskCardNode node={taskNode} context={context} render={noopRender} />
-              </TouchableOpacity>
+              </Pressable>
             );
           })}
         </View>
@@ -295,9 +300,11 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: layoutTokens.headingFontSize,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     lineHeight: layoutTokens.headingFontSize,
     fontWeight: '700',
-    letterSpacing: layoutTokens.letterSpacing,
+    letterSpacing: tracking.bold,
   },
   seeAllPill: {
     height: 18,
@@ -310,12 +317,21 @@ const styles = StyleSheet.create({
   },
   seeAllText: {
     fontSize: layoutTokens.captionFontSize,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
     lineHeight: layoutTokens.captionFontSize,
-    letterSpacing: layoutTokens.letterSpacing,
+    letterSpacing: tracking.regular,
   },
   list: {
     width: '100%',
     gap: layoutTokens.gap,
+  },
+  // Press feedback: a subtle scale-down. We deliberately avoid the default TouchableOpacity opacity
+  // dim here — the card casts an Android `elevation` shadow, and fading a shadowed view's opacity
+  // renders badly on Android (the shadow shows through the translucent card as a hard gray box).
+  // A scale transform is elevation-safe and reads the same on both platforms.
+  taskPressed: {
+    transform: [{ scale: 0.98 }],
   },
   emptyState: {
     padding: 24,
@@ -324,5 +340,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 13,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
   },
 });

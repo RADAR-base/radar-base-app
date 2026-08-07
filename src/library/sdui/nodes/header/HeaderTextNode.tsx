@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { getColorTokens, headerLayout, layout as layoutTokens } from '../../../../theme/theme';
+import { tracking, fontFamily, getColorTokens, headerLayout, layout as layoutTokens } from '../../../../theme/theme';
 import type { NodeProps } from '../../types';
 
 /**
@@ -22,7 +22,7 @@ export function HeaderTextNode({ node, context }: NodeProps) {
   const showEditButton = node.showEditButton !== false;
   const editLabel = typeof node.editLabel === 'string' ? node.editLabel : 'Edit';
 
-  const tokens = getColorTokens(context.colorScheme ?? 'light');
+  const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
   const textColor = typeof node.textColor === 'string' ? node.textColor : tokens.header.text;
   const descriptionColor =
     typeof node.descriptionColor === 'string' ? node.descriptionColor : textColor;
@@ -91,9 +91,11 @@ const styles = StyleSheet.create({
   },
   heading: {
     fontSize: 40,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
     lineHeight: 40,
     fontWeight: '400',
-    letterSpacing: headerLayout.letterSpacing,
+    letterSpacing: tracking.regular,
   },
   subRow: {
     flexDirection: 'row',
@@ -104,7 +106,9 @@ const styles = StyleSheet.create({
   description: {
     flexShrink: 1,
     fontSize: 14,
-    letterSpacing: headerLayout.letterSpacing,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
+    letterSpacing: tracking.regular,
   },
   editButton: {
     paddingHorizontal: 16,
@@ -113,6 +117,8 @@ const styles = StyleSheet.create({
   },
   editLabel: {
     fontSize: headerLayout.captionFontSize,
-    letterSpacing: headerLayout.letterSpacing,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
+    letterSpacing: tracking.regular,
   },
 });

@@ -8,6 +8,7 @@ import type {
 import { BarChart, Sparkline } from '../Charts';
 import { useDashboardData } from '../useDashboardData';
 import type { NodeProps } from '../types';
+import { fontFamily } from '../../../theme/theme';
 
 /**
  * Renders a graph for a single metric. Three visual variants:
@@ -261,14 +262,14 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 1,
   },
-  title: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
-  description: { fontSize: 12, marginBottom: 10 },
+  title: { fontSize: 16, fontWeight: '700', marginBottom: 4, fontFamily: fontFamily.bold, includeFontPadding: false },
+  description: { fontSize: 12, marginBottom: 10, fontFamily: fontFamily.regular, includeFontPadding: false },
   rangeRow: { flexDirection: 'row', marginBottom: 12, flexWrap: 'wrap', gap: 6 },
   rangePill: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14 },
-  rangeText: { fontSize: 12, fontWeight: '600' },
-  lastValue: { fontSize: 12, marginBottom: 6 },
-  statusText: { fontSize: 13, fontStyle: 'italic', marginVertical: 6 },
-  errorText: { fontSize: 13, color: '#dc3545', marginVertical: 6 },
+  rangeText: { fontSize: 12, fontWeight: '600', fontFamily: fontFamily.semiBold, includeFontPadding: false },
+  lastValue: { fontSize: 12, marginBottom: 6, fontFamily: fontFamily.regular, includeFontPadding: false },
+  statusText: { fontSize: 13, fontStyle: 'italic', marginVertical: 6, fontFamily: fontFamily.regular, includeFontPadding: false },
+  errorText: { fontSize: 13, color: '#dc3545', marginVertical: 6, fontFamily: fontFamily.regular, includeFontPadding: false },
   /* Compact */
   compactCard: {
     width: 145,
@@ -285,8 +286,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
-  compactLabel: { fontSize: 13, fontWeight: '600' },
-  compactArrow: { fontSize: 16 },
+  compactLabel: { fontSize: 13, fontWeight: '600', fontFamily: fontFamily.semiBold, includeFontPadding: false },
+  compactArrow: { fontSize: 16, fontFamily: fontFamily.regular, includeFontPadding: false },
   compactChartArea: {
     paddingTop: 4,
   },
@@ -297,6 +298,8 @@ const styles = StyleSheet.create({
   ringValue: {
     position: 'absolute',
     fontSize: 22,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     fontWeight: '700',
   },
 });

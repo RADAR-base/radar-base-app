@@ -4,6 +4,7 @@ import { useCoreServices } from '../../../core/CoreServicesContext';
 import { EVENTS } from '../../../core/EventBus';
 import type { Task } from '../../../types';
 import type { NodeProps } from '../types';
+import { fontFamily } from '../../../theme/theme';
 
 interface FilterShape {
   status?: 'incomplete' | 'complete' | 'all';
@@ -271,7 +272,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 const styles = StyleSheet.create({
-  description: { fontSize: 13, marginBottom: 10 },
+  description: { fontSize: 13, marginBottom: 10, fontFamily: fontFamily.regular, includeFontPadding: false },
   listContainer: {
     overflow: 'hidden',
     shadowColor: '#000',
@@ -300,12 +301,16 @@ const styles = StyleSheet.create({
   },
   iconText: {
     fontSize: 18,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
   },
   taskContent: {
     flex: 1,
   },
   taskTitle: {
     fontSize: 15,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
     fontWeight: '600',
     marginBottom: 6,
   },
@@ -325,6 +330,8 @@ const styles = StyleSheet.create({
   },
   pillText: {
     fontSize: 9,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
     fontWeight: '600',
   },
   timeBadge: {
@@ -350,6 +357,8 @@ const styles = StyleSheet.create({
   },
   timeBadgeText: {
     fontSize: 10,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     fontWeight: '700',
   },
   emptyState: {
@@ -363,5 +372,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 13,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
   },
 });

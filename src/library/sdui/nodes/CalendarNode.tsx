@@ -4,6 +4,7 @@ import { useCoreServices } from '../../../core/CoreServicesContext';
 import { EVENTS } from '../../../core/EventBus';
 import type { TaskInstance } from '../../../types';
 import type { NodeProps } from '../types';
+import { fontFamily } from '../../../theme/theme';
 
 interface CalendarEvent {
   time: string;
@@ -115,14 +116,14 @@ const STATE_COLORS: Record<string, string> = {
 
 const styles = StyleSheet.create({
   container: { borderWidth: 1, padding: 12, marginBottom: 12 },
-  title: { fontSize: 15, fontWeight: '700', marginBottom: 6 },
+  title: { fontSize: 15, fontWeight: '700', marginBottom: 6, fontFamily: fontFamily.bold, includeFontPadding: false },
   navRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   navBtn: { backgroundColor: '#e0e0e0', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
-  navText: { fontWeight: '700', fontSize: 12 },
-  sub: { fontSize: 13, fontWeight: '600' },
+  navText: { fontWeight: '700', fontSize: 12, fontFamily: fontFamily.bold, includeFontPadding: false },
+  sub: { fontSize: 13, fontWeight: '600', fontFamily: fontFamily.semiBold, includeFontPadding: false },
   row: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-  time: { width: 54, fontSize: 12 },
-  eventTitle: { flex: 1, fontSize: 13 },
-  state: { fontSize: 11, fontWeight: '600', marginLeft: 8 },
+  time: { width: 54, fontSize: 12, fontFamily: fontFamily.regular, includeFontPadding: false },
+  eventTitle: { flex: 1, fontSize: 13, fontFamily: fontFamily.regular, includeFontPadding: false },
+  state: { fontSize: 11, fontWeight: '600', marginLeft: 8, fontFamily: fontFamily.semiBold, includeFontPadding: false },
   empty: { fontStyle: 'italic' },
 });

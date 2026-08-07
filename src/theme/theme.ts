@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 import type { ThemeManifest } from '../library/contracts/ManifestSchema';
 
 /**
@@ -83,6 +85,21 @@ export interface ColorTokens {
     loading: string;
   };
   /**
+   * Text input field states — Figma "Text Input Field" (node 3120:3491). Light values are from
+   * the design; dark values are derived from the dark theme's equivalents (card.hint, gray, etc.).
+   */
+  input: {
+    fill: string;
+    text: string;
+    border: string;
+    focusBorder: string;
+    focusRing: string;
+    errorBorder: string;
+    disabledFill: string;
+    disabledBorder: string;
+    disabledText: string;
+  };
+  /**
    * `ToDoStatusNode`'s three end-of-day banner states (node 2923:3189). Figma shows no
    * light/dark variant for these — same hex in both `lightTheme` and `darkTheme` below.
    */
@@ -129,210 +146,343 @@ export interface ColorTokens {
   };
 }
 
+/**
+ * Primitive color palette: every unique color used by the themes below, defined once so a
+ * value lives in a single place. Names encode hue + a lightness step (higher = darker). The
+ * semantic tokens in `darkTheme`/`lightTheme` reference these instead of repeating literals.
+ */
+const palette = {
+  white:      '#FFFFFF',
+  gray100:    '#E5E5EA',
+  gray800:    '#2E2E30',
+  gray900:    '#1E1E1E',
+  gray900_2:  '#1C1C1E',
+  gray900a50: 'rgba(30, 30, 31, 0.5)',
+  gray950:    '#111111',
+  black:      '#000000',
+  red400:     '#E84855',
+  red550:     '#C0312D',
+  orange450:  '#F9A825',
+  orange50:   '#FEF3E2',
+  amber50:    '#FFF8DD',
+  amber500:   '#FFD700',
+  lime450:    '#9CB167',
+  green400:   '#6CCF8E',
+  green50:    '#E8F2EC',
+  green500:   '#34C759',
+  green600:   '#4A7C59',
+  green750:   '#2D5C3F',
+  green850:   '#1A2E1A',
+  teal150:    '#C8F0E2',
+  teal50:     '#EEF8F4',
+  teal650:    '#1D9E75',
+  teal650a25: 'rgba(29, 158, 117, 0.25)',
+  teal900:    '#04342C',
+  cyan300:    '#7EC8E8',
+  slate200:   '#C5D1DC',
+  slate350:   '#8FA6B8',
+  slate50:    '#E8EDF2',
+  slate800:   '#252E3A',
+  navy700:    '#2C4F6B',
+  navy700a30: 'rgba(44, 79, 107, 0.3)',
+  navy700a80: 'rgba(44, 79, 107, 0.8)',
+  navy750:    '#1D3557',
+  navy750_2:  '#0E5474',
+  navy750a30: 'rgba(29, 53, 87, 0.3)',
+  navy750a80: 'rgba(29, 53, 87, 0.8)',
+  navy800:    '#1B2E4B',
+  navy850:    '#0E1E33',
+  navy850_2:  '#1A2530',
+  navy900:    '#0A1520',
+  navy900_2:  '#051E2E',
+  blue450:    '#378ADD',
+  blue550:    '#2196C4',
+  blue600:    '#4A708A',
+  blue650:    '#3C357C',
+  blue650_2:  '#1778A0',
+  sky100:     '#E1DBF5',
+  sky100_2:   '#E4EAF2',
+  sky150:     '#B5DFF2',
+  sky150_2:   '#B5D4F4',
+  sky250:     '#A8C4E0',
+  sky300:     '#7EB8F0',
+  sky450:     '#52ADD1',
+  sky50:      '#E3F4FA',
+  sky50_2:    '#E6F1FB',
+  pink200:    '#ECB1D5',
+  pink50:     '#F8E5F0',
+  pink650:    '#89346D',
+  pink750:    '#571E44',
+} as const;
+
 export const darkTheme: ColorTokens = {
   background: {
-    primary: '#111111',
-    secondary: '#0A1520',
-    tertiary: '#ECB1D5',
+    primary: palette.gray950,
+    secondary: palette.navy900,
+    tertiary: palette.pink200,
   },
   card: {
-    background: '#1E1E1E',
+    background: palette.gray900,
     engagement: {
-      background2: '#1C1C1E',
-      text: '#FFFFFF',
-      checkinBadge: '#1D9E75',
-      checkinIcon: '#C8F0E2',
-      streakBadge: '#F9A825',
-      streakIcon: '#FEF3E2',
-      longstreakIcon: '#FFF8DD',
-      longstreakBadge: '#FFD700',
-      activedaysIcon: '#E1DBF5',
-      activedaysBadge: '#3C357C',
+      background2: palette.gray900_2,
+      text: palette.white,
+      checkinBadge: palette.teal650,
+      checkinIcon: palette.teal150,
+      streakBadge: palette.orange450,
+      streakIcon: palette.orange50,
+      longstreakIcon: palette.amber50,
+      longstreakBadge: palette.amber500,
+      activedaysIcon: palette.sky100,
+      activedaysBadge: palette.blue650,
     },
     stats: {
-      background: '#1E1E1E',
-      openBadge: '#2E2E30',
-      openIcon: '#FFFFFF',
-      description: '#C5D1DC',
+      background: palette.gray900,
+      openBadge: palette.gray800,
+      openIcon: palette.white,
+      description: palette.slate200,
     },
     task: {
-      background: '#1E1E1E',
-      border: '#2196C4',
-      text: '#E3F4FA',
-      pillBackground: '#FFFFFF',
-      badges: '#2196C4',
+      background: palette.gray900,
+      border: palette.blue550,
+      text: palette.sky50,
+      pillBackground: palette.white,
+      badges: palette.blue550,
       taskType: {
-        reminderText: '#1C1C1E',
-        medication: { badge: '#1A2530', icon: '#7EB8F0' },
-        questionnaire: { badge: '#252E3A', icon: '#A8C4E0' },
-        physical: { badge: '#1A2E1A', icon: '#6CCF8E', badgeText: '#04342C' },
-        speech: { badge: '#0E1E33', icon: '#8FA6B8' },
+        reminderText: palette.gray900_2,
+        medication: { badge: palette.navy850_2, icon: palette.sky300 },
+        questionnaire: { badge: palette.slate800, icon: palette.sky250 },
+        physical: { badge: palette.green850, icon: palette.green400, badgeText: palette.teal900 },
+        speech: { badge: palette.navy850, icon: palette.slate350 },
       },
     },
     hint: {
-      background: '#051E2E',
-      text: '#B5DFF2',
+      background: palette.navy900_2,
+      text: palette.sky150,
     },
   },
   header: {
-    text: '#FFFFFF',
-    buttonBackground: '#2C4F6B',
-    buttonIcon: '#FFFFFF',
-    redBubble: '#C0312D',
-    buttonPressed: '#1D3557',
-    headerBackground: '#0A1520',
+    text: palette.white,
+    buttonBackground: palette.navy700,
+    buttonIcon: palette.white,
+    redBubble: palette.red550,
+    buttonPressed: palette.navy750,
+    headerBackground: palette.navy900,
   },
   navbar: {
-    dropshadow: 'rgba(30, 30, 31, 0.5)',
-    surface: { background: '#0A1520', backgroundInvert: '#1D3557' },
-    border: '#0A1520',
-    text: { primary: '#FFFFFF', invert: '#FFFFFF' },
+    dropshadow: palette.gray900a50,
+    surface: { background: palette.navy900, backgroundInvert: palette.navy750 },
+    border: palette.navy900,
+    text: { primary: palette.white, invert: palette.white },
   },
   text: {
-    primary: '#FFFFFF',
-    brand: '#571E44',
+    primary: palette.white,
+    brand: palette.pink750,
   },
   button: {
-    text: '#FFFFFF',
-    background: '#2C4F6B',
-    icon: '#FFFFFF',
-    redBubble: '#C0312D',
-    pressed: '#4A708A',
-    noBackgroundText: '#FFFFFF',
-    disabled: 'rgba(44, 79, 107, 0.3)',
-    success: '#34C759',
-    error: '#C0312D',
-    loading: 'rgba(44, 79, 107, 0.8)',
+    text: palette.white,
+    background: palette.navy700,
+    icon: palette.white,
+    redBubble: palette.red550,
+    pressed: palette.blue600,
+    noBackgroundText: palette.white,
+    disabled: palette.navy700a30,
+    success: palette.green500,
+    error: palette.red550,
+    loading: palette.navy700a80,
+  },
+  input: {
+    fill: palette.navy900_2, //      dark tinted field (matches dark card.hint.background)
+    text: palette.sky150, //         readable light text (matches dark card.hint.text)
+    border: palette.navy700, //      resting brand-navy border
+    focusBorder: palette.blue550, // brighter focus accent
+    focusRing: palette.cyan300, //   light focus halo
+    errorBorder: palette.red400, //  error red (same in both themes)
+    disabledFill: palette.gray900, //   muted dark field
+    disabledBorder: palette.gray800,
+    disabledText: palette.slate350,
   },
   toDoStatus: {
-    allCompleted: '#9CB167',
-    someMissed: '#4A708A',
-    allMissed: '#52ADD1',
+    allCompleted: palette.lime450,
+    someMissed: palette.blue600,
+    allMissed: palette.sky450,
   },
   dataWheel: {
-    bad: '#C0312D',
-    neutral: '#F9A825',
-    good: '#9CB167',
+    bad: palette.red550,
+    neutral: palette.orange450,
+    good: palette.lime450,
   },
   barChart: {
-    bar: '#1D9E75',
-    barTrack: 'rgba(29, 158, 117, 0.25)',
-    average: '#1778A0',
-    averageLabel: '#FFFFFF',
-    currentDay: '#9CB167',
+    bar: palette.teal650,
+    barTrack: palette.teal650a25,
+    average: palette.blue650_2,
+    averageLabel: palette.white,
+    currentDay: palette.lime450,
   },
   graph: {
-    line: '#1D9E75',
-    area: '#1D9E75',
-    dot: '#1D3557',
-    crosshair: '#1D3557',
+    line: palette.teal650,
+    area: palette.teal650,
+    dot: palette.navy750,
+    crosshair: palette.navy750,
   },
 };
 
 export const lightTheme: ColorTokens = {
   background: {
-    primary: '#EEF8F4',
-    secondary: '#1D3557',
-    tertiary: '#F8E5F0',
+    primary: palette.teal50,
+    secondary: palette.navy750,
+    tertiary: palette.pink50,
   },
   card: {
-    background: '#FFFFFF',
+    background: palette.white,
     engagement: {
-      background2: '#FFFFFF',
-      text: '#111111',
-      checkinBadge: '#C8F0E2',
-      checkinIcon: '#1D9E75',
-      streakBadge: '#FEF3E2',
-      streakIcon: '#F9A825',
-      longstreakIcon: '#FFD700',
-      longstreakBadge: '#FFF8DD',
-      activedaysIcon: '#3C357C',
-      activedaysBadge: '#E1DBF5',
+      background2: palette.white,
+      text: palette.gray950,
+      checkinBadge: palette.teal150,
+      checkinIcon: palette.teal650,
+      streakBadge: palette.orange50,
+      streakIcon: palette.orange450,
+      longstreakIcon: palette.amber500,
+      longstreakBadge: palette.amber50,
+      activedaysIcon: palette.blue650,
+      activedaysBadge: palette.sky100,
     },
     stats: {
-      background: '#FFFFFF',
-      openBadge: '#E5E5EA',
-      openIcon: '#111111',
-      description: '#2E2E30',
+      background: palette.white,
+      openBadge: palette.gray100,
+      openIcon: palette.gray950,
+      description: palette.gray800,
     },
     task: {
-      background: '#FFFFFF',
-      border: '#B5D4F4',
-      text: '#FFFFFF',
-      pillBackground: '#E6F1FB',
-      badges: '#52ADD1',
+      background: palette.white,
+      border: palette.sky150_2,
+      text: palette.white,
+      pillBackground: palette.sky50_2,
+      badges: palette.sky450,
       taskType: {
-        reminderText: '#FFFFFF',
-        medication: { badge: '#E6F1FB', icon: '#378ADD' },
-        questionnaire: { badge: '#E4EAF2', icon: '#1B2E4B' },
-        physical: { badge: '#E8F2EC', icon: '#4A7C59', badgeText: '#2D5C3F' },
-        speech: { badge: '#E8EDF2', icon: '#4A708A' },
+        reminderText: palette.white,
+        medication: { badge: palette.sky50_2, icon: palette.blue450 },
+        questionnaire: { badge: palette.sky100_2, icon: palette.navy800 },
+        physical: { badge: palette.green50, icon: palette.green600, badgeText: palette.green750 },
+        speech: { badge: palette.slate50, icon: palette.blue600 },
       },
     },
     hint: {
-      background: '#E3F4FA',
-      text: '#0E5474',
+      background: palette.sky50,
+      text: palette.navy750_2,
     },
   },
   header: {
-    text: '#C5D1DC',
-    buttonBackground: '#FFFFFF',
-    buttonIcon: '#1D3557',
-    redBubble: '#C0312D',
-    buttonPressed: '#8FA6B8',
-    headerBackground: '#1D3557',
+    text: palette.slate200,
+    buttonBackground: palette.white,
+    buttonIcon: palette.navy750,
+    redBubble: palette.red550,
+    buttonPressed: palette.slate350,
+    headerBackground: palette.navy750,
   },
   navbar: {
-    dropshadow: 'rgba(29, 53, 87, 0.3)',
-    surface: { background: '#1D3557', backgroundInvert: '#FFFFFF' },
-    border: '#1D3557',
-    text: { primary: '#FFFFFF', invert: '#1D3557' },
+    dropshadow: palette.navy750a30,
+    surface: { background: palette.navy750, backgroundInvert: palette.white },
+    border: palette.navy750,
+    text: { primary: palette.white, invert: palette.navy750 },
   },
   text: {
-    primary: '#000000',
-    brand: '#89346D',
+    primary: palette.black,
+    brand: palette.pink650,
   },
   button: {
-    text: '#2E2E30',
-    background: '#1D3557',
-    icon: '#FFFFFF',
-    redBubble: '#C0312D',
-    pressed: '#0E1E33',
-    noBackgroundText: '#1D3557',
-    disabled: 'rgba(29, 53, 87, 0.3)',
-    success: '#34C759',
-    error: '#C0312D',
-    loading: 'rgba(29, 53, 87, 0.8)',
+    text: palette.gray800,
+    background: palette.navy750,
+    icon: palette.white,
+    redBubble: palette.red550,
+    pressed: palette.navy850,
+    noBackgroundText: palette.navy750,
+    disabled: palette.navy750a30,
+    success: palette.green500,
+    error: palette.red550,
+    loading: palette.navy750a80,
+  },
+  input: {
+    fill: palette.sky50,
+    text: palette.navy750_2,
+    border: palette.navy750,
+    focusBorder: palette.blue550,
+    focusRing: palette.cyan300,
+    errorBorder: palette.red400,
+    disabledFill: palette.slate50,
+    disabledBorder: palette.slate350,
+    disabledText: palette.slate350,
   },
   toDoStatus: {
-    allCompleted: '#9CB167',
-    someMissed: '#4A708A',
-    allMissed: '#52ADD1',
+    allCompleted: palette.lime450,
+    someMissed: palette.blue600,
+    allMissed: palette.sky450,
   },
   dataWheel: {
-    bad: '#C0312D',
-    neutral: '#F9A825',
-    good: '#9CB167',
+    bad: palette.red550,
+    neutral: palette.orange450,
+    good: palette.lime450,
   },
   barChart: {
-    bar: '#1D9E75',
-    barTrack: 'rgba(29, 158, 117, 0.25)',
-    average: '#1778A0',
-    averageLabel: '#FFFFFF',
-    currentDay: '#9CB167',
+    bar: palette.teal650,
+    barTrack: palette.teal650a25,
+    average: palette.blue650_2,
+    averageLabel: palette.white,
+    currentDay: palette.lime450,
   },
   graph: {
-    line: '#1D9E75',
-    area: '#1D9E75',
-    dot: '#1D3557',
-    crosshair: '#1D3557',
+    line: palette.teal650,
+    area: palette.teal650,
+    dot: palette.navy750,
+    crosshair: palette.navy750,
   },
 };
 
 export type ThemeMode = 'light' | 'dark';
 
-export function getColorTokens(mode: ThemeMode): ColorTokens {
-  return mode === 'dark' ? darkTheme : lightTheme;
+/**
+ * Brand colors an app can set (e.g. from the manifest) to override the theme. Each one replaces
+ * a single palette entry, so it cascades to every token that references that entry. Any omitted
+ * color falls back to the design-system default.
+ */
+export interface ThemeColorOverrides {
+  /** Replaces the dominant navy — `navy750` in light, `navy900` in dark. */
+  primary?: string;
+  /** Replaces the lighter navy — `blue600` in light, `navy750` in dark. */
+  secondary?: string;
+  /** Replaces the teal accent — `teal650` in both modes. */
+  tertiary?: string;
+}
+
+/** Which palette entry each brand override targets, per mode. */
+const BRAND_SLOTS: Record<ThemeMode, Record<keyof ThemeColorOverrides, keyof typeof palette>> = {
+  light: { primary: 'navy750', secondary: 'blue600', tertiary: 'teal650' },
+  dark: { primary: 'navy900', secondary: 'navy750', tertiary: 'teal650' },
+};
+
+/** Deep-clone `value`, replacing any leaf string found in `swaps` with its mapped color. */
+function deepReplace<T>(value: T, swaps: Record<string, string>): T {
+  if (typeof value === 'string') return (swaps[value] ?? value) as T;
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) out[k] = deepReplace(v, swaps);
+    return out as T;
+  }
+  return value;
+}
+
+export function getColorTokens(mode: ThemeMode, overrides?: ThemeColorOverrides): ColorTokens {
+  const base = mode === 'dark' ? darkTheme : lightTheme;
+  if (!overrides) return base;
+
+  // Map each overridden brand color's *default* palette value -> the new color, then swap every
+  // token that used it. Palette values are unique, so this only repaints the intended color.
+  const slots = BRAND_SLOTS[mode];
+  const swaps: Record<string, string> = {};
+  for (const slot of ['primary', 'secondary', 'tertiary'] as const) {
+    const next = overrides[slot];
+    if (next) swaps[palette[slots[slot]]] = next;
+  }
+  return Object.keys(swaps).length ? deepReplace(base, swaps) : base;
 }
 
 /**
@@ -362,8 +512,12 @@ export function toThemeManifest(mode: ThemeMode): ThemeManifest {
  * happens to need a 9px gap or a pill-shaped badge.
  */
 export const layout = {
-  /** Figma's tracking value on virtually all text in this design system. */
-  letterSpacing: -0.5,
+  /**
+   * Figma's tracking value (SF Pro). Android renders negative `letterSpacing` noticeably tighter than
+   * iOS, so it gets 0 (natural spacing) to match iOS's -0.5 visually — the shared -0.5 otherwise reads
+   * as squished on Android. Tune the Android value here if it needs more/less.
+   */
+  letterSpacing: Platform.select({ android: 0, default: -0.5 }) as number,
   /** The 9px gap Figma uses between rows/items — headers, navbar, card grids, sections. */
   gap: 9,
   /** Caption-sized text (badges, pills, "Keep it up!"/"See All", last-synced label). */
@@ -386,6 +540,44 @@ export const layout = {
    */
   sectionGap: 16,
 };
+
+/**
+ * Typeface — Inter (an open, SF-Pro-like font) loaded by the host app via `@expo-google-fonts/inter`,
+ * so Android matches the iOS/Figma design instead of falling back to Roboto. React Native can't
+ * derive weights from one custom family, so each weight is its own family; components pick the family
+ * for their `fontWeight` (keep `fontWeight` set too — it's the fallback when a platform uses its
+ * system font).
+ *
+ * Currently Inter on BOTH platforms. To use Inter on Android only (keep native SF Pro on iOS),
+ * set `INTER_ANDROID_ONLY = true` — the iOS values then become `undefined` (system font).
+ */
+const INTER_ANDROID_ONLY = true;
+const inter = (name: string): string | undefined =>
+  INTER_ANDROID_ONLY && Platform.OS === 'ios' ? undefined : name;
+
+export const fontFamily = {
+  light: inter('Inter_300Light'),
+  regular: inter('Inter_400Regular'),
+  medium: inter('Inter_500Medium'),
+  semiBold: inter('Inter_600SemiBold'),
+  bold: inter('Inter_700Bold'),
+} as const;
+
+/**
+ * Per-weight letter tracking, paired with `fontFamily` (a text style uses `tracking[weight]` matching
+ * its `fontFamily[weight]`). iOS (system SF Pro) keeps a flat value across weights. On Android the
+ * heavier Inter weights read tighter, so they get a small extra nudge to match the lighter ones so
+ * tracking looks even across weights. Tune the Android nudges below if a weight still looks off.
+ */
+const BASE_TRACKING = Platform.select({ android: 0, default: -0.5 }) as number;
+const androidNudge = (d: number) => (Platform.OS === 'android' ? d : 0);
+export const tracking = {
+  light: BASE_TRACKING,
+  regular: BASE_TRACKING,
+  medium: BASE_TRACKING + androidNudge(0.05),
+  semiBold: BASE_TRACKING + androidNudge(0.1),
+  bold: BASE_TRACKING + androidNudge(0.2),
+} as const;
 
 /**
  * Shared layout constants for the header nodes (`HeaderNode` / `HeaderBarNode` /

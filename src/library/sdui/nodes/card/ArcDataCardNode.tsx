@@ -2,7 +2,7 @@ import React, { useId, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Circle, ClipPath, Defs, G, Path } from 'react-native-svg';
 import ArrowRightIcon from '../../../../theme/icons/arrowright.svg';
-import { getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
+import { tracking, fontFamily, getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
 import { useDashboardData } from '../../useDashboardData';
 import type { DashboardWidgetConfig } from '../../../../types';
 import type { NodeProps } from '../../types';
@@ -91,7 +91,7 @@ export function ArcDataCardNode({ node, context }: NodeProps) {
   const percent = Math.max(0, Math.min(100, (statValue / target) * 100));
   const fraction = percent / 100;
 
-  const tokens = getColorTokens(context.colorScheme ?? 'light');
+  const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
   const arcColor = tokens.dataWheel[arcState(percent, reverse)];
 
   // The arc SVG scales to its measured box (keeping the Figma band's aspect via the
@@ -202,7 +202,9 @@ const styles = StyleSheet.create({
   title: {
     flexShrink: 1,
     fontSize: 12,
-    letterSpacing: layoutTokens.letterSpacing,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
+    letterSpacing: tracking.regular,
   },
   arcWrap: {
     flex: 1,
@@ -217,9 +219,11 @@ const styles = StyleSheet.create({
   },
   value: {
     fontSize: 36,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     lineHeight: NUMBER_LINE_HEIGHT,
     fontWeight: '700',
-    letterSpacing: layoutTokens.letterSpacing,
+    letterSpacing: tracking.bold,
   },
   openBadge: {
     width: 24,

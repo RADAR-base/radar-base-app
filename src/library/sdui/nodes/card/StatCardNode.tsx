@@ -6,7 +6,7 @@ import CheckinIcon from '../../../../theme/icons/checkin.svg';
 import CalendarIcon from '../../../../theme/icons/calendar.svg';
 import FireIcon from '../../../../theme/icons/fire.svg';
 import MedalIcon from '../../../../theme/icons/medal.svg';
-import { getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
+import { tracking, fontFamily, getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
 import type { NodeProps } from '../../types';
 
 type EngagementTokenKey =
@@ -95,7 +95,7 @@ export function StatCardNode({ node, context }: NodeProps) {
   const showKeepItUp = node.showKeepItUp !== false;
   const keepItUpLabel = typeof node.keepItUpLabel === 'string' ? node.keepItUpLabel : 'Keep it up!';
 
-  const tokens = getColorTokens(context.colorScheme ?? 'light');
+  const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
   const engagement = tokens.card.engagement;
   const badgeColor = engagement[BADGE_TOKEN[statsType]];
   const iconColor = engagement[ICON_TOKEN[statsType]];
@@ -184,10 +184,12 @@ const styles = StyleSheet.create({
   title: {
     flexShrink: 1,
     fontSize: 12,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
     // lineHeight equal to fontSize clips descenders (g/y/p) on some platforms — give it
     // some breathing room instead of a 1:1 ratio.
     lineHeight: 16,
-    letterSpacing: layoutTokens.letterSpacing,
+    letterSpacing: tracking.regular,
   },
   valuePillWrapper: {
     flex: 1,
@@ -196,9 +198,11 @@ const styles = StyleSheet.create({
   },
   valueLarge: {
     fontSize: 64,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     lineHeight: 64,
     fontWeight: 'bold',
-    letterSpacing: layoutTokens.letterSpacing,
+    letterSpacing: tracking.bold,
   },
   valueRowSmall: {
     flexDirection: 'row',

@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Line } from 'react-native-svg';
 import ArrowRightIcon from '../../../../theme/icons/arrowright.svg';
-import { getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
+import { tracking, fontFamily, getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
 import { useDashboardData } from '../../useDashboardData';
 import type { DashboardWidgetConfig } from '../../../../types';
 import type { NodeProps } from '../../types';
@@ -81,7 +81,7 @@ export function BarChartCardNode({ node, context }: NodeProps) {
 
   const avgFraction = fractionForValue(average);
 
-  const tokens = getColorTokens(context.colorScheme ?? 'light');
+  const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
   const barTokens = tokens.barChart;
 
   // The dashed average line is drawn with SVG (RN's `borderStyle: 'dashed'` renders
@@ -315,8 +315,10 @@ const styles = StyleSheet.create({
   },
   avgPillText: {
     fontSize: layoutTokens.captionFontSize,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     fontWeight: '700',
-    letterSpacing: layoutTokens.letterSpacing,
+    letterSpacing: tracking.bold,
   },
   dayRow: {
     flexDirection: 'row',
@@ -326,23 +328,31 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     fontSize: layoutTokens.captionFontSize,
-    letterSpacing: layoutTokens.letterSpacing,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
+    letterSpacing: tracking.regular,
   },
   titleSmall: {
     flexShrink: 1,
     fontSize: 12,
-    letterSpacing: layoutTokens.letterSpacing,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
+    letterSpacing: tracking.regular,
   },
   // Figma's large `BarStats` uses a 24px bold heading beside the chart (node 2985:1049);
   // there's no design token for that size, so it's inlined like `DataWheelCardNode`'s
   // 24px `ringValue`.
   titleLarge: {
     fontSize: 24,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     fontWeight: '700',
   },
   description: {
     fontSize: 12,
-    letterSpacing: layoutTokens.letterSpacing,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
+    letterSpacing: tracking.regular,
   },
   openBadge: {
     width: 24,

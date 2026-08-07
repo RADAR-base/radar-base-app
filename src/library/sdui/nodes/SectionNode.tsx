@@ -1,6 +1,6 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { layout as layoutTokens } from '../../../theme/theme';
+import { fontFamily, layout as layoutTokens } from '../../../theme/theme';
 import type { Node } from '../../contracts/NodeSchema';
 import type { NodeProps } from '../types';
 
@@ -79,6 +79,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 16,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     fontWeight: '700',
   },
   seeAllPill: {
@@ -90,6 +92,8 @@ const styles = StyleSheet.create({
   },
   seeAllText: {
     fontSize: 12,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
     fontWeight: '600',
   },
   horizontalContent: {

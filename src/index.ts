@@ -72,6 +72,18 @@ export {
   RangeInput,
   SliderInput,
   TextQuestionInput,
+  TextInputField,
+  HintCard,
+  RegistrationHeader,
+  StepSlider,
+  PillButton,
+  useStepFlow,
+  useSlideOverlay,
+  useTopInset,
+  NotificationsScreen,
+  ConnectHealthScreen,
+  LoadingDots,
+  LoadingScreen,
   InfoScreen,
   QuestionRenderer,
   evaluateBranchingLogic,
@@ -92,6 +104,17 @@ export type {
   StatCardSize,
   TaskCardType,
   DataWheelSize,
+  TextInputFieldProps,
+  HintCardProps,
+  RegistrationHeaderProps,
+  StepSliderProps,
+  PillButtonProps,
+  StepFlow,
+  StepDirection,
+  NotificationsScreenProps,
+  ConnectHealthScreenProps,
+  LoadingDotsProps,
+  LoadingScreenProps,
 } from './library/sdui';
 
 // SDUI contracts
@@ -157,6 +180,29 @@ export type {
   TaskInstance,
   TaskInstanceState,
 } from './types';
+
+// Design tokens — colors + layout primitives transcribed from the Figma design system.
+export {
+  darkTheme,
+  lightTheme,
+  getColorTokens,
+  toThemeManifest,
+  layout,
+  fontFamily,
+  tracking,
+  headerLayout,
+  navbarLayout,
+} from './theme/theme';
+export type { ColorTokens, ThemeMode, ThemeColorOverrides } from './theme/theme';
+
+// Design-system icons — React components (resolved via react-native-svg-transformer in the host app).
+export { default as QrCodeIcon } from './theme/icons/qrcode.svg';
+export { default as ScanQRCode } from './theme/icons/scanqrcode.svg';
+export { default as LoginIcon } from './theme/icons/login.svg';
+export { default as RegistrationCompleteIllustration } from './theme/icons/registrationcomplete.svg';
+export { default as EnableNotificationsIllustration } from './theme/icons/enablenotifications.svg';
+export { default as AppleHealthIcon } from './theme/icons/applehealth.svg';
+export { default as HealthConnectIcon } from './theme/icons/healthconnect.svg';
 
 // Architecture-aligned namespace entry points
 export * as LibrarySDUI from './library/sdui';

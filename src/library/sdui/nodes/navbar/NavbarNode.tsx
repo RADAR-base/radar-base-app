@@ -52,7 +52,7 @@ function isNavbarTabArray(value: unknown): value is NavbarTab[] {
  * handles this (switches the active tab and clears the secondary-view stack).
  */
 export function NavbarNode({ node, context }: NodeProps) {
-  const tokens = getColorTokens(context.colorScheme ?? 'light');
+  const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
 
   const backgroundColor =
     typeof node.backgroundColor === 'string' ? node.backgroundColor : tokens.navbar.surface.background;

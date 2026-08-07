@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { NodeProps } from '../types';
+import { fontFamily } from '../../../theme/theme';
 
 /**
  * Activity summary grid matching the Figma "My Activity" design.
@@ -102,6 +103,8 @@ const styles = StyleSheet.create({
   },
   cardLabel: {
     fontSize: 12,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
     fontWeight: '600',
   },
   iconCircle: {
@@ -113,9 +116,13 @@ const styles = StyleSheet.create({
   },
   iconEmoji: {
     fontSize: 14,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
   },
   bigNumber: {
     fontSize: 36,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     fontWeight: '700',
   },
   badge: {
@@ -126,6 +133,8 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: 11,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
     fontWeight: '600',
   },
   streakRow: {
@@ -136,9 +145,13 @@ const styles = StyleSheet.create({
   },
   streakNumber: {
     fontSize: 28,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     fontWeight: '700',
   },
   streakIcon: {
     fontSize: 22,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
   },
 });

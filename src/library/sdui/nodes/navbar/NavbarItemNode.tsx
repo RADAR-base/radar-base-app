@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { ComponentType } from 'react';
 import type { SvgProps } from 'react-native-svg';
-import { navbarLayout, layout as layoutTokens } from '../../../../theme/theme';
+import { fontFamily, navbarLayout, layout as layoutTokens } from '../../../../theme/theme';
 
 /**
  * One tab of the bottom `Navbar` (Figma node 1795:434) — an icon, optional label, and a
@@ -67,5 +67,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: layoutTokens.captionFontSize,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
   },
 });

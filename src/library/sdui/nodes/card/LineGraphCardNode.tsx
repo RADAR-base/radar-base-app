@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop } from 'react-native-svg';
 import ArrowRightIcon from '../../../../theme/icons/arrowright.svg';
-import { getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
+import { tracking, fontFamily, getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
 import { useScrollLock } from '../../ScrollLockContext';
 import { useDashboardData } from '../../useDashboardData';
 import type { DashboardWidgetConfig } from '../../../../types';
@@ -53,7 +53,7 @@ export function LineGraphCardNode({ node, context }: NodeProps) {
   const { series } = useDashboardData(config);
   const values = series[0]?.values ?? [];
 
-  const tokens = getColorTokens(context.colorScheme ?? 'light');
+  const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
   const graphTokens = tokens.graph;
 
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -275,7 +275,9 @@ const styles = StyleSheet.create({
   title: {
     flexShrink: 1,
     fontSize: 12,
-    letterSpacing: layoutTokens.letterSpacing,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
+    letterSpacing: tracking.regular,
   },
   plot: {
     flex: 1,
@@ -294,12 +296,16 @@ const styles = StyleSheet.create({
   },
   tooltipValue: {
     fontSize: 16,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     fontWeight: '700',
-    letterSpacing: layoutTokens.letterSpacing,
+    letterSpacing: tracking.bold,
   },
   tooltipMetric: {
     fontSize: 11,
-    letterSpacing: layoutTokens.letterSpacing,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
+    letterSpacing: tracking.regular,
     opacity: 0.8,
   },
   openBadge: {

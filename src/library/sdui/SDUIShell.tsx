@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   StyleSheet,
   Text,
   TouchableOpacity,
   useColorScheme,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CoreServicesProvider, type CoreServiceOverrides } from '../../core/CoreServicesContext';
 import type { AppManifest, TabManifest } from '../contracts/ManifestSchema';
 import type { ScreenBlueprint } from '../contracts/BlueprintSchema';
@@ -14,11 +14,12 @@ import type { Node } from '../contracts/NodeSchema';
 import { BlueprintLoader, type BlueprintSource } from './BlueprintLoader';
 import { ManifestLoader, type ManifestSource } from './ManifestLoader';
 import { NodeRenderer } from './NodeRenderer';
+import { LoadingScreen, LoadingDots } from './LoadingScreen';
 import { createActionDispatcher } from './ActionDispatcher';
 import { registerBuiltInNodes } from './nodes';
 import { HeaderNode } from './nodes/header/HeaderNode';
 import { NavbarNode } from './nodes/navbar/NavbarNode';
-import { navbarLayout, layout as layoutTokens } from '../../theme/theme';
+import { fontFamily, navbarLayout, layout as layoutTokens } from '../../theme/theme';
 import type { SDUIContext, TemplateContext } from './types';
 
 const noopRender = () => null;
@@ -128,12 +129,7 @@ export function SDUIShell(props: SDUIShellProps) {
   }
 
   if (!manifest || !activeTabId) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator />
-        <Text style={styles.loadingText}>Loading…</Text>
-      </View>
-    );
+    return <LoadingScreen />;
   }
 
   const context: SDUIContext = {
@@ -282,6 +278,13 @@ function BottomTabBar({
   activeTabId: string;
   context: SDUIContext;
 }) {
+  // Edge-to-edge: the shell draws behind the system navigation bar / home indicator. Pad the bottom
+  // by whichever is larger — the bottom safe-area inset or `outerPaddingBottom` — so the floating
+  // navbar clears the Android 3-button nav bar (a ~48px inset) without floating too high where the
+  // inset is small or zero (iOS home indicator ~34px, Android gesture nav, older home-button iPhones
+  // = 0). Summing them instead would push the pill too high on iOS.
+  const insets = useSafeAreaInsets();
+
   const navbarNode: Node = {
     id: 'shell-navbar',
     type: 'NavbarNode',
@@ -295,7 +298,12 @@ function BottomTabBar({
   };
 
   return (
-    <View style={styles.tabBarOuter}>
+    <View
+      style={[
+        styles.tabBarOuter,
+        { paddingBottom: Math.max(insets.bottom, navbarLayout.outerPaddingBottom) },
+      ]}
+    >
       <NavbarNode node={navbarNode} context={context} render={noopRender} />
     </View>
   );
@@ -362,7 +370,7 @@ function TabView({
   if (!blueprint) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator />
+        <LoadingDots />
       </View>
     );
   }
@@ -401,11 +409,15 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: layoutTokens.headingFontSize,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
     fontWeight: '600',
   },
   secondaryTitle: {
     flex: 1,
     fontSize: 18,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     fontWeight: '700',
     textAlign: 'center',
   },
@@ -423,7 +435,8 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     paddingHorizontal: 24,
-    paddingBottom: navbarLayout.outerPaddingBottom,
+    // paddingBottom is applied inline — max(bottom safe-area inset, navbarLayout.outerPaddingBottom) —
+    // so the floating pill clears the system navigation bar / home indicator in edge-to-edge mode.
     paddingTop: navbarLayout.outerPaddingTop,
   },
   /* Shared */
@@ -435,18 +448,24 @@ const styles = StyleSheet.create({
   },
   errorTitle: {
     fontSize: layoutTokens.headingFontSize,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     fontWeight: '700',
     color: '#dc3545',
     marginBottom: 6,
   },
   errorBody: {
     fontSize: 13,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
     color: '#6c757d',
     textAlign: 'center',
   },
   loadingText: {
     marginTop: 8,
     fontSize: 13,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
     color: '#6c757d',
   },
 });

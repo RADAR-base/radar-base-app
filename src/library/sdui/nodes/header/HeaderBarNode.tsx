@@ -3,7 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import SyncIcon from '../../../../theme/icons/sync.svg';
 import BellIcon from '../../../../theme/icons/bell.svg';
 import SettingsIcon from '../../../../theme/icons/settings.svg';
-import { getColorTokens, headerLayout } from '../../../../theme/theme';
+import { tracking, fontFamily, getColorTokens, headerLayout } from '../../../../theme/theme';
 import type { NodeProps } from '../../types';
 
 /**
@@ -21,7 +21,7 @@ export function HeaderBarNode({ node, context }: NodeProps) {
   const notificationCount =
     typeof node.notificationCount === 'number' ? node.notificationCount : 0;
 
-  const tokens = getColorTokens(context.colorScheme ?? 'light');
+  const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
   const textColor = typeof node.textColor === 'string' ? node.textColor : tokens.header.text;
   const buttonBg =
     typeof node.buttonBackgroundColor === 'string'
@@ -107,7 +107,9 @@ const styles = StyleSheet.create({
   },
   lastSynced: {
     fontSize: headerLayout.captionFontSize,
-    letterSpacing: headerLayout.letterSpacing,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
+    letterSpacing: tracking.regular,
     marginRight: 2,
   },
   iconButton: {
