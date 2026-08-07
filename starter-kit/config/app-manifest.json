@@ -1,9 +1,12 @@
 {
   "appName": "RADAR Active App",
+  "description": "Track your health data and complete your daily study tasks.",
   "version": "1.0.0",
   "configSchemaVersion": "1",
   "clinicalTemplate": null,
   "theme": {
+    "brandColors": {
+    }
   },
   "header": {
     "title": "Hello",

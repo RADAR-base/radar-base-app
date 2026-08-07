@@ -17,6 +17,18 @@ export const ThemeSchema = z
     fontFamily: z.string().optional(),
     fontSize: z.number().optional(),
     button: z.object({ borderRadius: z.number() }).partial().optional(),
+    /**
+     * Optional brand overrides. Each color replaces a design-system palette slot and cascades to
+     * every token that uses it (see `getColorTokens`): primary → the dominant navy, secondary →
+     * the lighter navy, tertiary → the teal accent. Omitted colors keep the theme default.
+     */
+    brandColors: z
+      .object({
+        primary: z.string().optional(),
+        secondary: z.string().optional(),
+        tertiary: z.string().optional(),
+      })
+      .optional(),
   })
   .passthrough();
 
