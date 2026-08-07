@@ -3,10 +3,13 @@
     "name": "RADAR-Base Starter",
     "slug": "radar-base-starter",
     "version": "0.1.0",
+    "scheme": "com.radarbase.starter",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
-    "plugins": [],
+    "plugins": [
+      "expo-font"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "org.radarbase.starter",
