@@ -5,7 +5,8 @@
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run copy-assets",
+    "copy-assets": "mkdir -p lib/theme/icons && cp src/theme/icons/*.svg lib/theme/icons/",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf lib",
     "prepublishOnly": "npm run clean && npm run build",
@@ -31,14 +32,17 @@
   "author": "RADAR-Base",
   "license": "MIT",
   "peerDependencies": {
-    "react": ">=16.8.0",
-    "react-native": ">=0.60.0",
     "@react-native-async-storage/async-storage": ">=1.0.0",
     "@react-native-firebase/analytics": ">=18.0.0",
     "@react-native-firebase/app": ">=18.0.0",
     "@react-native-firebase/messaging": ">=18.0.0",
     "@react-native-firebase/remote-config": ">=18.0.0",
-    "react-native-keychain": ">=8.0.0"
+    "react": ">=16.8.0",
+    "react-native": ">=0.60.0",
+    "react-native-keychain": ">=8.0.0",
+    "react-native-reanimated": ">=3.0.0",
+    "react-native-safe-area-context": ">=4.0.0",
+    "react-native-svg": ">=13.0.0"
   },
   "peerDependenciesMeta": {
     "@react-native-async-storage/async-storage": {
@@ -57,6 +61,12 @@
       "optional": true
     },
     "react-native-keychain": {
+      "optional": true
+    },
+    "react-native-safe-area-context": {
+      "optional": true
+    },
+    "react-native-svg": {
       "optional": true
     }
   },
@@ -84,6 +94,9 @@
     "prettier": "3.4.2",
     "react": "19.2.0",
     "react-native": "0.80.3",
+    "react-native-reanimated": "^3.17.4",
+    "react-native-safe-area-context": "^5.8.0",
+    "react-native-svg": "^15.15.5",
     "react-test-renderer": "19.2.0",
     "typescript": "5.8.3"
   },
