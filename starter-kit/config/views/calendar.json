@@ -7,17 +7,8 @@
     "title": "Calendar",
     "children": [
       {
-        "id": "card_study_info",
-        "type": "CardNode",
-        "isCanvas": true,
-        "children": [
-          {
-            "id": "text_study_title",
-            "type": "TextNode",
-            "text": "Calendar",
-            "style": "heading3"
-          }
-        ]
+        "id": "calendar_selector",
+        "type": "CalendarNode"
       }
     ]
   }
