@@ -1,3 +1,10 @@
+// Install app-wide Text defaults on import of the library (before any Text renders): the OS
+// font-scale cap (so accessibility sizes enlarge text without breaking the fixed-geometry card
+// layouts) and Android's includeFontPadding:false (line-height parity with iOS). See
+// theme/fontScaling.ts. Idempotent — a second call is a no-op.
+import { installTextDefaults } from './theme/fontScaling';
+installTextDefaults();
+
 // Core services
 export {
   CoreServicesProvider,
@@ -74,14 +81,16 @@ export {
   TextQuestionInput,
   TextInputField,
   HintCard,
-  RegistrationHeader,
+  PageHeader,
   StepSlider,
   PillButton,
   useStepFlow,
   useSlideOverlay,
   useTopInset,
+  useBottomInset,
   NotificationsScreen,
   ConnectHealthScreen,
+  TaskInstructionsScreen,
   LoadingDots,
   LoadingScreen,
   InfoScreen,
@@ -106,13 +115,14 @@ export type {
   DataWheelSize,
   TextInputFieldProps,
   HintCardProps,
-  RegistrationHeaderProps,
+  PageHeaderProps,
   StepSliderProps,
   PillButtonProps,
   StepFlow,
   StepDirection,
   NotificationsScreenProps,
   ConnectHealthScreenProps,
+  TaskInstructionsScreenProps,
   LoadingDotsProps,
   LoadingScreenProps,
 } from './library/sdui';
@@ -194,6 +204,7 @@ export {
   navbarLayout,
 } from './theme/theme';
 export type { ColorTokens, ThemeMode, ThemeColorOverrides } from './theme/theme';
+export { MAX_FONT_SCALE, installTextDefaults, installFontScaleCap } from './theme/fontScaling';
 
 // Design-system icons — React components (resolved via react-native-svg-transformer in the host app).
 export { default as QrCodeIcon } from './theme/icons/qrcode.svg';
