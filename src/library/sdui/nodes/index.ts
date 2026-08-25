@@ -13,6 +13,7 @@ import { ArcDataCardNode } from './card/ArcDataCardNode';
 import { LineGraphCardNode } from './card/LineGraphCardNode';
 import { CardSectionNode } from './section/CardSectionNode';
 import { TaskListSectionNode } from './section/TaskListSectionNode';
+import { NotificationListNode } from './section/NotificationListNode';
 import { ConnectDevicesMenuNode } from './ConnectDevicesMenuNode';
 import { HeaderNode } from './header/HeaderNode';
 import { InboxItemListCoordinatorNode } from './InboxItemListCoordinatorNode';
@@ -49,6 +50,7 @@ export function registerBuiltInNodes(): void {
   registry.register('LineGraphCardNode', LineGraphCardNode);
   registry.register('CardSectionNode', CardSectionNode);
   registry.register('TaskListSectionNode', TaskListSectionNode);
+  registry.register('NotificationListNode', NotificationListNode);
 
   // Header — HeaderBarNode / HeaderTextNode are internal building blocks; only the
   // composite HeaderNode is a blueprint-addressable node type.
@@ -92,6 +94,7 @@ export {
   LineGraphCardNode,
   CardSectionNode,
   TaskListSectionNode,
+  NotificationListNode,
   ConnectDevicesMenuNode,
   HeaderNode,
   InboxItemListCoordinatorNode,
