@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    lineHeight: 24,
+    lineHeight: 30, // > fontSize so Android doesn't clip the title
     fontWeight: '700',
     fontFamily: fontFamily.bold,
     letterSpacing: tracking.bold,

@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
     paddingRight: 36, // balances the close button so the title stays centered
   },
   close: {
-    // Match RegistrationHeader's 36×36 back-button box so the title row is the same height and the
+    // Match PageHeader's 36×36 back-button box so the title row is the same height and the
     // X / title line up with the flow's back button / title behind the translucent scrim.
     width: 36,
     height: 36,

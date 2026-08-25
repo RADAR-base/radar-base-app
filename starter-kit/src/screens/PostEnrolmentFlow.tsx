@@ -31,7 +31,7 @@ export function PostEnrolmentFlow({ onDone, brandColors }: PostEnrolmentFlowProp
 
   return (
     <View style={styles.root}>
-      <StepSlider index={flow.index} direction={flow.direction}>
+      <StepSlider index={flow.index}>
         {(i) => {
           if (i === 0) {
             return <RegistrationCompleteScreen onStart={flow.next} brandColors={brandColors} />;

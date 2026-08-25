@@ -3,7 +3,8 @@ import { StyleSheet, useColorScheme, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import {
   getColorTokens,
-  RegistrationHeader,
+  layout,
+  PageHeader,
   StepSlider,
   useSlideOverlay,
   useStepFlow,
@@ -87,14 +88,14 @@ export function RegistrationFlow({
 
   return (
     <View style={[styles.root, { backgroundColor: tokens.background.primary }]}>
-      <RegistrationHeader
+      <PageHeader
         onBack={handleBack}
         progress={STEP_PROGRESS[flow.index]}
         mode={mode}
         brandColors={brandColors}
       />
 
-      <StepSlider index={flow.index} direction={flow.direction}>
+      <StepSlider index={flow.index}>
         {(i) =>
           i === 0 ? (
             <ChooseMethodView
@@ -111,7 +112,10 @@ export function RegistrationFlow({
       </StepSlider>
 
       {camera.visible && (
-        <Animated.View style={[StyleSheet.absoluteFill, camera.overlayStyle]}>
+        <Animated.View
+          {...camera.panHandlers}
+          style={[StyleSheet.absoluteFill, styles.roundedOverlay, camera.overlayStyle]}
+        >
           <CameraScanScreen
             onBack={closeCamera}
             // Frontend only: returns to the QR step for now; wire to the login-token flow later.
@@ -125,6 +129,11 @@ export function RegistrationFlow({
 }
 
 const styles = StyleSheet.create({
+  // Rounds the sliding camera overlay so it reads as a rounded card over the flow behind it.
+  roundedOverlay: {
+    borderRadius: layout.radiusScreen,
+    overflow: 'hidden',
+  },
   root: {
     flex: 1,
     // No padding here: the header and each step view own their own insets, and the StepSlider needs

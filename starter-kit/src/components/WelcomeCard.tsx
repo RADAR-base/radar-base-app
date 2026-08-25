@@ -123,7 +123,9 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 40,
-    lineHeight: 40,
+    // ~1.2× the font size, not 40: an equal line height makes Android cramp/clip wrapped lines
+    // (e.g. a two-line study name) and tall glyphs; iOS renders it fine either way.
+    lineHeight: 48,
     fontWeight: '700',
     fontFamily: fontFamily.bold,
     letterSpacing: tracking.bold,
@@ -147,7 +149,7 @@ const styles = StyleSheet.create({
   },
   prompt: {
     fontSize: 14,
-    lineHeight: 14,
+    lineHeight: 18, // > fontSize so Android doesn't clip the text
     fontWeight: '300',
     fontFamily: fontFamily.light,
     letterSpacing: tracking.light,

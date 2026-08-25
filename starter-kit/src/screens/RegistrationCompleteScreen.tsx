@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, useColorScheme, View } from 'react-native';
 import {
   getColorTokens,
-  RegistrationHeader,
+  PageHeader,
   type ThemeColorOverrides,
   type ThemeMode,
 } from '@radarbase/app-kit';
@@ -38,7 +38,7 @@ export function RegistrationCompleteScreen({
 
   return (
     <View style={[styles.root, { backgroundColor: tokens.background.primary }]}>
-      <RegistrationHeader
+      <PageHeader
         onBack={() => {}}
         progress={1}
         showBack={false}
