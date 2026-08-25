@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { NodeProps } from '../types';
-import { fontFamily } from '../../../theme/theme';
+import { fontFamily, cardShadow } from '../../../theme/theme';
 
 /**
  * Device connection status indicator. Matches the Figma header sync style
@@ -75,11 +75,7 @@ export function ConnectDevicesMenuNode({ node, context }: NodeProps) {
 const styles = StyleSheet.create({
   container: {
     padding: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    ...cardShadow,
   },
   headerRow: {
     flexDirection: 'row',

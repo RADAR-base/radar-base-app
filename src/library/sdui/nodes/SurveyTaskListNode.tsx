@@ -4,7 +4,7 @@ import { useCoreServices } from '../../../core/CoreServicesContext';
 import { EVENTS } from '../../../core/EventBus';
 import type { Task } from '../../../types';
 import type { NodeProps } from '../types';
-import { fontFamily } from '../../../theme/theme';
+import { fontFamily, cardShadow } from '../../../theme/theme';
 
 interface FilterShape {
   status?: 'incomplete' | 'complete' | 'all';
@@ -275,11 +275,7 @@ const styles = StyleSheet.create({
   description: { fontSize: 13, marginBottom: 10, fontFamily: fontFamily.regular, includeFontPadding: false },
   listContainer: {
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
+    ...cardShadow,
   },
   taskItem: {
     flexDirection: 'row',
@@ -364,11 +360,7 @@ const styles = StyleSheet.create({
   emptyState: {
     padding: 24,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    ...cardShadow,
   },
   emptyText: {
     fontSize: 13,

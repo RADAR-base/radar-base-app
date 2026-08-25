@@ -5,7 +5,7 @@ import type { Answer, Question, QuestionnaireResult, QuestionTimestamp } from '.
 import type { NodeProps } from '../types';
 import { QuestionRenderer } from './questionnaire/QuestionRenderer';
 import { evaluateBranchingLogic } from './questionnaire/branchingLogic';
-import { fontFamily } from '../../../theme/theme';
+import { fontFamily, cardShadow } from '../../../theme/theme';
 
 const ON_PRIMARY = '#FFFFFF';
 
@@ -259,11 +259,7 @@ const styles = StyleSheet.create({
   container: {
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    ...cardShadow,
   },
   progressRow: {
     flexDirection: 'row',

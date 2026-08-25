@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
     fontSize: layoutTokens.headingFontSize,
     fontFamily: fontFamily.bold,
     includeFontPadding: false,
-    lineHeight: layoutTokens.headingFontSize,
+    lineHeight: layoutTokens.headingLineHeight,
     fontWeight: '700',
     letterSpacing: tracking.bold,
   },

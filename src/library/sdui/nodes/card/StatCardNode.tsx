@@ -6,7 +6,8 @@ import CheckinIcon from '../../../../theme/icons/checkin.svg';
 import CalendarIcon from '../../../../theme/icons/calendar.svg';
 import FireIcon from '../../../../theme/icons/fire.svg';
 import MedalIcon from '../../../../theme/icons/medal.svg';
-import { tracking, fontFamily, getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
+import { tracking, fontFamily, getColorTokens, layout as layoutTokens, cardShadow } from '../../../../theme/theme';
+import { useLocalMetric } from '../../useLocalMetric';
 import type { NodeProps } from '../../types';
 
 type EngagementTokenKey =
@@ -90,7 +91,15 @@ export function StatCardNode({ node, context }: NodeProps) {
   // CardSectionNode's `layout: "grid"`) need the card to fill whatever flex cell it's
   // placed in instead, so they set `fillWidth: true`.
   const fillWidth = node.fillWidth === true;
-  const value = typeof node.value === 'string' || typeof node.value === 'number' ? node.value : 0;
+  // A local metric (e.g. `metric: "task_completed"`) drives the value from app data (the task
+  // schedule); otherwise fall back to the static `value` from the blueprint.
+  const metric = typeof node.metric === 'string' ? node.metric : '';
+  const local = useLocalMetric(metric);
+  const value = local
+    ? local.value
+    : typeof node.value === 'string' || typeof node.value === 'number'
+      ? node.value
+      : 0;
   const label = typeof node.label === 'string' ? node.label : DEFAULT_LABEL[statsType];
   const showKeepItUp = node.showKeepItUp !== false;
   const keepItUpLabel = typeof node.keepItUpLabel === 'string' ? node.keepItUpLabel : 'Keep it up!';
@@ -155,23 +164,21 @@ const styles = StyleSheet.create({
   card: {
     padding: layoutTokens.cardPadding,
     borderRadius: layoutTokens.radiusCard,
-    shadowColor: '#085041',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 2,
+    ...cardShadow,
   },
   // 195 is deliberate, not arbitrary: two stacked small cards (93) plus the 9px gap
   // between them (in CardSectionNode's grid layout) sum to exactly 195 — cardLarge's
   // height — so the two grid columns line up evenly. 93 is itself the minimum that
   // fits cardSmall's content (title + 9px gap + value row) inside a 16px padding on
   // all sides without overflowing into (and visually shrinking) the bottom padding.
+  // `minHeight` (not fixed `height`) so the card renders identically at normal font size but grows
+  // instead of clipping when accessibility font scaling enlarges the title/value. See fontScaling.ts.
   cardLarge: {
-    height: 195,
+    minHeight: 195,
     justifyContent: 'flex-start',
   },
   cardSmall: {
-    height: 93,
+    minHeight: 93,
     justifyContent: 'space-between',
   },
   titleRow: {
@@ -200,7 +207,8 @@ const styles = StyleSheet.create({
     fontSize: 64,
     fontFamily: fontFamily.bold,
     includeFontPadding: false,
-    lineHeight: 64,
+    // Slightly taller than the font size so the top of the digits isn't clipped on Android.
+    lineHeight: 72,
     fontWeight: 'bold',
     letterSpacing: tracking.bold,
   },

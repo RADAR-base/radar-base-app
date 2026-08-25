@@ -2,7 +2,7 @@ import React, { useId, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Circle, ClipPath, Defs, G, Path } from 'react-native-svg';
 import ArrowRightIcon from '../../../../theme/icons/arrowright.svg';
-import { tracking, fontFamily, getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
+import { tracking, fontFamily, getColorTokens, layout as layoutTokens, cardShadow } from '../../../../theme/theme';
 import { useDashboardData } from '../../useDashboardData';
 import type { DashboardWidgetConfig } from '../../../../types';
 import type { NodeProps } from '../../types';
@@ -70,6 +70,9 @@ export function ArcDataCardNode({ node, context }: NodeProps) {
   const target = typeof node.target === 'number' && node.target > 0 ? node.target : 100;
   const reverse = node.reverse === true;
   const viewPath = typeof node.viewPath === 'string' ? node.viewPath : undefined;
+  // The open button (arrow → `viewPath`) shows by default; set `showOpenButton: false` in the config
+  // to hide it. Navigation still requires `viewPath` — a shown button with no target stays disabled.
+  const showOpenButton = node.showOpenButton !== false;
   const inlineValue = typeof node.value === 'number' ? node.value : undefined;
   const inlineValues = Array.isArray(node.values)
     ? (node.values as number[]).filter((v) => typeof v === 'number')
@@ -142,7 +145,7 @@ export function ArcDataCardNode({ node, context }: NodeProps) {
         <Text style={[styles.title, { color: tokens.text.primary }]} numberOfLines={1}>
           {title}
         </Text>
-        {openButton}
+        {showOpenButton && openButton}
       </View>
 
       <View style={styles.arcWrap} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
@@ -182,16 +185,14 @@ export function ArcDataCardNode({ node, context }: NodeProps) {
 const styles = StyleSheet.create({
   card: {
     width: '100%',
-    height: 176,
+    // minHeight so enlarged text grows the card rather than being clipped by `overflow: hidden`
+    // (the arc graphic keeps its own size). See fontScaling.ts.
+    minHeight: 176,
     borderRadius: layoutTokens.radiusCard,
     padding: layoutTokens.cardPadding,
     gap: 4,
     overflow: 'hidden',
-    shadowColor: '#085041',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 2,
+    ...cardShadow,
   },
   headerRow: {
     flexDirection: 'row',

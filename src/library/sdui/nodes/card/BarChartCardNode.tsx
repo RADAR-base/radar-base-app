@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Line } from 'react-native-svg';
 import ArrowRightIcon from '../../../../theme/icons/arrowright.svg';
-import { tracking, fontFamily, getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
+import { tracking, fontFamily, getColorTokens, layout as layoutTokens, cardShadow } from '../../../../theme/theme';
 import { useDashboardData } from '../../useDashboardData';
 import type { DashboardWidgetConfig } from '../../../../types';
 import type { NodeProps } from '../../types';
@@ -46,6 +46,9 @@ export function BarChartCardNode({ node, context }: NodeProps) {
   const metric = typeof node.metric === 'string' ? node.metric : 'wearable_metric';
   const unit = typeof node.unit === 'string' ? node.unit : undefined;
   const viewPath = typeof node.viewPath === 'string' ? node.viewPath : undefined;
+  // The open button (arrow → `viewPath`) shows by default; set `showOpenButton: false` in the config
+  // to hide it. Navigation still requires `viewPath` — a shown button with no target stays disabled.
+  const showOpenButton = node.showOpenButton !== false;
   // Defaults to today (JS Sunday=0 remapped to a Monday-first index), but can be pinned
   // from a blueprint for previews / fixed reports.
   const currentDayIndex =
@@ -189,7 +192,7 @@ export function BarChartCardNode({ node, context }: NodeProps) {
           <Text style={[styles.titleSmall, { color: tokens.text.primary }]} numberOfLines={1}>
             {title}
           </Text>
-          {openButton}
+          {showOpenButton && openButton}
         </View>
         <View style={styles.largeRow}>
           <View style={styles.chartColumn}>
@@ -213,7 +216,7 @@ export function BarChartCardNode({ node, context }: NodeProps) {
         <Text style={[styles.titleSmall, { color: tokens.text.primary }]} numberOfLines={1}>
           {title}
         </Text>
-        {openButton}
+        {showOpenButton && openButton}
       </View>
       {chart}
       {dayLabels}
@@ -237,11 +240,7 @@ const styles = StyleSheet.create({
     borderRadius: layoutTokens.radiusCard,
     padding: layoutTokens.cardPadding,
     gap: layoutTokens.gap,
-    shadowColor: '#085041',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 2,
+    ...cardShadow,
   },
   cardSmall: {
     width: 176,

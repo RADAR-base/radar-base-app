@@ -8,7 +8,7 @@ import type {
 import { BarChart, Sparkline } from '../Charts';
 import { useDashboardData } from '../useDashboardData';
 import type { NodeProps } from '../types';
-import { fontFamily } from '../../../theme/theme';
+import { fontFamily, resolveBackground, cardShadow } from '../../../theme/theme';
 
 /**
  * Renders a graph for a single metric. Three visual variants:
@@ -62,7 +62,7 @@ export function GraphDataNode({ node, context }: NodeProps) {
   const surface = theme.surfaceColor ?? '#FFFFFF';
   const text = theme.textColor ?? '#1C3549';
   const textSecondary = theme.textSecondaryColor ?? '#8E8E93';
-  const background = theme.backgroundColor ?? '#EDF1F5';
+  const background = resolveBackground(theme, context.colorScheme ?? 'light');
   const radius = theme.button?.borderRadius ?? 12;
 
   const values = useMemo(() => {
@@ -256,11 +256,7 @@ const styles = StyleSheet.create({
   container: {
     padding: 14,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    ...cardShadow,
   },
   title: { fontSize: 16, fontWeight: '700', marginBottom: 4, fontFamily: fontFamily.bold, includeFontPadding: false },
   description: { fontSize: 12, marginBottom: 10, fontFamily: fontFamily.regular, includeFontPadding: false },
@@ -274,11 +270,7 @@ const styles = StyleSheet.create({
   compactCard: {
     width: 145,
     padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    ...cardShadow,
   },
   compactHeader: {
     flexDirection: 'row',

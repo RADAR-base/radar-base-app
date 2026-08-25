@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import DoneIcon from '../../../../theme/icons/done.svg';
 import CheckIcon from '../../../../theme/icons/check.svg';
 import MissedIcon from '../../../../theme/icons/missed.svg';
-import { tracking, fontFamily, getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
+import { tracking, fontFamily, getColorTokens, layout as layoutTokens, cardShadow } from '../../../../theme/theme';
 import type { NodeProps } from '../../types';
 
 type ToDoStatus = 'allCompleted' | 'someMissed' | 'allMissed';
@@ -99,11 +99,7 @@ const styles = StyleSheet.create({
     gap: layoutTokens.gap,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#085041',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 2,
+    ...cardShadow,
   },
   textBlock: {
     alignItems: 'center',
