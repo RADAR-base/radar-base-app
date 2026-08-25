@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
-import { useAuth, useSlideOverlay, type ThemeManifest } from '@radarbase/app-kit';
+import { layout, useAuth, useSlideOverlay, type ThemeManifest } from '@radarbase/app-kit';
 
 import { GradientMeshBackground, StudyNameModal, WelcomeCard } from '../components';
 import { RegistrationFlow } from './RegistrationFlow';
@@ -43,6 +43,7 @@ export function LoginScreen({
   const isAuthenticating = status === 'authenticating';
   const insets = useSafeAreaInsets();
   const [signUpOpen, setSignUpOpen] = useState(false);
+  const [loginIdOpen, setLoginIdOpen] = useState(false);
 
   // Pushes the enrolment page in from the right; the welcome screen slides left in lockstep.
   const enrolment = useSlideOverlay();
@@ -131,11 +132,28 @@ export function LoginScreen({
         brandColors={theme.brandColors}
       />
 
+      {/* "Enter Login Details" opens this study-ID prompt (same modal as Sign Up). Pressing Search
+          kicks off the OAuth login in the browser, exactly as the button used to do directly. The
+          entered ID isn't yet used to resolve the portal URL — that stays the configured default. */}
+      <StudyNameModal
+        visible={loginIdOpen}
+        onClose={() => setLoginIdOpen(false)}
+        onSubmit={() => {
+          setLoginIdOpen(false);
+          void onPressLogin();
+        }}
+        title="Enter Study ID"
+        description="Enter your study ID and we'll find your login portal"
+        placeholder="Study ID"
+        ctaLabel="Search"
+        brandColors={theme.brandColors}
+      />
+
       {enrolment.visible && (
-        <Animated.View style={[StyleSheet.absoluteFill, enrolment.overlayStyle]}>
+        <Animated.View style={[StyleSheet.absoluteFill, styles.roundedOverlay, enrolment.overlayStyle]}>
           <RegistrationFlow
             onExit={enrolment.close}
-            onEnterLoginDetails={onPressLogin}
+            onEnterLoginDetails={() => setLoginIdOpen(true)}
             onResetLogin={cancelLogin}
             isAuthenticating={isAuthenticating}
             brandColors={theme.brandColors}
@@ -167,6 +185,11 @@ const styles = StyleSheet.create({
     flex: 1,
     // Fallback shown for the first frame before the Skia canvas paints.
     backgroundColor: '#482fc4',
+  },
+  // Rounds the sliding registration overlay so it reads as a rounded card over the welcome screen.
+  roundedOverlay: {
+    borderRadius: layout.radiusScreen,
+    overflow: 'hidden',
   },
   safeArea: {
     flex: 1,
