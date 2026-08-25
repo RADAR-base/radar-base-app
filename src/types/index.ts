@@ -114,6 +114,12 @@ export interface Task {
   completed?: boolean;
   /** Epoch ms of the protocol-configured reminder, if any — see `TaskInstance.reminderTimestamp`. */
   reminderTimestamp?: number;
+  /** True until the user first opens this task — drives the card's "New Task" pill. */
+  isNew?: boolean;
+  /** Optional study-supplied icon URL (from `AssessmentConfig.icon`). When set, the task/calendar
+   *  card shows this image over the type-colored badge instead of the bundled default glyph; it
+   *  falls back to the default on load error, so the card is never blank. */
+  iconUrl?: string;
 }
 
 export interface DataExportConfig {
@@ -417,6 +423,10 @@ export interface QuestionnaireMetadata {
 /** A single assessment entry in the top-level `protocols` array. */
 export interface AssessmentConfig {
   name: string;
+  /** Optional study-supplied task icon URL (raster). Studies set this to brand their tasks with
+   *  their own icon; when omitted the app shows the default type badge. Flows to `TaskInstance.icon`
+   *  → `Task.iconUrl` → the card's `TaskIcon`. */
+  icon?: string;
   questionnaire?: QuestionnaireMetadata;
   estimatedCompletionTime?: number;
   protocol: AssessmentProtocol;
@@ -470,6 +480,8 @@ export interface TaskInstance {
    * `ScheduleService.buildTasksForAssessment` — see `reminderOffsetMillis`.
    */
   reminderTimestamp?: number;
+  /** Optional study-supplied icon URL, carried from `AssessmentConfig.icon`. */
+  icon?: string;
 }
 
 export interface ScheduleService {
@@ -483,6 +495,10 @@ export interface ScheduleService {
   skipTask(instanceId: string): Promise<TaskInstance>;
   refreshStates(): Promise<void>;
   toSDUITask(instance: TaskInstance): Task;
+  /** Mark a task as opened by the user, persistently — clears its "New Task" pill. */
+  markTaskOpened(instanceId: string): Promise<void>;
+  /** Distinct calendar days the user has completed ≥1 task — drives the "Active days" metric. */
+  getActiveDaysCount(): number;
   destroy(): void;
 }
 

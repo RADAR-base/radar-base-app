@@ -18,6 +18,14 @@ import { EVENTS } from './EventBus';
 const STORAGE_KEYS = {
   PROTOCOL: '@radarbase/schedule_protocol',
   INSTANCES: '@radarbase/schedule_instances',
+  // instanceIds the user has opened at least once — drives the "New Task" pill (a task is "new"
+  // until it's been opened). Persisted so it survives restarts.
+  OPENED: '@radarbase/schedule_opened_tasks',
+  // Calendar-day keys on which the user completed ≥1 task — its size is the "Active days" count.
+  // Persisted separately from `INSTANCES` (which get pruned), so the count only ever grows.
+  ACTIVE_DAYS: '@radarbase/schedule_active_days',
+  // instanceIds we've already surfaced a "task ready" notification for — so each task notifies once.
+  NOTIFIED_READY: '@radarbase/schedule_notified_ready',
 };
 
 const DEFAULT_COMPLETION_WINDOW_MS = 86_400_000; // 1 day
@@ -26,7 +34,12 @@ const DEFAULT_COMPLETION_WINDOW_MS = 86_400_000; // 1 day
 // re-merged, see `mergeInstances`) on every app start. A rolling 2-week window is plenty
 // for "today" + "upcoming" without the unbounded growth that was blowing past browser
 // localStorage's quota (`QuotaExceededError`) after repeated reloads/protocol edits.
-const DEFAULT_SCHEDULE_DAYS_COVERAGE = 14;
+// Wide enough to span the calendar's whole range from an enrolment reference up to two weeks back:
+// worst case ~5 weeks (2 weeks back + this week + 1 week forward, plus week-alignment slack).
+const DEFAULT_SCHEDULE_DAYS_COVERAGE = 35;
+// How many days of already-expired ("missed") tasks to keep, so the calendar can show them on previous
+// days. Covers the calendar's two-weeks-back range (up to ~20 days for a Sunday); older is dropped.
+const SCHEDULE_LOOKBACK_DAYS = 21;
 const REFRESH_INTERVAL_MS = 60_000;
 
 export class DefaultScheduleService implements ScheduleService {
@@ -34,6 +47,12 @@ export class DefaultScheduleService implements ScheduleService {
   private protocol: ProtocolConfig | null = null;
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
   private initialized = false;
+  /** instanceIds the user has opened — a task shows the "New Task" pill until it's in here. */
+  private openedTaskIds = new Set<string>();
+  /** Calendar-day keys with ≥1 completed task — `size` is the "Active days" count. */
+  private activeDays = new Set<string>();
+  /** instanceIds already surfaced as a "task ready" notification — dedup so each notifies once. */
+  private notifiedReadyIds = new Set<string>();
 
   constructor(
     private readonly storage: StorageService,
@@ -46,13 +65,20 @@ export class DefaultScheduleService implements ScheduleService {
     if (this.initialized) return;
     this.initialized = true;
 
-    const [savedProtocol, savedInstances] = await Promise.all([
-      this.storage.get<ProtocolConfig>(STORAGE_KEYS.PROTOCOL),
-      this.storage.get<TaskInstance[]>(STORAGE_KEYS.INSTANCES),
-    ]);
+    const [savedProtocol, savedInstances, savedOpened, savedActiveDays, savedNotifiedReady] =
+      await Promise.all([
+        this.storage.get<ProtocolConfig>(STORAGE_KEYS.PROTOCOL),
+        this.storage.get<TaskInstance[]>(STORAGE_KEYS.INSTANCES),
+        this.storage.get<string[]>(STORAGE_KEYS.OPENED),
+        this.storage.get<string[]>(STORAGE_KEYS.ACTIVE_DAYS),
+        this.storage.get<string[]>(STORAGE_KEYS.NOTIFIED_READY),
+      ]);
 
     if (savedProtocol) this.protocol = savedProtocol;
     if (savedInstances) this.instances = savedInstances;
+    if (savedOpened) this.openedTaskIds = new Set(savedOpened);
+    if (savedActiveDays) this.activeDays = new Set(savedActiveDays);
+    if (savedNotifiedReady) this.notifiedReadyIds = new Set(savedNotifiedReady);
 
     // Diagnostic: confirms whether storage restore actually found anything, and how many
     // were already completed/skipped — if `restoredCompleted` is 0 right after a reload
@@ -86,6 +112,19 @@ export class DefaultScheduleService implements ScheduleService {
     console.log(
       `[ScheduleService] loadProtocol: refTimestamp=${new Date(refTimestamp).toISOString()} generated=${generated.length} completed/skipped before=${before} after=${after}`,
     );
+
+    // Bound the "opened" set: drop ids no longer in the store so it can't grow forever.
+    const liveIds = new Set(this.instances.map((i) => i.instanceId));
+    const keptOpened = [...this.openedTaskIds].filter((id) => liveIds.has(id));
+    if (keptOpened.length !== this.openedTaskIds.size) {
+      this.openedTaskIds = new Set(keptOpened);
+      await this.storage.set(STORAGE_KEYS.OPENED, keptOpened);
+    }
+    const keptReady = [...this.notifiedReadyIds].filter((id) => liveIds.has(id));
+    if (keptReady.length !== this.notifiedReadyIds.size) {
+      this.notifiedReadyIds = new Set(keptReady);
+      await this.storage.set(STORAGE_KEYS.NOTIFIED_READY, keptReady);
+    }
 
     await this.persist();
     await this.refreshStates();
@@ -125,12 +164,26 @@ export class DefaultScheduleService implements ScheduleService {
     ).length;
   }
 
+  /** Number of distinct calendar days on which the user has completed ≥1 task (persisted, only grows). */
+  getActiveDaysCount(): number {
+    return this.activeDays.size;
+  }
+
   async completeTask(instanceId: string): Promise<TaskInstance> {
     const instance = this.instances.find(i => i.instanceId === instanceId);
     if (!instance) throw new Error(`Task instance not found: ${instanceId}`);
 
     instance.state = 'completed';
     instance.stateChangedAt = new Date().toISOString();
+
+    // "Active days": the first task completed on a given local calendar day marks that day active, so
+    // the count grows by one per distinct day. Persisted independently of the (pruned) instances.
+    const now = new Date();
+    const dayKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+    if (!this.activeDays.has(dayKey)) {
+      this.activeDays.add(dayKey);
+      await this.storage.set(STORAGE_KEYS.ACTIVE_DAYS, [...this.activeDays]);
+    }
 
     await this.persist();
     this.bus.emit(EVENTS.TASK_COMPLETED, { instanceId, name: instance.name });
@@ -160,11 +213,34 @@ export class DefaultScheduleService implements ScheduleService {
   async refreshStates(): Promise<void> {
     const now = Date.now();
     let changed = false;
+    let readyChanged = false;
 
     for (const instance of this.instances) {
+      const expiresAt = instance.timestamp + instance.completionWindow;
+
+      // "Ready" = the completion window is open right now and the task isn't already done. Emit once
+      // per task (deduped via `notifiedReadyIds`, persisted) so a notification card is created the
+      // moment it becomes ready — including catch-up for tasks whose window opened while the app was
+      // closed. Already-expired past tasks fail `now < expiresAt`, so they never notify.
+      if (
+        instance.state !== 'completed' &&
+        instance.state !== 'skipped' &&
+        now >= instance.timestamp &&
+        now < expiresAt &&
+        !this.notifiedReadyIds.has(instance.instanceId)
+      ) {
+        this.notifiedReadyIds.add(instance.instanceId);
+        readyChanged = true;
+        this.bus.emit(EVENTS.TASK_READY, {
+          instanceId: instance.instanceId,
+          name: instance.name,
+          title: instance.title,
+          timestamp: instance.timestamp,
+        });
+      }
+
       if (instance.state !== 'pending') continue;
 
-      const expiresAt = instance.timestamp + instance.completionWindow;
       if (now > expiresAt) {
         instance.state = 'expired';
         instance.stateChangedAt = new Date().toISOString();
@@ -175,6 +251,10 @@ export class DefaultScheduleService implements ScheduleService {
         changed = true;
         this.bus.emit(EVENTS.TASK_OVERDUE, { instanceId: instance.instanceId, name: instance.name });
       }
+    }
+
+    if (readyChanged) {
+      await this.storage.set(STORAGE_KEYS.NOTIFIED_READY, [...this.notifiedReadyIds]);
     }
 
     if (changed) {
@@ -202,7 +282,17 @@ export class DefaultScheduleService implements ScheduleService {
       completionWindow: instance.completionWindow,
       completed: instance.state === 'completed',
       reminderTimestamp: instance.reminderTimestamp,
+      isNew: !this.openedTaskIds.has(instance.instanceId),
+      iconUrl: instance.icon,
     };
+  }
+
+  async markTaskOpened(instanceId: string): Promise<void> {
+    if (this.openedTaskIds.has(instanceId)) return;
+    this.openedTaskIds.add(instanceId);
+    await this.storage.set(STORAGE_KEYS.OPENED, [...this.openedTaskIds]);
+    // Refresh the UI so the task's "New Task" pill clears immediately.
+    this.bus.emit(EVENTS.SCHEDULE_UPDATED, { reason: 'task-opened' });
   }
 
   destroy(): void {
@@ -265,7 +355,8 @@ function generateAllInstances(
  * 3. Outer loop: while refTime <= endTime, advance by repeatProtocol.
  * 4. Inner loop: for each offset in repeatQuestionnaire.unitsFromZero, create a task at
  *    `advanceRepeat(refTime, { unit: repeatQ.unit, amount: offset })`.
- * 5. Filter: only keep tasks where timestamp + completionWindow > today.
+ * 5. Filter: keep tasks whose window hasn't elapsed, plus recently-expired ones within the calendar
+ *    lookback (so previous days show "missed"); drop anything older.
  */
 function buildTasksForAssessment(
   assessment: AssessmentConfig,
@@ -311,6 +402,7 @@ function buildTasksForAssessment(
         warning: chooseText(assessment.warn),
         syncedToServer: false,
         reminderTimestamp: reminderOffsetMs != null ? taskTime + reminderOffsetMs : undefined,
+        icon: assessment.icon,
       });
     }
 
@@ -318,8 +410,12 @@ function buildTasksForAssessment(
     refTime = advanceRepeat(refTime, repeatP);
   }
 
-  // Only keep tasks whose window hasn't fully elapsed
-  return tasks.filter(t => t.timestamp + t.completionWindow > today);
+  // Keep tasks whose window hasn't fully elapsed, plus recently-expired ones within the calendar's
+  // lookback so previous days can still show them as "missed". Anything older is dropped (storage).
+  const lookbackCutoff = advanceRepeat(today, { unit: 'day', amount: -SCHEDULE_LOOKBACK_DAYS });
+  return tasks.filter(
+    (t) => t.timestamp + t.completionWindow > today || t.timestamp >= lookbackCutoff,
+  );
 }
 
 /** Merge newly generated instances with existing ones, preserving completed/skipped state. */
@@ -336,7 +432,19 @@ function mergeInstances(existing: TaskInstance[], generated: TaskInstance[]): Ta
 
   const existingMap = new Map(
     existing
-      .filter((inst) => generatedIds.has(inst.instanceId) || inst.timestamp >= cutoff)
+      // Keep an existing instance only if it's part of the current generated window, or it's a
+      // *recently completed/skipped* task that's no longer generated (a short-lived history grace so
+      // a just-finished task doesn't vanish if the protocol changes). Stale *pending* instances
+      // outside the current window are dropped: without this, leftovers from an older/larger
+      // generation window (the previous 1-year coverage, or timestamps that drifted across runs) pile
+      // up unboundedly and diverge across installs — which is how one store ends up showing hundreds
+      // of phantom pending tasks for a single day while a fresh install shows only a handful. Anything
+      // still wanted is simply re-generated as the rolling window advances.
+      .filter(
+        (inst) =>
+          generatedIds.has(inst.instanceId) ||
+          ((inst.state === 'completed' || inst.state === 'skipped') && inst.timestamp >= cutoff),
+      )
       .map((i) => [i.instanceId, i]),
   );
 

@@ -74,6 +74,8 @@ export const EVENTS = {
   TASK_STARTED: 'taskStarted',
   TASK_COMPLETED: 'taskCompleted',
   TASK_SKIPPED: 'taskSkipped',
+  /** Tapping a task on the home screen requests its instructions page (payload: task details). */
+  OPEN_TASK_INSTRUCTIONS: 'openTaskInstructions',
   
   // Auth Events
   AUTH_STATE_CHANGED: 'authStateChanged',
@@ -92,6 +94,10 @@ export const EVENTS = {
   // Schedule Events
   SCHEDULE_UPDATED: 'scheduleUpdated',
   TASK_OVERDUE: 'taskOverdue',
+  /** A task's completion window has just opened — it's now ready to complete (payload:
+   *  `{ instanceId, name, title, timestamp }`). Emitted once per task; drives a "task ready"
+   *  notification card. */
+  TASK_READY: 'taskReady',
 
   // Questionnaire Events
   QUESTIONNAIRE_COMPLETED: 'questionnaireCompleted',
