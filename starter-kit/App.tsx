@@ -18,6 +18,7 @@ import {
   createBundledBlueprintSource,
   eventBus,
   getColorTokens,
+  layout,
   useAuth,
   useScheduleService,
   LoadingScreen,
@@ -34,6 +35,8 @@ import homeBlueprint from './config/views/home.json';
 import profileBlueprint from './config/views/profile.json';
 import inboxHistoryBlueprint from './config/views/secondary/inbox-history.json';
 import questionnaireBlueprint from './config/views/secondary/questionnaire.json';
+import settingsBlueprint from './config/views/secondary/settings.json';
+import notificationsBlueprint from './config/views/secondary/notifications.json';
 import comingSoonBlueprint from './config/views/coming-soon.json';
 import calendarBlueprint from './config/views/calendar.json';
 
@@ -46,6 +49,8 @@ const BUNDLED_BLUEPRINTS: Record<string, unknown> = {
   'views/coming-soon.json': comingSoonBlueprint,
   'views/secondary/inbox-history.json': inboxHistoryBlueprint,
   'views/secondary/questionnaire.json': questionnaireBlueprint,
+  'views/secondary/settings.json': settingsBlueprint,
+  'views/secondary/notifications.json': notificationsBlueprint,
   'views/calendar.json': calendarBlueprint,
 };
 
@@ -82,7 +87,13 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <CoreServicesProvider overrides={serviceOverrides}>
-        <AppRoot serviceOverrides={serviceOverrides} />
+        {/* Dark backdrop + a rounded, clipped frame: every screen rendered inside inherits rounded
+            corners (which reveal this backdrop) — one place instead of rounding each screen. */}
+        <View style={styles.appBackdrop}>
+          <View style={styles.screenFrame}>
+            <AppRoot serviceOverrides={serviceOverrides} />
+          </View>
+        </View>
       </CoreServicesProvider>
     </SafeAreaProvider>
   );
@@ -93,7 +104,13 @@ function useScheduleInit() {
   useEffect(() => {
     (async () => {
       await schedule.init();
-      await schedule.loadProtocol(protocolConfig as ProtocolConfig);
+      // Demo: enrol the participant three weeks ago (midnight) so the calendar has history for its
+      // whole two-weeks-back range (completed/missed tasks). A real host passes the participant's
+      // actual enrolment timestamp here instead.
+      const enrolmentRef = new Date();
+      enrolmentRef.setHours(0, 0, 0, 0);
+      enrolmentRef.setDate(enrolmentRef.getDate() - 21);
+      await schedule.loadProtocol(protocolConfig as ProtocolConfig, enrolmentRef.getTime());
     })();
     return () => schedule.destroy();
   }, [schedule]);
@@ -183,5 +200,16 @@ const styles = StyleSheet.create({
   },
   shellWrapper: {
     flex: 1,
+  },
+  // Dark bezel-like backdrop revealed at the rounded corners of every screen.
+  appBackdrop: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  // Clips all app content to rounded corners.
+  screenFrame: {
+    flex: 1,
+    borderRadius: layout.radiusScreen,
+    overflow: 'hidden',
   },
 });
