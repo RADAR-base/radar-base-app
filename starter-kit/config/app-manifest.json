@@ -5,44 +5,39 @@
   "configSchemaVersion": "1",
   "clinicalTemplate": null,
   "theme": {
-    "brandColors": {
-    }
+      "brand": "#1E90FF",
+      "background": "#200023"
   },
   "header": {
-    "title": "Hello",
+    "title": "Welcome",
     "subtitle": "Track your data and complete your daily tasks",
-    "showName": true,
+    "showSettings": true,
+    "showNotifications": true,
     "profileIcon": true,
-    "showSettings": true
+    "settingsViewPath": "views/secondary/settings.json",
+    "notificationsViewPath": "views/secondary/notifications.json"
   },
   "tabs": [
     {
       "id": "tab_home",
       "label": "Home",
-      "showLabel": true,
+      "showLabel": false,
       "icon": "home",
       "viewPath": "views/home.json"
     },
     {
       "id": "tab_calendar",
       "label": "Calendar",
-      "showLabel": true,  
+      "showLabel": false,
       "icon": "calendar",
       "viewPath": "views/calendar.json"
     },
     {
       "id": "tab_profile",
       "label": "Profile",
-      "showLabel": true,
+      "showLabel": false,
       "icon": "person",
       "viewPath": "views/profile.json"
-    },
-    {
-      "id": "tab_more",
-      "label": "More",
-      "showLabel": true,
-      "icon": "grid",
-      "viewPath": "views/coming-soon.json"
     }
   ],
   "secondaryViews": {
