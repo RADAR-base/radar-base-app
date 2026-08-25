@@ -9,29 +9,43 @@
       {
         "id": "section_card_activity",
         "type": "CardSectionNode",
-        "title": "My Activity",
+        "title": "My Engagement",
         "layout": "grid",
         "children": [
           {
-            "id": "card_check_in",
+            "id": "card_active_days",
             "type": "StatCardNode",
-            "statsType": "checkIn",
-            "value": 12,
+            "statsType": "activeDays",
+            "metric": "active_days",
             "size": "small"
+          },
+          {
+            "id": "task_completed",
+            "type": "DataWheelCardNode",
+            "size": "small",
+            "title": "Todays Tasks",
+            "metric": "task_completed",
+            "showTotal": true,
+            "showOpenButton": false
           },
           {
             "id": "card_current_streak",
             "type": "StatCardNode",
             "statsType": "currentStreak",
-            "value": 4,
+            "size": "small"
+          },
+          {
+            "id": "card_active_days2",
+            "type": "StatCardNode",
+            "statsType": "activeDays",
+            "metric": "active_days",
             "size": "large"
           },
           {
-            "id": "card_longest_streak",
+            "id": "card_current_streak2",
             "type": "StatCardNode",
             "statsType": "longestStreak",
-            "value": 7,
-            "size": "small"
+            "size": "large"
           }
         ]
       },
@@ -45,8 +59,7 @@
           {
             "id": "todo_list",
             "type": "TaskListSectionNode",
-            "variant": "multiCard",
-            "filter": { "status": "incomplete" }
+            "variant": "singleCard"
           }
         ]
       },
@@ -72,7 +85,10 @@
             "metric": "heart_rate",
             "unit": "bpm",
             "xAxis": "day",
-            "values": [62, 64, 61, 68, 72, 88, 95, 84, 79, 74, 70, 76, 90, 102, 96, 85, 80, 77, 73, 69, 66, 64, 63, 61]
+            "values": [
+              62, 64, 61, 68, 72, 88, 95, 84, 79, 74, 70, 76, 90, 102, 96, 85, 80, 77, 73, 69, 66,
+              64, 63, 61
+            ]
           },
           {
             "id": "bars_steps_small",
