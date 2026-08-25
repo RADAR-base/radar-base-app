@@ -38,8 +38,8 @@ export { HintCard } from './HintCard';
 export type { HintCardProps } from './HintCard';
 
 // Registration / stepped-flow UI primitives (used across app enrolment, questionnaires, …).
-export { RegistrationHeader } from './RegistrationHeader';
-export type { RegistrationHeaderProps } from './RegistrationHeader';
+export { PageHeader } from './PageHeader';
+export type { PageHeaderProps } from './PageHeader';
 export { StepSlider } from './StepSlider';
 export type { StepSliderProps } from './StepSlider';
 export { PillButton } from './PillButton';
@@ -48,10 +48,13 @@ export { useStepFlow } from './useStepFlow';
 export type { StepFlow, StepDirection } from './useStepFlow';
 export { useSlideOverlay } from './useSlideOverlay';
 export { useTopInset } from './useTopInset';
+export { useBottomInset } from './useBottomInset';
 export { NotificationsScreen } from './NotificationsScreen';
 export type { NotificationsScreenProps } from './NotificationsScreen';
 export { ConnectHealthScreen } from './ConnectHealthScreen';
 export type { ConnectHealthScreenProps } from './ConnectHealthScreen';
+export { TaskInstructionsScreen } from './TaskInstructionsScreen';
+export type { TaskInstructionsScreenProps } from './TaskInstructionsScreen';
 export { LoadingDots, LoadingScreen } from './LoadingScreen';
 export type { LoadingDotsProps, LoadingScreenProps } from './LoadingScreen';
 export { useDashboardData } from './useDashboardData';

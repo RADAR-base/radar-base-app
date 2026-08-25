@@ -3,19 +3,20 @@ import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Svg, { Path, Rect } from 'react-native-svg';
 
-import { tracking, fontFamily, getColorTokens, layout, type ThemeColorOverrides, type ThemeMode } from '../../theme/theme';
+import { layout, tracking, fontFamily, getColorTokens, type ThemeColorOverrides, type ThemeMode } from '../../theme/theme';
 import { useTopInset } from './useTopInset';
 
 /**
- * Registration-flow header — a back button, a centered title, and an animated progress bar. Intended
- * as a single persistent instance owned by a stepped flow, so `progress` changes animate the fill
- * smoothly between steps instead of jumping. Also owns the top safe-area inset and horizontal
- * padding for the flow. Colors come from the theme tokens.
+ * Generic content-page header — a back chip, a centered title, and an optional animated progress
+ * bar. Used by stepped flows (pass `progress`, updated per step so the fill animates smoothly) and by
+ * plain pushed pages such as a settings / notifications inbox view (omit `progress` for just a back
+ * chip + title). Owns the top safe-area inset and horizontal padding. Colors come from theme tokens.
  */
-export interface RegistrationHeaderProps {
+export interface PageHeaderProps {
   onBack: () => void;
-  /** Progress, 0..1. Changes animate the fill width. */
-  progress: number;
+  /** Progress, 0..1 — animates the fill width. Omit to hide the progress bar entirely, leaving a
+   *  plain back-chip + centered-title header (e.g. a settings / notifications inbox page). */
+  progress?: number;
   title?: string;
   /** Whether to show the back button. When false, its space is kept so the title stays centered. */
   showBack?: boolean;
@@ -24,26 +25,26 @@ export interface RegistrationHeaderProps {
   brandColors?: ThemeColorOverrides;
 }
 
-export function RegistrationHeader({
+export function PageHeader({
   onBack,
   progress,
   title = 'Registration',
   showBack = true,
   mode,
   brandColors,
-}: RegistrationHeaderProps) {
+}: PageHeaderProps) {
   const deviceScheme = useColorScheme();
   const resolvedMode: ThemeMode = mode ?? (deviceScheme === 'dark' ? 'dark' : 'light');
   const tokens = getColorTokens(resolvedMode, brandColors);
   const progressColor = tokens.header.buttonIcon; // navy in light, white in dark
-  // The header owns the top safe-area inset for the registration flow, so screens using it don't
-  // each add their own paddingTop. Clears the status bar (edge-to-edge) + an Android breathing gutter.
+  // The header owns the top safe-area inset for the page, so screens using it don't each add their
+  // own paddingTop. Clears the status bar (edge-to-edge) + an Android breathing gutter.
   const topInset = useTopInset();
 
   // Animate the fill width. We animate a pixel width (from the track's measured width) rather than a
   // percentage, since reanimated animates numeric values cleanly.
   const [trackWidth, setTrackWidth] = useState(0);
-  const clamped = Math.min(Math.max(progress, 0), 1);
+  const clamped = Math.min(Math.max(progress ?? 0, 0), 1);
   const fillWidth = useSharedValue(0);
   useEffect(() => {
     fillWidth.value = withTiming(clamped * trackWidth, { duration: 300 });
@@ -70,13 +71,15 @@ export function RegistrationHeader({
         <Text style={[styles.title, { color: tokens.card.hint.text }]}>{title}</Text>
       </View>
 
-      <View
-        style={styles.progressTrack}
-        onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
-      >
-        <View style={[styles.progressTrackFill, { backgroundColor: progressColor }]} />
-        <Animated.View style={[styles.progressFill, fillStyle, { backgroundColor: progressColor }]} />
-      </View>
+      {progress !== undefined && (
+        <View
+          style={styles.progressTrack}
+          onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
+        >
+          <View style={[styles.progressTrackFill, { backgroundColor: progressColor }]} />
+          <Animated.View style={[styles.progressFill, fillStyle, { backgroundColor: progressColor }]} />
+        </View>
+      )}
     </View>
   );
 }
@@ -109,6 +112,7 @@ const styles = StyleSheet.create({
     width: '100%',
     gap: 16,
     paddingHorizontal: 16,
+    paddingBottom: layout.gap,
   },
   titleBar: {
     flexDirection: 'row',

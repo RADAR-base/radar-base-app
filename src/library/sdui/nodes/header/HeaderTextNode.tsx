@@ -53,28 +53,35 @@ export function HeaderTextNode({ node, context }: NodeProps) {
           </>
         )}
       </View>
-      <View style={styles.subRow}>
-        {description !== '' && (
-          <Text style={[styles.description, { color: descriptionColor }]} numberOfLines={1}>
-            {description}
-          </Text>
-        )}
-        {showEditButton && (
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel={editLabel}
-            onPress={() =>
-              context.dispatch({
-                type: 'TriggerEvent',
-                eventName: typeof node.editEventName === 'string' ? node.editEventName : 'HeaderEdit',
-              })
-            }
-            style={[styles.editButton, { backgroundColor: buttonBg, borderRadius: buttonBorderRadius }]}
-          >
-            <Text style={[styles.editLabel, { color: buttonTextColor }]}>{editLabel}</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      {/* Only render the subtitle row when it has content. Otherwise its container `gap` would
+          leave a stray 9px below a title-only header, making the space under the title (9 + 16px
+          bottom padding = 25) larger than the 16px framing it elsewhere. Omitting it collapses
+          the gap so the title keeps an even 16px on all sides. */}
+      {(description !== '' || showEditButton) && (
+        <View style={styles.subRow}>
+          {description !== '' && (
+            <Text style={[styles.description, { color: descriptionColor }]} numberOfLines={1}>
+              {description}
+            </Text>
+          )}
+          {showEditButton && (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={editLabel}
+              onPress={() =>
+                context.dispatch({
+                  type: 'TriggerEvent',
+                  eventName:
+                    typeof node.editEventName === 'string' ? node.editEventName : 'HeaderEdit',
+                })
+              }
+              style={[styles.editButton, { backgroundColor: buttonBg, borderRadius: buttonBorderRadius }]}
+            >
+              <Text style={[styles.editLabel, { color: buttonTextColor }]}>{editLabel}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
     </View>
   );
 }
@@ -91,10 +98,15 @@ const styles = StyleSheet.create({
   },
   heading: {
     fontSize: 40,
-    fontFamily: fontFamily.regular,
+    // Weight must be set on BOTH axes: `fontFamily` picks the Inter file on Android, while
+    // `fontWeight` drives the system font on iOS (where `fontFamily` resolves to undefined). Keep
+    // them in sync — 600/semiBold is a notch thinner than bold (700). Use .medium/'500' for thinner.
+    fontFamily: fontFamily.semiBold,
+    fontWeight: '600',
     includeFontPadding: false,
-    lineHeight: 40,
-    fontWeight: '400',
+    // ~1.2× the font size, not 40: an equal line height clips tall glyphs / cramps wrapped lines
+    // on Android (iOS is unaffected).
+    lineHeight: 48,
     letterSpacing: tracking.regular,
   },
   subRow: {

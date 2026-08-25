@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    lineHeight: 14,
+    lineHeight: 18, // > fontSize so Android doesn't clip the caption
     fontFamily: fontFamily.regular,
     letterSpacing: tracking.regular,
     textAlign: 'center',

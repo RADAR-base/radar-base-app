@@ -6,7 +6,7 @@ import HomeIcon from '../../../../theme/icons/homenavbar.svg';
 import CalendarIcon from '../../../../theme/icons/calendarnavbar.svg';
 import ProfileIcon from '../../../../theme/icons/profilenavbar.svg';
 import DataIcon from '../../../../theme/icons/datanavbar.svg';
-import { getColorTokens, navbarLayout } from '../../../../theme/theme';
+import { getColorTokens, navbarLayout, withAlpha } from '../../../../theme/theme';
 import { NavbarItemNode } from './NavbarItemNode';
 import type { NodeProps } from '../../types';
 
@@ -33,6 +33,9 @@ const ICONS: Record<string, ComponentType<SvgProps>> = {
   data: DataIcon,
 };
 
+/** Opacity of the selected tab's highlight — a translucent tint of the icon color over the dark bar. */
+const NAV_SELECTED_TINT = 0.2;
+
 function isNavbarTabArray(value: unknown): value is NavbarTab[] {
   return (
     Array.isArray(value) &&
@@ -56,14 +59,17 @@ export function NavbarNode({ node, context }: NodeProps) {
 
   const backgroundColor =
     typeof node.backgroundColor === 'string' ? node.backgroundColor : tokens.navbar.surface.background;
+  const unselectedColor =
+    typeof node.textColor === 'string' ? node.textColor : tokens.navbar.text.primary;
+  // Selected tab: the icon keeps its (unselected) color and sits on a translucent tint of that same
+  // color — a soft highlight that reads on the dark bar in both light & dark, deriving one fill from
+  // the icon color instead of a solid pill token that had to swap per theme.
+  const selectedColor =
+    typeof node.selectedTextColor === 'string' ? node.selectedTextColor : unselectedColor;
   const selectedBg =
     typeof node.selectedBackgroundColor === 'string'
       ? node.selectedBackgroundColor
-      : tokens.navbar.surface.backgroundInvert;
-  const selectedColor =
-    typeof node.selectedTextColor === 'string' ? node.selectedTextColor : tokens.navbar.text.invert;
-  const unselectedColor =
-    typeof node.textColor === 'string' ? node.textColor : tokens.navbar.text.primary;
+      : withAlpha(unselectedColor, NAV_SELECTED_TINT);
   const borderColor = typeof node.borderColor === 'string' ? node.borderColor : tokens.navbar.border;
 
   const defaultShowLabel = node.showLabels !== false;

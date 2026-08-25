@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
-  interpolate,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
@@ -13,8 +12,11 @@ import type { StepDirection } from './useStepFlow';
 export interface StepSliderProps {
   /** Current step index. */
   index: number;
-  /** Direction of the last move: 1 = incoming enters from the right, -1 = from the left. */
-  direction: StepDirection;
+  /**
+   * @deprecated No longer needed — slide direction is derived automatically from the index change
+   * (forward slides in from the right, back from the left). Kept for API compatibility.
+   */
+  direction?: StepDirection;
   /** Transition duration in ms. */
   duration?: number;
   /** Renders the content for a given step index. */
@@ -22,51 +24,51 @@ export interface StepSliderProps {
 }
 
 /**
- * Slides between step views horizontally: on an index change the incoming view enters from the
- * `direction` side while the outgoing view exits the opposite way, then the outgoing view is
- * dropped. Only the content moves — a persistent header above (or a background behind) stays put.
- * Pair with `useStepFlow`, which supplies `index` and `direction`.
+ * Slides between step views horizontally: on an index change the incoming view enters from the side
+ * (right when advancing, left when going back) while the outgoing view exits the opposite way, then
+ * the outgoing view is dropped. Only the content moves — a persistent header above (or a background
+ * behind) stays put. Pair with `useStepFlow`, which supplies `index`.
+ *
+ * Positions are driven by a single `position` shared value that animates between absolute step
+ * indices — it is **not** reset per transition. That's deliberate: when the incoming panel first
+ * mounts, `position` still holds the previous index, which already places the panel off-screen, so
+ * there's no reset-to-0 for the first paint to race with (the source of a one-frame blink otherwise).
  */
-export function StepSlider({ index, direction, duration = 260, children }: StepSliderProps) {
+export function StepSlider({ index, duration = 260, children }: StepSliderProps) {
   const { width } = useWindowDimensions();
-  // `curr` is the settled step; during a transition `prev` is the outgoing one (else null).
-  const [panels, setPanels] = useState<{ curr: number; prev: number | null; dir: StepDirection }>({
-    curr: index,
-    prev: null,
-    dir: 1,
-  });
-  const progress = useSharedValue(1); // 0 at the start of a transition, 1 when settled
-
-  const settle = () => setPanels((p) => ({ ...p, prev: null }));
+  const position = useSharedValue(index);
+  // `to` is the settling step; during a transition `from` is the outgoing one (else `from === to`).
+  const [panels, setPanels] = useState<{ from: number; to: number }>({ from: index, to: index });
 
   useEffect(() => {
-    if (index === panels.curr) return;
-    setPanels({ curr: index, prev: panels.curr, dir: direction });
-    progress.value = 0;
-    progress.value = withTiming(1, { duration }, (finished) => {
-      if (finished) runOnJS(settle)();
+    if (index === panels.to) return;
+    setPanels((p) => ({ from: p.to, to: index }));
+    position.value = withTiming(index, { duration }, (finished) => {
+      // Drop the outgoing panel once fully settled (a new transition sets finished=false, so only the
+      // last one collapses the panels).
+      if (finished) runOnJS(setPanels)({ from: index, to: index });
     });
-    // Only react to index changes; `direction` is read alongside it.
+    // Only react to index changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index]);
 
-  // Incoming: from dir*width → 0. Outgoing: from 0 → -dir*width. Together they always cover the
-  // viewport during the transition, so the background never peeks through.
-  const currStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: interpolate(progress.value, [0, 1], [panels.dir * width, 0]) }],
+  // Each panel sits at (its index − current position) × width: the incoming panel enters from the
+  // side as `position` advances toward it, the outgoing one exits the opposite way; at rest it's at 0.
+  const toStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: (panels.to - position.value) * width }],
   }));
-  const prevStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: interpolate(progress.value, [0, 1], [0, -panels.dir * width]) }],
+  const fromStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: (panels.from - position.value) * width }],
   }));
 
   return (
     <View style={styles.viewport}>
-      {panels.prev !== null && (
-        <Animated.View style={[StyleSheet.absoluteFill, prevStyle]} pointerEvents="none">
-          {children(panels.prev)}
+      {panels.from !== panels.to && (
+        <Animated.View style={[StyleSheet.absoluteFill, fromStyle]} pointerEvents="none">
+          {children(panels.from)}
         </Animated.View>
       )}
-      <Animated.View style={[StyleSheet.absoluteFill, currStyle]}>{children(panels.curr)}</Animated.View>
+      <Animated.View style={[StyleSheet.absoluteFill, toStyle]}>{children(panels.to)}</Animated.View>
     </View>
   );
 }
