@@ -5,6 +5,7 @@
   "protocols": [
     {
       "name": "Daily Mood Check",
+      "icon": "https://cdn-icons-png.flaticon.com/512/4634/4634993.png",
       "showIntroduction": false,
       "questionnaire": {
         "name": "daily_mood",
@@ -27,7 +28,7 @@
         },
         "repeatQuestionnaire": {
           "unit": "min",
-          "unitsFromZero": [10]
+          "unitsFromZero": [600]
         },
         "reminders": {
           "unit": "hour",
@@ -35,8 +36,8 @@
           "repeat": 1
         },
         "completionWindow": {
-          "unit": "min",
-          "amount": 10
+          "unit": "hour",
+          "amount": 12
         }
       }
     },
@@ -59,12 +60,12 @@
       "estimatedCompletionTime": 3,
       "protocol": {
         "repeatProtocol": {
-          "unit": "min",
-          "amount": 10
+          "unit": "day",
+          "amount": 1
         },
         "repeatQuestionnaire": {
           "unit": "min",
-          "unitsFromZero": [10]
+          "unitsFromZero": [540]
         },
         "reminders": {
           "unit": "hour",
@@ -72,8 +73,8 @@
           "repeat": 1
         },
         "completionWindow": {
-          "unit": "min",
-          "amount": 10
+          "unit": "hour",
+          "amount": 4
         }
       }
     },
@@ -96,8 +97,8 @@
       "estimatedCompletionTime": 1,
       "protocol": {
         "repeatProtocol": {
-          "unit": "min",
-          "amount": 10
+          "unit": "day",
+          "amount": 1
         },
         "repeatQuestionnaire": {
           "unit": "min",
@@ -109,8 +110,8 @@
           "repeat": 1
         },
         "completionWindow": {
-          "unit": "min",
-          "amount": 10
+          "unit": "hour",
+          "amount": 4
         }
       }
     },
@@ -142,12 +143,12 @@
         },
         "reminders": {
           "unit": "day",
-          "amount": 1,  
+          "amount": 1,
           "repeat": 1
         },
         "completionWindow": {
-          "unit": "min",
-          "amount": 10
+          "unit": "day",
+          "amount": 1
         }
       }
     }
