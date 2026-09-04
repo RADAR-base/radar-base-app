@@ -67,7 +67,10 @@ export class DefaultAuthService implements AuthService {
       if (!this.pendingState) {
         this.pendingState = await this.storage.get<string>(OAUTH_STATE_KEY);
       }
-      if (!this.pendingState) return; // No pending auth flow
+      if (!this.pendingState) {
+        this.logger.log('[AuthService] handleAuthCallback ignored — no pending OAuth state');
+        return; // No pending auth flow
+      }
       if (this.pendingState !== state) {
         this.pendingState = null;
         await this.storage.set(OAUTH_STATE_KEY, null);
@@ -102,12 +105,18 @@ export class DefaultAuthService implements AuthService {
       }
 
       const tokens: TokenPair = await response.json();
+      // Debug enrolment: log shape only (never full secrets).
+      this.logger.log(
+        `[AuthService] token exchange ok — keys=[${Object.keys(tokens as object).join(', ')}] ` +
+          `access=${tokenDebug(tokens.access_token)} refresh=${tokenDebug(tokens.refresh_token)}`,
+      );
       if (!tokens.access_token) throw new Error('Token response missing access_token.');
       if (!tokens.refresh_token) throw new Error('Token response missing refresh_token.');
 
       // Store tokens and configure endpoints — single token call, no refresh needed
       await this.token.setURI(this.oauthConfig.endpoint);
       await this.token.setTokenEndpoint(tokenEndpoint);
+      await this.configureTokenClient();
       await this.token.register({ refresh_token: tokens.refresh_token, access_token: tokens.access_token });
 
       await this.analytics.setUserProperties({ baseUrl: this.oauthConfig.endpoint });
@@ -149,6 +158,7 @@ export class DefaultAuthService implements AuthService {
       await this.token.setURI(baseUrl);
       await this.analytics.setUserProperties({ baseUrl });
       await this.token.setTokenEndpoint(tokenEndpoint);
+      await this.configureTokenClient();
       await this.token.register({ refresh_token: refreshToken, access_token: accessToken });
       await this.registerAsSource();
 
@@ -175,6 +185,7 @@ export class DefaultAuthService implements AuthService {
     try {
       this.logger.log('Resetting authentication state');
       await this.token.clearTokens();
+      await this.subjectConfig.clear?.();
       this.analytics.logAuthenticationEvent('logout', true);
       this.emitAuthState('unauthenticated');
     } catch (error: any) {
@@ -199,6 +210,15 @@ export class DefaultAuthService implements AuthService {
 
   private emitAuthState(status: AuthStatus, error?: string): void {
     this.bus.emit(EVENTS.AUTH_STATE_CHANGED, { status, error: error ?? null });
+  }
+
+  /** Keep TokenService's refresh client_id/secret in sync with the app's OAuth config. */
+  private async configureTokenClient(): Promise<void> {
+    if (!this.oauthConfig?.clientId) return;
+    await this.token.configureOAuthClient({
+      clientId: this.oauthConfig.clientId,
+      clientSecret: this.oauthConfig.clientSecret,
+    });
   }
 
   private isManagementPortalAuth(credentials: string | Record<string, any>): boolean {
@@ -258,6 +278,14 @@ export class DefaultAuthService implements AuthService {
       this.logger.error('Failed to register as source', error);
     }
   }
+}
+
+/** Safe token summary for logs — presence + length only. */
+function tokenDebug(value: unknown): string {
+  if (value == null) return 'missing';
+  if (typeof value !== 'string') return `non-string(${typeof value})`;
+  if (!value) return 'empty';
+  return `present(len=${value.length})`;
 }
 
 function generateRandomState(): string {
