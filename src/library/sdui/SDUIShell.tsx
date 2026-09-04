@@ -269,6 +269,8 @@ function SecondaryViewHost({
 /** Payload carried on `EVENTS.OPEN_TASK_INSTRUCTIONS` — the tapped task's display data. */
 export interface TaskInstructionsPayload {
   taskId: string;
+  /** The assessment name — links to `QuestionnaireDataService.getQuestions(assessmentName)`. */
+  assessmentName: string;
   taskName: string;
   description?: string;
   taskType: TaskCardType;
@@ -280,18 +282,20 @@ export interface TaskInstructionsPayload {
 /**
  * Listens for `OPEN_TASK_INSTRUCTIONS` (emitted when a task is tapped in `TaskListSectionNode`) and
  * slides the `TaskInstructionsScreen` in from the right over the whole shell. Lives inside
- * `CoreServicesProvider` so it can reach the schedule service to start the task. "Lets Start" runs the
- * task (for now: marks it complete — the previous tap-to-complete behavior, now gated behind the
- * instructions page); back / "Remind Me Later" just slide it away.
+ * `CoreServicesProvider` so it can reach the schedule service to start the task.
+ *
+ * Flow: instructions → "Lets Start" → questionnaire → auto-complete task on finish.
  */
 function TaskInstructionsHost({ context }: { context: SDUIContext }) {
-  const { schedule, eventBus } = useCoreServices();
+  const { schedule, eventBus, questionnaireData } = useCoreServices();
   const [payload, setPayload] = useState<TaskInstructionsPayload | null>(null);
+  const [phase, setPhase] = useState<'instructions' | 'questionnaire'>('instructions');
   const overlay = useSlideOverlay();
 
   useEffect(() => {
     const handler = (data: TaskInstructionsPayload) => {
       setPayload(data);
+      setPhase('instructions');
       overlay.open();
     };
     eventBus.on(EVENTS.OPEN_TASK_INSTRUCTIONS, handler);
@@ -300,18 +304,28 @@ function TaskInstructionsHost({ context }: { context: SDUIContext }) {
 
   // Fully unmount the page once the slide-out finishes (overlay.visible flips false in its callback).
   useEffect(() => {
-    if (!overlay.visible) setPayload(null);
+    if (!overlay.visible) {
+      setPayload(null);
+      setPhase('instructions');
+    }
   }, [overlay.visible]);
 
   const start = () => {
-    if (payload) {
-      // TODO (task flow): launch the real questionnaire/assessment for this task. For now we keep the
-      // prior behavior — mark it complete — so the home list updates; the instructions page is the
-      // new gate in front of it.
-      void schedule.completeTask(payload.taskId).catch(() => {});
-    }
-    overlay.close();
+    if (!payload) return;
+    // Transition to questionnaire phase — the QuestionnaireNode handles the rest
+    setPhase('questionnaire');
   };
+
+  // Listen for questionnaire completion → mark task complete and close
+  useEffect(() => {
+    if (phase !== 'questionnaire' || !payload) return;
+    const handler = () => {
+      void schedule.completeTask(payload.taskId).catch(() => {});
+      overlay.close();
+    };
+    eventBus.on(EVENTS.QUESTIONNAIRE_COMPLETED, handler);
+    return () => eventBus.off(EVENTS.QUESTIONNAIRE_COMPLETED, handler);
+  }, [phase, payload, schedule, eventBus, overlay]);
 
   if (!payload && !overlay.visible) return null;
 
@@ -320,7 +334,7 @@ function TaskInstructionsHost({ context }: { context: SDUIContext }) {
       {...overlay.panHandlers}
       style={[StyleSheet.absoluteFill, styles.instructionsOverlay, overlay.overlayStyle]}
     >
-      {payload && (
+      {payload && phase === 'instructions' && (
         <TaskInstructionsScreen
           taskName={payload.taskName}
           description={payload.description}
@@ -334,6 +348,26 @@ function TaskInstructionsHost({ context }: { context: SDUIContext }) {
           mode={context.colorScheme ?? 'light'}
           brandColors={context.theme.brandColors}
         />
+      )}
+      {payload && phase === 'questionnaire' && (
+        <View style={{ flex: 1, backgroundColor: resolveBackground(context.theme, context.colorScheme ?? 'light') }}>
+          <PageHeader
+            onBack={overlay.close}
+            title={payload.taskName}
+            mode={context.colorScheme ?? 'light'}
+            brandColors={context.theme.brandColors}
+          />
+          <NodeRenderer
+            node={{
+              type: 'QuestionnaireNode',
+              id: `questionnaire-${payload.taskId}`,
+              assessmentName: payload.assessmentName,
+              title: payload.taskName,
+              fullScreen: true,
+            }}
+            context={context}
+          />
+        </View>
       )}
     </Animated.View>
   );

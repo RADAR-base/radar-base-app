@@ -163,10 +163,10 @@ export function NotificationsProvider({
   // emits TASK_READY once per task; the id guard also drops any duplicate on re-subscribe.
   const { eventBus } = useCoreServices();
   useEffect(() => {
-    const handler = (payload: { instanceId?: string; title?: string }) => {
-      const instanceId = typeof payload?.instanceId === 'string' ? payload.instanceId : undefined;
-      if (!instanceId) return;
-      const id = `ready-${instanceId}`;
+    const handler = (payload: { taskId?: string; title?: string }) => {
+      const taskId = typeof payload?.taskId === 'string' ? payload.taskId : undefined;
+      if (!taskId) return;
+      const id = `ready-${taskId}`;
       const title =
         typeof payload?.title === 'string' && payload.title.length > 0 ? payload.title : 'Task';
       setNotifications((prev) => {

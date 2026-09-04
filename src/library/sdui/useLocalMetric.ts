@@ -46,7 +46,7 @@ export function useLocalMetric(metric: string): LocalMetric | null {
     if (wantsTasks) {
       try {
         const instances = await schedule.getTasksForDate(new Date());
-        const tasks = instances.map((i) => schedule.toSDUITask(i));
+        const tasks = instances.map((i) => schedule.toTaskView(i));
         setTaskCounts({
           completed: tasks.filter((t) => t.status === 'completed').length,
           total: tasks.length,
