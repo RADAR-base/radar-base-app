@@ -14,8 +14,15 @@ export { authServiceFactory, DefaultAuthService } from './AuthService';
 export { useAuth } from './useAuth';
 export type { UseAuthResult } from './useAuth';
 export { notificationServiceFactory, DefaultNotificationService } from './NotificationService';
-export { scheduleServiceFactory, DefaultScheduleService } from './ScheduleService';
+export { ScheduleServiceBase } from './ScheduleService';
+export { AppserverScheduleService, scheduleServiceFactory } from './AppserverScheduleService';
 export { questionnaireDataServiceFactory, DefaultQuestionnaireDataService } from './QuestionnaireDataService';
+export {
+  subjectConfigServiceFactory,
+  ManagementPortalSubjectConfigService,
+  subjectIdFromAccessToken,
+} from './SubjectConfigService';
+export type { ManagementPortalSubject } from './SubjectConfigService';
 
 // Re-export types for convenience
 export type {
