@@ -1,0 +1,24 @@
+{
+  "blueprintVersion": "1",
+  "root": {
+    "id": "root_coming_soon",
+    "type": "ViewNode",
+    "isCanvas": true,
+    "title": "Coming Soon",
+    "children": [
+      {
+        "id": "card_study_info",
+        "type": "CardNode",
+        "isCanvas": true,
+        "children": [
+          {
+            "id": "text_study_title",
+            "type": "TextNode",
+            "text": "Coming Soon",
+            "style": "heading3"
+          }
+        ]
+      }
+    ]
+  }
+}

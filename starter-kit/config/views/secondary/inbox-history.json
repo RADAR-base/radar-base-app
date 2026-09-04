@@ -1,0 +1,58 @@
+{
+  "blueprintVersion": "1",
+  "root": {
+    "id": "root_inbox",
+    "type": "ViewNode",
+    "isCanvas": true,
+    "title": "Inbox",
+    "children": [
+      {
+        "id": "text_inbox_title",
+        "type": "TextNode",
+        "text": "## Inbox",
+        "style": "markdown"
+      },
+      {
+        "id": "inbox_list_coordinator",
+        "type": "InboxItemListCoordinatorNode",
+        "isCanvas": true,
+        "children": [
+          {
+            "id": "inbox_messages",
+            "type": "InboxItemListNode",
+            "category": "Messages"
+          },
+          {
+            "id": "inbox_surveys",
+            "type": "InboxItemListNode",
+            "category": "Surveys"
+          },
+          {
+            "id": "inbox_resources",
+            "type": "InboxItemListNode",
+            "category": "Resources"
+          },
+          {
+            "id": "inbox_recent",
+            "type": "InboxItemListNode",
+            "category": "Recent"
+          }
+        ]
+      },
+      {
+        "id": "card_view_history",
+        "type": "CardNode",
+        "isCanvas": true,
+        "children": [
+          {
+            "id": "action_view_history",
+            "type": "ActionNode",
+            "title": "View inbox history",
+            "action": "OpenCustomView",
+            "viewUrl": "inbox_history"
+          }
+        ]
+      }
+    ]
+  }
+}

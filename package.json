@@ -1,6 +1,6 @@
 {
   "name": "@radarbase/app-kit",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A plugin-based React Native library of widgets, components, and services for building configuration-driven health research apps",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -66,6 +66,7 @@
     "zod": "3.23.8"
   },
   "devDependencies": {
+    "@react-native-async-storage/async-storage": "^1.24.0",
     "@types/jest": "29.5.14",
     "@types/js-yaml": "4.0.9",
     "@types/react": "19.1.10",
@@ -96,7 +97,13 @@
       "**/__tests__/**/*.{ts,tsx}",
       "**/*.test.{ts,tsx}"
     ],
-    "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json"],
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js",
+      "jsx",
+      "json"
+    ],
     "collectCoverageFrom": [
       "src/**/*.{ts,tsx}",
       "!src/index.ts"
