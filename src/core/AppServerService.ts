@@ -40,8 +40,9 @@ export class DefaultAppServerService implements IAppServerService {
 
   private async getHeaders(): Promise<Record<string, string>> {
     if (!this.APP_SERVER_URL) await this.updateAppServerURL();
-    const tokens = await this.token.refresh();
-    this.api.setHeaders({ 'Authorization': `Bearer ${tokens.access_token}`, 'Content-Type': 'application/json' });
+    const accessToken = await this.token.getAccessToken();
+    if (!accessToken) throw new Error('No access token available');
+    this.api.setHeaders({ 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' });
     return ({});
   }
 

@@ -227,10 +227,10 @@ export interface QuestionnaireService {
 }
 
 // App Server related service abstractions
-export interface TokenPair { access_token: string; refresh_token?: string }
+export interface TokenPair { access_token: string; refresh_token?: string; expires_in?: number }
 export interface TokenService {
   refresh(): Promise<TokenPair>;
-  register(refreshParams: { refresh_token: string; access_token?: string }): Promise<void>;
+  register(refreshParams: { refresh_token: string; access_token?: string; expires_in?: number }): Promise<void>;
   /**
    * Provide the OAuth client id/secret used on refresh. Call at app boot (from `OAuthConfig`)
    * and again after login so refresh works across restarts without coupling TokenService to

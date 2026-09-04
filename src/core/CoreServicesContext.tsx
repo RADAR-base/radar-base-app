@@ -175,6 +175,7 @@ export function CoreServicesProvider({
   const token = tokenServiceFactory({
     storage,
     logger,
+    bus: eventBus,
     oauthClient: overrides.authConfig?.clientId
       ? {
           clientId: overrides.authConfig.clientId,

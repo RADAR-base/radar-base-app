@@ -117,7 +117,7 @@ export class DefaultAuthService implements AuthService {
       await this.token.setURI(this.oauthConfig.endpoint);
       await this.token.setTokenEndpoint(tokenEndpoint);
       await this.configureTokenClient();
-      await this.token.register({ refresh_token: tokens.refresh_token, access_token: tokens.access_token });
+      await this.token.register({ refresh_token: tokens.refresh_token, access_token: tokens.access_token, expires_in: tokens.expires_in });
 
       await this.analytics.setUserProperties({ baseUrl: this.oauthConfig.endpoint });
       await this.analytics.logAuthenticationEvent('login', true);
