@@ -7,12 +7,10 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
-    "plugins": [
-      "expo-font"
-    ],
+    "plugins": [],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "org.radarbase.starter",
+      "bundleIdentifier": "com.radarbase.starter",
       "scheme": "com.radarbase.starter"
     },
     "android": {

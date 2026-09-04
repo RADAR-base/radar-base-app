@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useCoreServices } from '../../../../core/CoreServicesContext';
 import { EVENTS } from '../../../../core/EventBus';
-import type { Task } from '../../../../types';
+import type { TaskView as Task } from '../../../../types';
 import { layout as layoutTokens } from '../../../../theme/theme';
 import { TaskCardNode, type TaskCardType } from '../card/TaskCardNode';
 import { ToDoStatusNode } from '../card/ToDoStatusNode';
@@ -58,8 +58,8 @@ export function TaskDayList({ context, date, variant, filter = NO_FILTER, idPref
   const loadTasks = useCallback(async () => {
     try {
       const instances = await schedule.getTasksForDate(new Date(dayStamp));
-      // `toSDUITask` sets `isNew` (true until the user opens the task) — see `markTaskOpened`.
-      const sduiTasks = instances.map((i) => schedule.toSDUITask(i));
+      // `toTaskView` sets `isNew` (true until the user opens the task) — see `markTaskOpened`.
+      const sduiTasks = instances.map((i) => schedule.toTaskView(i));
       setAllTasks(sduiTasks);
       setTasks(filterTasks(sduiTasks, filter));
     } catch {
@@ -102,12 +102,13 @@ export function TaskDayList({ context, date, variant, filter = NO_FILTER, idPref
     // TaskInstructionsHost). The task is actually started/completed from "Lets Start" there.
     eventBus.emit(EVENTS.OPEN_TASK_INSTRUCTIONS, {
       taskId: current.id,
+      assessmentName: current.assessmentName,
       taskName: current.title,
       description: current.description,
       taskType: inferTaskType(current.title),
       duration: current.estimated_minutes > 0 ? `${current.estimated_minutes} min` : undefined,
       expirationTime: formatExpiration(current),
-      questionNumber: 'x8', // placeholder — protocol.json has no per-assessment question count
+      questionNumber: current.nQuestions ? `x${current.nQuestions}` : undefined,
     });
   };
 

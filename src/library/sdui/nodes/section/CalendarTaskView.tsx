@@ -5,7 +5,7 @@ import type { SvgProps } from 'react-native-svg';
 
 import { useCoreServices } from '../../../../core/CoreServicesContext';
 import { EVENTS } from '../../../../core/EventBus';
-import type { Task } from '../../../../types';
+import type { TaskView as Task } from '../../../../types';
 import { fontFamily, tracking, getColorTokens, resolveBackground } from '../../../../theme/theme';
 import TimeMorning from '../../../../theme/icons/timemorning.svg';
 import TimeAfternoon from '../../../../theme/icons/timeafternoon.svg';
@@ -58,7 +58,7 @@ export function CalendarTaskView({ context, date }: CalendarTaskViewProps) {
   const loadTasks = useCallback(async () => {
     try {
       const instances = await schedule.getTasksForDate(new Date(dayStamp));
-      setTasks(instances.map((i) => schedule.toSDUITask(i)));
+      setTasks(instances.map((i) => schedule.toTaskView(i)));
     } catch {
       setTasks([]);
     }
@@ -91,12 +91,13 @@ export function CalendarTaskView({ context, date }: CalendarTaskViewProps) {
     void schedule.markTaskOpened(task.id);
     eventBus.emit(EVENTS.OPEN_TASK_INSTRUCTIONS, {
       taskId: task.id,
+      assessmentName: task.assessmentName,
       taskName: task.title,
       description: task.description,
       taskType: inferTaskType(task.title),
       duration: task.estimated_minutes > 0 ? `${task.estimated_minutes} min` : undefined,
       expirationTime: formatExpiration(task),
-      questionNumber: 'x8', // placeholder — protocol.json has no per-assessment question count
+      questionNumber: task.nQuestions ? `x${task.nQuestions}` : undefined,
     });
   };
 

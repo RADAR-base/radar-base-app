@@ -24,7 +24,6 @@ import {
   LoadingScreen,
   type CoreServiceOverrides,
   type ThemeManifest,
-  type ProtocolConfig,
 } from '@radarbase/app-kit';
 
 import { createAsyncStorageService, LoginScreen, PostEnrolmentFlow } from './src';
@@ -41,7 +40,7 @@ import comingSoonBlueprint from './config/views/coming-soon.json';
 import calendarBlueprint from './config/views/calendar.json';
 
 import CustomDemoNode from './CustomDemoNode';
-import protocolConfig from './config/protocol.json';
+
 
 const BUNDLED_BLUEPRINTS: Record<string, unknown> = {
   'views/home.json': homeBlueprint,
@@ -99,27 +98,28 @@ export default function App() {
   );
 }
 
-function useScheduleInit() {
+function useScheduleInit(): boolean {
   const schedule = useScheduleService();
+  const [ready, setReady] = useState(false);
   useEffect(() => {
+    let mounted = true;
     (async () => {
       await schedule.init();
-      // Demo: enrol the participant three weeks ago (midnight) so the calendar has history for its
-      // whole two-weeks-back range (completed/missed tasks). A real host passes the participant's
-      // actual enrolment timestamp here instead.
-      const enrolmentRef = new Date();
-      enrolmentRef.setHours(0, 0, 0, 0);
-      enrolmentRef.setDate(enrolmentRef.getDate() - 21);
-      await schedule.loadProtocol(protocolConfig as ProtocolConfig, enrolmentRef.getTime());
+      await schedule.fetchSchedule();
+      if (mounted) setReady(true);
     })();
-    return () => schedule.destroy();
+    return () => {
+      mounted = false;
+      schedule.destroy();
+    };
   }, [schedule]);
+  return ready;
 }
 
 function AppRoot({ serviceOverrides }: { serviceOverrides: CoreServiceOverrides }) {
   const { status } = useAuth();
   useFirebaseBootstrap();
-  useScheduleInit();
+  const scheduleReady = useScheduleInit();
 
   // After a fresh authentication in THIS session (i.e. the user came through the login flow), show
   // the post-enrolment flow (complete → enable notifications) before entering the app. Returning
@@ -175,7 +175,7 @@ function AppRoot({ serviceOverrides }: { serviceOverrides: CoreServiceOverrides 
       {bootLoading && (
         <LoadingScreen
           brandColors={theme.brandColors}
-          ready={status !== 'unknown'}
+          ready={status !== 'unknown' && (status === 'unauthenticated' || status === 'authenticating' || scheduleReady)}
           onHidden={() => setBootLoading(false)}
         />
       )}

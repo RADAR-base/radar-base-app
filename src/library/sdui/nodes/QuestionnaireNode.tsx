@@ -138,6 +138,8 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
     }
   }, [questionnaireData, assessmentName, title, answers, timestamps, eventBus]);
 
+  const fullScreen = node.fullScreen === true;
+
   const theme = context.theme;
   const primary = theme.primaryColor;
   const surface = theme.surfaceColor ?? '#FFFFFF';
@@ -145,10 +147,14 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
   const textSecondary = theme.textSecondaryColor ?? '#6D6D80';
   const radius = theme.button?.borderRadius ?? 8;
 
+  const containerStyle = fullScreen
+    ? [styles.fullContainer, { backgroundColor: surface }]
+    : [styles.container, { backgroundColor: surface, borderRadius: radius }];
+
   // --- Introduction Screen ---
   if (phase === 'intro') {
     return (
-      <View style={[styles.container, { backgroundColor: surface, borderRadius: radius }]}>
+      <View style={containerStyle}>
         <Text style={[styles.title, { color: text }]}>{title}</Text>
         {startText && <Text style={[styles.introText, { color: textSecondary }]}>{startText}</Text>}
         <TouchableOpacity
@@ -169,7 +175,7 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
   // --- Completion Screen ---
   if (phase === 'done') {
     return (
-      <View style={[styles.container, { backgroundColor: surface, borderRadius: radius }]}>
+      <View style={containerStyle}>
         <Text style={[styles.title, { color: text }]}>{title}</Text>
         <Text style={[styles.doneText, { color: textSecondary }]}>{endText}</Text>
         <Text style={[styles.doneSubtext, { color: textSecondary }]}>
@@ -182,7 +188,7 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
   // --- Questions Screen ---
   if (allQuestions.length === 0) {
     return (
-      <View style={[styles.container, { backgroundColor: surface, borderRadius: radius }]}>
+      <View style={containerStyle}>
         <Text style={[styles.title, { color: text }]}>{title}</Text>
         <Text style={[styles.emptyText, { color: textSecondary }]}>No questions available</Text>
       </View>
@@ -195,7 +201,7 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
   const canProceed = !isRequired || hasAnswer || isInfoType;
 
   return (
-    <View style={[styles.container, { backgroundColor: surface, borderRadius: radius }]}>
+    <View style={containerStyle}>
       {/* Progress bar */}
       <View style={styles.progressRow}>
         <Text style={[styles.progressText, { color: textSecondary }]}>
@@ -209,7 +215,7 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
       <Text style={[styles.title, { color: text }]}>{title}</Text>
 
       {/* Current question */}
-      <ScrollView style={styles.questionArea} contentContainerStyle={styles.questionContent}>
+      <ScrollView style={fullScreen ? styles.questionAreaFull : styles.questionArea} contentContainerStyle={styles.questionContent}>
         {currentQuestion && (
           <QuestionRenderer
             question={currentQuestion}
@@ -261,6 +267,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     ...cardShadow,
   },
+  fullContainer: {
+    flex: 1,
+    padding: 16,
+  },
   progressRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -281,6 +291,7 @@ const styles = StyleSheet.create({
   doneSubtext: { fontSize: 12, fontStyle: 'italic', fontFamily: fontFamily.regular, includeFontPadding: false },
   emptyText: { fontSize: 13, fontStyle: 'italic', marginTop: 8, fontFamily: fontFamily.regular, includeFontPadding: false },
   questionArea: { maxHeight: 400 },
+  questionAreaFull: { flex: 1 },
   questionContent: { paddingBottom: 8 },
   navRow: {
     flexDirection: 'row',

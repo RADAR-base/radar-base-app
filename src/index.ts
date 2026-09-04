@@ -30,9 +30,12 @@ export { dataService } from './core/DataService';
 export { apiService } from './core/ApiService';
 export { eventBus } from './core/EventBus';
 export { appServerServiceFactory } from './core/AppServerService';
-export { AppserverScheduleService } from './core/AppserverScheduleService';
-export { scheduleServiceFactory } from './core/ScheduleService';
+export { scheduleServiceFactory } from './core/AppserverScheduleService';
 export { questionnaireDataServiceFactory } from './core/QuestionnaireDataService';
+export {
+  subjectConfigServiceFactory,
+  ManagementPortalSubjectConfigService,
+} from './core/SubjectConfigService';
 
 // SDUI engine — the primary public surface
 export {
@@ -173,6 +176,7 @@ export type {
   AuthService,
   AuthStatus,
   OAuthConfig,
+  OAuthClientCredentials,
   AnalyticsService,
   CacheService,
   KafkaService,
@@ -187,8 +191,8 @@ export type {
   RepeatQuestionnaire,
   MultiLanguageText,
   QuestionnaireMetadata,
-  TaskInstance,
-  TaskInstanceState,
+  TaskState,
+  TaskView,
 } from './types';
 
 // Design tokens — colors + layout primitives transcribed from the Figma design system.
