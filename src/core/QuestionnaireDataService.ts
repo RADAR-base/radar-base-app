@@ -14,6 +14,27 @@ const STORAGE_KEY = '@radarbase/questionnaire_definitions';
 const DEFAULT_QUESTIONNAIRE_TYPE = '_armt';
 const DEFAULT_QUESTIONNAIRE_FORMAT = '.json';
 const GIT_API_URI = 'https://api.github.com/repos';
+const MAX_RETRY_ATTEMPTS = 2;
+const RETRY_BASE_DELAY_MS = 1_000;
+
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxAttempts = MAX_RETRY_ATTEMPTS,
+  baseDelay = RETRY_BASE_DELAY_MS,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastError = e;
+      if (attempt < maxAttempts - 1) {
+        await new Promise(r => setTimeout(r, baseDelay * Math.pow(2, attempt)));
+      }
+    }
+  }
+  throw lastError;
+}
 
 export class DefaultQuestionnaireDataService implements QuestionnaireDataService {
   private definitions: Map<string, Question[]> = new Map();
@@ -22,7 +43,7 @@ export class DefaultQuestionnaireDataService implements QuestionnaireDataService
     private readonly storage: StorageService,
     private readonly logger: LoggerService,
     private readonly bus: EventBus,
-  ) {}
+  ) { }
 
   async loadDefinitions(protocol: ProtocolConfig, language = 'en'): Promise<void> {
     // Restore cached definitions
@@ -39,16 +60,16 @@ export class DefaultQuestionnaireDataService implements QuestionnaireDataService
       if (this.definitions.has(assessment.name)) continue;
 
       try {
-        const questions = await this.fetchQuestionnaire(assessment, language);
+        const questions = await retryWithBackoff(() => this.fetchQuestionnaire(assessment, language));
         if (questions.length > 0) {
           this.definitions.set(assessment.name, formatQuestionHeaders(questions));
         }
       } catch (e) {
-        this.logger.log(`Failed to fetch questionnaire for ${assessment.name}: ${e}`);
+        this.logger.log(`Failed to fetch questionnaire for ${assessment.name} after retries: ${e}`);
         // Try English fallback if language-specific fetch failed
         if (language !== 'en') {
           try {
-            const questions = await this.fetchQuestionnaire(assessment, 'en');
+            const questions = await retryWithBackoff(() => this.fetchQuestionnaire(assessment, 'en'));
             if (questions.length > 0) {
               this.definitions.set(assessment.name, formatQuestionHeaders(questions));
             }
@@ -68,6 +89,17 @@ export class DefaultQuestionnaireDataService implements QuestionnaireDataService
   }
 
   async getQuestions(assessmentName: string): Promise<Question[]> {
+    // Lazy restore: if the in-memory map is empty (e.g. loadDefinitions was
+    // skipped because the protocol version was unchanged), try loading from
+    // persisted storage so callers still see previously-fetched definitions.
+    if (this.definitions.size === 0) {
+      const cached = await this.storage.get<Record<string, Question[]>>(STORAGE_KEY);
+      if (cached) {
+        for (const [name, questions] of Object.entries(cached)) {
+          this.definitions.set(name, questions);
+        }
+      }
+    }
     return this.definitions.get(assessmentName) ?? [];
   }
 
@@ -84,6 +116,7 @@ export class DefaultQuestionnaireDataService implements QuestionnaireDataService
     const metadata = assessment.questionnaire!;
     const uri = formatQuestionnaireUri(metadata.repository!, metadata.name, language);
 
+    this.logger.log(`Fetching questionnaire for ${assessment.name} from ${uri}`);
     const response = await fetch(uri);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
@@ -133,7 +166,7 @@ function formatQuestionnaireUri(repository: string, name: string, language: stri
 
     const langSuffix = language !== 'en' ? `_${language}` : '';
     const fileName = `${name}${DEFAULT_QUESTIONNAIRE_TYPE}${langSuffix}${DEFAULT_QUESTIONNAIRE_FORMAT}`;
-    const path = directory ? `${directory}${name}/${fileName}` : `${name}/${fileName}`;
+    const path = directory ? `${directory}/${name}/${fileName}` : `${name}/${fileName}`;
 
     return `${GIT_API_URI}/${org}/${repo}/contents/${path}?ref=${branch}`;
   } catch {

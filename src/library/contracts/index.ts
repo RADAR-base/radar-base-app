@@ -32,6 +32,7 @@ export type {
   Question,
   TaskListConfig,
   Task,
+  TaskView,
   DashboardWidgetConfig,
   DashboardSeriesConfig,
   DashboardRangeConfig,

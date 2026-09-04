@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useCoreServices } from '../../../core/CoreServicesContext';
 import { EVENTS } from '../../../core/EventBus';
-import type { Task } from '../../../types';
+import type { TaskView as Task } from '../../../types';
 import type { NodeProps } from '../types';
 import { fontFamily, cardShadow } from '../../../theme/theme';
 
@@ -44,7 +44,7 @@ export function SurveyTaskListNode({ node, context }: NodeProps) {
   const loadTasks = useCallback(async () => {
     try {
       const instances = await schedule.getTasksForDate(new Date());
-      const sduiTasks = instances.map(i => schedule.toSDUITask(i));
+      const sduiTasks = instances.map(i => schedule.toTaskView(i));
       setTasks(filterTasks(sduiTasks, filter, variant));
     } catch {
       setTasks([]);

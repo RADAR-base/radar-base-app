@@ -12,6 +12,8 @@ export class DefaultAppServerService implements IAppServerService {
   private readonly QUESTIONNAIRE_STATE_EVENTS_PATH = 'state_events';
   private readonly NOTIFICATIONS_PATH = 'messaging/notifications';
   private readonly STATE_EVENTS_PATH = 'state_events';
+  // TO UPDATE: This is a temporary default URL for development purposes. In production, the URL should be set via remote config or environment variables.
+  private readonly DEFAULT_APPSERVER_URL = 'https://dev.radarbasedev.co.uk/appserver-2';
 
   constructor(
     private readonly api: ApiService,
@@ -21,7 +23,7 @@ export class DefaultAppServerService implements IAppServerService {
     private readonly remoteConfig: RemoteConfigService,
     private readonly localization: LocalizationService,
     private readonly token: TokenService,
-  ) {}
+  ) { }
 
   async init(): Promise<any> {
     await this.updateAppServerURL();
@@ -36,10 +38,11 @@ export class DefaultAppServerService implements IAppServerService {
     return this.addSubjectIfMissing(subjectId, projectId, enrolmentDate, attributes, fcmToken || undefined);
   }
 
-  private async getHeaders(): Promise<Record<string,string>> {
+  private async getHeaders(): Promise<Record<string, string>> {
     if (!this.APP_SERVER_URL) await this.updateAppServerURL();
-    const tokens = await this.token.refresh();
-    this.api.setHeaders({ 'Authorization': `Bearer ${tokens.access_token}`, 'Content-Type': 'application/json' });
+    const accessToken = await this.token.getAccessToken();
+    if (!accessToken) throw new Error('No access token available');
+    this.api.setHeaders({ 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' });
     return ({});
   }
 
@@ -77,7 +80,7 @@ export class DefaultAppServerService implements IAppServerService {
     try {
       const subject = await this.getSubject(projectId, subjectId);
       return this.updateSubject(subject, {
-        fcmToken,
+        fcmToken: "fcmToken",
         lastOpened: new Date().toISOString(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         language: this.localization.getLanguage().value,
@@ -85,7 +88,7 @@ export class DefaultAppServerService implements IAppServerService {
       });
     } catch (e: any) {
       if (e?.message?.includes('404')) {
-        return this.addSubjectToServer(subjectId, projectId, enrolmentDate, fcmToken, attributes);
+        return this.addSubjectToServer(subjectId, projectId, enrolmentDate, "fcmToken", attributes);
       }
       throw e;
     }
@@ -121,6 +124,15 @@ export class DefaultAppServerService implements IAppServerService {
   async fetchFromGithub(githubUrl: string): Promise<any> {
     await this.getHeaders();
     return this.api.get(`/${this.GITHUB_CONTENT_PATH}?url=${encodeURIComponent(githubUrl)}`);
+  }
+
+  async getProtocol(): Promise<any> {
+    const [subjectId, projectId] = await Promise.all([
+      this.subjectConfig.getParticipantLogin(),
+      this.subjectConfig.getProjectName(),
+    ]);
+    await this.getHeaders();
+    return this.api.get(`/${this.PROJECT_PATH}/${projectId}/${this.SUBJECT_PATH}/${subjectId}/protocols`);
   }
 
   async getSchedule(): Promise<any> {
@@ -210,7 +222,7 @@ export class DefaultAppServerService implements IAppServerService {
 
   async updateAppServerURL(): Promise<string> {
     const cfg = await this.remoteConfig.forceFetch();
-    const url = cfg.getOrDefault('APP_SERVER_URL', '');
+    const url = cfg.getOrDefault('APP_SERVER_URL', this.DEFAULT_APPSERVER_URL);
     this.APP_SERVER_URL = url;
     this.api.setBaseUrl(url);
     return url;

@@ -95,7 +95,7 @@ export const EVENTS = {
   SCHEDULE_UPDATED: 'scheduleUpdated',
   TASK_OVERDUE: 'taskOverdue',
   /** A task's completion window has just opened — it's now ready to complete (payload:
-   *  `{ instanceId, name, title, timestamp }`). Emitted once per task; drives a "task ready"
+   *  `{ taskId, name, title, timestamp }`). Emitted once per task; drives a "task ready"
    *  notification card. */
   TASK_READY: 'taskReady',
 
