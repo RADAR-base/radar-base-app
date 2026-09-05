@@ -78,9 +78,11 @@ export class DefaultAppServerService implements IAppServerService {
     fcmToken?: string
   ): Promise<any> {
     try {
+      // TODO: Temporary placeholder until FCM token is properly retrieved from the device. In a real implementation, this should be replaced with actual logic to get the FCM token.
+      fcmToken = "fcmToken"
       const subject = await this.getSubject(projectId, subjectId);
       return this.updateSubject(subject, {
-        fcmToken: "fcmToken",
+        fcmToken,
         lastOpened: new Date().toISOString(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         language: this.localization.getLanguage().value,
@@ -88,7 +90,7 @@ export class DefaultAppServerService implements IAppServerService {
       });
     } catch (e: any) {
       if (e?.message?.includes('404')) {
-        return this.addSubjectToServer(subjectId, projectId, enrolmentDate, "fcmToken", attributes);
+        return this.addSubjectToServer(subjectId, projectId, enrolmentDate, fcmToken, attributes);
       }
       throw e;
     }
