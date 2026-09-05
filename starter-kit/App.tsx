@@ -20,13 +20,14 @@ import {
   getColorTokens,
   layout,
   useAuth,
-  useScheduleService,
+  useScheduleInit,
+  createAsyncStorageService,
   LoadingScreen,
   type CoreServiceOverrides,
-  type ThemeManifest,
+  type ThemeColorOverrides,
 } from '@radarbase/app-kit';
 
-import { createAsyncStorageService, LoginScreen, PostEnrolmentFlow } from './src';
+import { LoginScreen, PostEnrolmentFlow } from './src';
 import { DEFAULT_AUTH_CONFIG } from './src/auth';
 
 import appManifest from './config/app-manifest.json';
@@ -79,7 +80,7 @@ export default function App() {
   const scheme = useColorScheme();
   const bootBackground = getColorTokens(
     scheme === 'dark' ? 'dark' : 'light',
-    (appManifest.theme as ThemeManifest).brandColors,
+    appManifest.theme as ThemeColorOverrides,
   ).background.primary;
   if (!fontsLoaded) return <View style={[styles.root, { backgroundColor: bootBackground }]} />;
 
@@ -98,23 +99,6 @@ export default function App() {
   );
 }
 
-function useScheduleInit(): boolean {
-  const schedule = useScheduleService();
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      await schedule.init();
-      await schedule.fetchSchedule();
-      if (mounted) setReady(true);
-    })();
-    return () => {
-      mounted = false;
-      schedule.destroy();
-    };
-  }, [schedule]);
-  return ready;
-}
 
 function AppRoot({ serviceOverrides }: { serviceOverrides: CoreServiceOverrides }) {
   const { status } = useAuth();
@@ -133,7 +117,7 @@ function AppRoot({ serviceOverrides }: { serviceOverrides: CoreServiceOverrides 
     }
   }, [status]);
 
-  const theme = appManifest.theme as ThemeManifest;
+  const theme = appManifest.theme as ThemeColorOverrides;
 
   // Boot loading overlay: covers the app until auth status resolves, then slides off to the left to
   // reveal the first screen. Kept mounted (not early-returned) until its `onHidden` fires after the
@@ -143,14 +127,14 @@ function AppRoot({ serviceOverrides }: { serviceOverrides: CoreServiceOverrides 
   let content: React.ReactNode = null;
   if (status === 'unauthenticated' || status === 'authenticating') {
     content = (
-      <LoginScreen theme={theme} appName={appManifest.appName} description={appManifest.description} />
+      <LoginScreen brandColors={theme} appName={appManifest.appName} description={appManifest.description} />
     );
   } else if (status !== 'unknown') {
     // Authenticated. A fresh in-session enrolment runs the post-enrolment flow before the shell;
     // returning users skip straight in.
     content =
       sawAuthFlow.current && !enteredApp ? (
-        <PostEnrolmentFlow onDone={() => setEnteredApp(true)} brandColors={theme.brandColors} />
+        <PostEnrolmentFlow onDone={() => setEnteredApp(true)} brandColors={theme} />
       ) : (
         <View style={styles.shellWrapper}>
           <SDUIShell
@@ -174,7 +158,7 @@ function AppRoot({ serviceOverrides }: { serviceOverrides: CoreServiceOverrides 
       {content}
       {bootLoading && (
         <LoadingScreen
-          brandColors={theme.brandColors}
+          brandColors={theme}
           ready={status !== 'unknown' && (status === 'unauthenticated' || status === 'authenticating' || scheduleReady)}
           onHidden={() => setBootLoading(false)}
         />
