@@ -19,7 +19,8 @@ class SimpleApiService implements ApiService {
 
   async get<T = any>(path: string, options: RequestInit = {}): Promise<T> {
     const authHeaders = await this.buildAuthHeaders();
-    const res = await fetch(`${this.baseUrl}${path}`, {
+    const url = this.resolveUrl(path);
+    const res = await fetch(url, {
       ...options,
       method: 'GET',
       headers: { ...this.headers, ...authHeaders, ...(options.headers || {}) },
@@ -30,7 +31,8 @@ class SimpleApiService implements ApiService {
 
   async post<T = any>(path: string, body: unknown, options: RequestInit = {}): Promise<T> {
     const authHeaders = await this.buildAuthHeaders();
-    const res = await fetch(`${this.baseUrl}${path}`, {
+    const url = this.resolveUrl(path);
+    const res = await fetch(url, {
       ...options,
       method: 'POST',
       headers: { ...this.headers, ...authHeaders, ...(options.headers || {}) },
@@ -38,6 +40,12 @@ class SimpleApiService implements ApiService {
     });
     if (!res.ok) throw new Error(`POST ${path} failed: ${res.status} ${res.statusText}`);
     return (await res.json()) as T;
+  }
+
+  /** If path is already an absolute URL, use it as-is; otherwise prepend baseUrl. */
+  private resolveUrl(path: string): string {
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    return `${this.baseUrl}${path}`;
   }
 
   private async buildAuthHeaders(): Promise<Record<string, string>> {

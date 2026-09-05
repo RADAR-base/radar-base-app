@@ -17,13 +17,11 @@ export class DefaultTokenService implements TokenService {
     ACCESS_TOKEN: 'ACCESS_TOKEN',
     REFRESH_TOKEN: 'REFRESH_TOKEN',
     EXPIRES_AT: 'EXPIRES_AT',
-    BASE_URI: 'BASE_URI',
     TOKEN_ENDPOINT: 'TOKEN_ENDPOINT',
     CLIENT_ID: 'OAUTH_CLIENT_ID',
     CLIENT_SECRET: 'OAUTH_CLIENT_SECRET',
   };
 
-  private baseUri: string = '';
   private tokenEndpoint: string = '';
   private clientId: string | null = null;
   private clientSecret: string | undefined;
@@ -205,42 +203,6 @@ export class DefaultTokenService implements TokenService {
     return { refresh_token: refreshToken };
   }
 
-  async getURI(): Promise<string> {
-    const uri = await this.storage.get<string>(this.TOKEN_STORE.BASE_URI);
-    if (!uri) {
-      throw new Error('Base URI not set. Please complete authentication first.');
-    }
-    this.baseUri = uri;
-    return uri;
-  }
-
-  async setURI(uri: string): Promise<string> {
-    if (!uri) {
-      throw new Error('Base URI cannot be null or empty');
-    }
-
-    // Validate URI format
-    try {
-      const url = new URL(uri);
-      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-        throw new Error('Invalid base URI. Please use a valid HTTP/HTTPS URL.');
-      }
-    } catch (e) {
-      throw new Error('Invalid base URI format. Please use a valid URL.');
-    }
-
-    // Remove trailing slashes
-    let lastSlashIndex = uri.length;
-    while (lastSlashIndex > 0 && uri[lastSlashIndex - 1] === '/') {
-      lastSlashIndex--;
-    }
-    const cleanUri = uri.substring(0, lastSlashIndex);
-
-    await this.storage.set(this.TOKEN_STORE.BASE_URI, cleanUri);
-    this.baseUri = cleanUri;
-    return cleanUri;
-  }
-
   async setTokenEndpoint(endpoint: string): Promise<void> {
     await this.storage.set(this.TOKEN_STORE.TOKEN_ENDPOINT, endpoint);
     this.tokenEndpoint = endpoint;
@@ -281,13 +243,12 @@ export class DefaultTokenService implements TokenService {
       this.storage.set(this.TOKEN_STORE.ACCESS_TOKEN, null),
       this.storage.set(this.TOKEN_STORE.REFRESH_TOKEN, null),
       this.storage.set(this.TOKEN_STORE.EXPIRES_AT, null),
-      this.storage.set(this.TOKEN_STORE.BASE_URI, null),
       this.storage.set(this.TOKEN_STORE.TOKEN_ENDPOINT, null),
     ]);
-    this.baseUri = '';
     this.tokenEndpoint = '';
     this.expiresAt = null;
     // Keep OAuth client credentials — they identify the app, not the session.
+    // Base URL is cleared by AuthService.reset() via ConfigService.
   }
 
   // ---------------------------------------------------------------------------
