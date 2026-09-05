@@ -1,0 +1,188 @@
+{
+  "blueprintVersion": "1",
+  "root": {
+    "id": "root_profile",
+    "type": "ViewNode",
+    "isCanvas": true,
+    "title": "Settings",
+    "children": [
+      {
+        "id": "card_study_info",
+        "type": "CardNode",
+        "isCanvas": true,
+        "children": [
+          {
+            "id": "text_study_title",
+            "type": "TextNode",
+            "text": "Study Information",
+            "style": "heading3"
+          },
+          {
+            "id": "text_study_name",
+            "type": "TextNode",
+            "text": "Study: {{study.name}}",
+            "style": "body"
+          },
+          {
+            "id": "text_enrollment_date",
+            "type": "TextNode",
+            "text": "Enrolled: {{study.enrollmentDate}}",
+            "style": "body"
+          },
+          {
+            "id": "text_study_status",
+            "type": "TextNode",
+            "text": "Status: {{study.status}}",
+            "style": "caption"
+          }
+        ]
+      },
+      {
+        "id": "section_devices",
+        "type": "SectionNode",
+        "title": "Devices",
+        "children": [
+          {
+            "id": "card_devices",
+            "type": "CardNode",
+            "isCanvas": true,
+            "children": [
+              {
+                "id": "devices_menu",
+                "type": "ConnectDevicesMenuNode"
+              }
+            ]
+          }
+        ]
+      },
+
+      {
+        "id": "section_settings",
+        "type": "SectionNode",
+        "title": "Settings",
+        "children": [
+          {
+            "id": "card_notifications",
+            "type": "CardNode",
+            "isCanvas": true,
+            "children": [
+              {
+                "id": "action_notifications",
+                "type": "ActionNode",
+                "title": "Notification preferences",
+                "action": "OpenCustomView",
+                "viewUrl": "notification_settings",
+                "icon": "bell"
+              }
+            ]
+          },
+          {
+            "id": "card_language",
+            "type": "CardNode",
+            "isCanvas": true,
+            "children": [
+              {
+                "id": "action_language",
+                "type": "ActionNode",
+                "title": "Language",
+                "action": "OpenCustomView",
+                "viewUrl": "language_settings",
+                "icon": "globe"
+              }
+            ]
+          }
+        ]
+      },
+
+      {
+        "id": "section_data_privacy",
+        "type": "SectionNode",
+        "title": "Data & Privacy",
+        "children": [
+          {
+            "id": "card_data_actions",
+            "type": "CardNode",
+            "isCanvas": true,
+            "children": [
+              {
+                "id": "action_export_data",
+                "type": "ActionNode",
+                "title": "Export my data",
+                "action": "TriggerEvent",
+                "eventName": "data.export_request",
+                "icon": "download"
+              },
+              {
+                "id": "action_privacy_policy",
+                "type": "ActionNode",
+                "title": "Privacy policy",
+                "action": "OpenExternalUrl",
+                "url": "{{study.privacyPolicyUrl}}",
+                "icon": "shield"
+              }
+            ]
+          },
+          {
+            "id": "banner_withdrawal",
+            "type": "AlertBannerNode",
+            "severity": "warning",
+            "title": "Study withdrawal",
+            "message": "If you wish to withdraw from this study, please contact your study coordinator."
+          }
+        ]
+      },
+
+      {
+        "id": "section_support",
+        "type": "SectionNode",
+        "title": "Support",
+        "children": [
+          {
+            "id": "card_support_actions",
+            "type": "CardNode",
+            "isCanvas": true,
+            "children": [
+              {
+                "id": "action_help",
+                "type": "ActionNode",
+                "title": "Help & FAQ",
+                "action": "OpenCustomView",
+                "viewUrl": "help_faq",
+                "icon": "help-circle"
+              },
+              {
+                "id": "action_contact",
+                "type": "ActionNode",
+                "title": "Contact research team",
+                "action": "TriggerEvent",
+                "eventName": "support.contact_team",
+                "icon": "mail"
+              }
+            ]
+          }
+        ]
+      },
+
+      {
+        "id": "section_about",
+        "type": "SectionNode",
+        "children": [
+          {
+            "id": "text_app_version",
+            "type": "TextNode",
+            "text": "App version {{app.version}}",
+            "style": "caption"
+          },
+          {
+            "id": "action_sign_out",
+            "type": "ActionNode",
+            "title": "Sign out",
+            "action": "TriggerEvent",
+            "eventName": "auth.sign_out",
+            "icon": "log-out"
+          }
+        ]
+      }
+    ]
+  }
+}

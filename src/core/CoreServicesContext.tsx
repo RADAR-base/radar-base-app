@@ -13,6 +13,7 @@ import {
   notificationServiceFactory,
   scheduleServiceFactory,
   questionnaireDataServiceFactory,
+  subjectConfigServiceFactory,
 } from './index';
 
 let remoteConfigModule: any;
@@ -90,6 +91,7 @@ const noopSubjectConfig: SubjectConfigService = {
   getProjectName: async () => 'default',
   getEnrolmentDate: async () => new Date().toISOString(),
   getParticipantAttributes: async () => ({}),
+  clear: async () => {},
 };
 
 const noopStorage: StorageService = {
@@ -98,9 +100,10 @@ const noopStorage: StorageService = {
   observe: () => ({ subscribe: () => ({ unsubscribe: () => {} }) }) as any,
 };
 
-const noopToken: TokenService = { 
+const noopToken: TokenService = {
   refresh: async () => ({ access_token: 'mock_token' }),
   register: async () => {},
+  configureOAuthClient: async () => {},
   getRefreshParams: (token: string) => ({ refresh_token: token }),
   getURI: async () => 'http://localhost',
   setURI: async (uri: string) => uri,
@@ -165,14 +168,34 @@ export function CoreServicesProvider({
   const logger = overrides.logger || noopLogger;
   const localization = overrides.localization || noopLocalization;
   const remoteConfig = overrides.remoteConfig || firebaseRemoteConfigService;
-  const subjectConfig = overrides.subjectConfig || noopSubjectConfig;
   const storage = overrides.storage || noopStorage;
 
-  // Create token service
+  // Create token service — pass OAuth client so cold-start refresh has client_id
+  // before any appserver call (RN fetch also needs a string body; see TokenService).
   const token = tokenServiceFactory({
     storage,
     logger,
+    bus: eventBus,
+    oauthClient: overrides.authConfig?.clientId
+      ? {
+          clientId: overrides.authConfig.clientId,
+          clientSecret: overrides.authConfig.clientSecret,
+        }
+      : undefined,
   });
+
+  // Subject identity: prefer an explicit override; otherwise resolve from Management Portal
+  // using the OAuth base URL (`GET …/managementportal/api/subjects/{login}`).
+  const subjectConfig =
+    overrides.subjectConfig ??
+    (overrides.authConfig?.endpoint
+      ? subjectConfigServiceFactory({
+          token,
+          storage,
+          logger,
+          baseUrl: overrides.authConfig.endpoint,
+        })
+      : noopSubjectConfig);
 
   // Create analytics service
   const analytics = analyticsServiceFactory({
@@ -239,19 +262,20 @@ export function CoreServicesProvider({
     token,
   });
 
-  // Create schedule service
-  const schedule = scheduleServiceFactory({
-    storage,
-    logger,
-    eventBus: eventBus,
-    appServer,
-  });
-
   // Create questionnaire data service
   const questionnaireData = questionnaireDataServiceFactory({
     storage,
     logger,
     eventBus: eventBus,
+  });
+
+  // Create schedule service (depends on questionnaireData for protocol-driven definition loading)
+  const schedule = scheduleServiceFactory({
+    storage,
+    logger,
+    eventBus: eventBus,
+    appServer,
+    questionnaireData,
   });
 
   // Inject auth token provider into ApiService

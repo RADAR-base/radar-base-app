@@ -45,6 +45,16 @@ export class BlueprintLoader {
     return promise;
   }
 
+  /**
+   * Synchronously return an already-cached blueprint, or `undefined` if it hasn't been loaded yet.
+   * Lets callers render a previously-loaded view immediately instead of going through the async
+   * `load()` (which always resolves on a later microtask, causing a one-frame loader flash on
+   * re-visits — e.g. switching back and forth between tabs).
+   */
+  peek(viewPath: string): ScreenBlueprint | undefined {
+    return this.cache.get(viewPath);
+  }
+
   /** Bypass the cache and force a fresh load. */
   async reload(viewPath: string): Promise<ScreenBlueprint> {
     this.cache.delete(viewPath);

@@ -14,10 +14,10 @@ import type { OAuthConfig } from '@radarbase/app-kit';
 export const DEFAULT_AUTH_CONFIG: OAuthConfig = {
   clientId: 'aRMT',
   clientSecret: '',
-  endpoint: 'http://radar-hydra:4445',
+  endpoint: 'https://dev.radarbasedev.co.uk',
   scopes: 'SUBJECT.READ SUBJECT.UPDATE PROJECT.READ MEASUREMENT.CREATE offline_access',
   audience: 'res_ManagementPortal res_gateway res_AppServer',
-  redirectUri: 'org.radarbase.starter://',
-  authPath: '/oauth2/auth',
-  tokenPath: '/oauth2/token',
+  redirectUri: 'com.radarbase.starter://enrol',
+  authPath: '/hydra/oauth2/auth',
+  tokenPath: '/hydra/oauth2/token',
 };

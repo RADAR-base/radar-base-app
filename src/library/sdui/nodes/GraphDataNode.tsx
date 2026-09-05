@@ -8,29 +8,30 @@ import type {
 import { BarChart, Sparkline } from '../Charts';
 import { useDashboardData } from '../useDashboardData';
 import type { NodeProps } from '../types';
+import { fontFamily, resolveBackground, cardShadow } from '../../../theme/theme';
 
 /**
- * Renders a vitals chart for a single metric. Three visual variants:
+ * Renders a graph for a single metric. Three visual variants:
  *   - `mini`     — sparkline only.
  *   - `compact`  — card for horizontal "My Data" row (ring or bar chart).
  *   - `detailed` — full bar chart with title, description, and range pills.
  */
-export function VitalsChartNode({ node, context }: NodeProps) {
-  const vitalType = typeof node.vitalType === 'string' ? node.vitalType : 'metric';
+export function GraphDataNode({ node, context }: NodeProps) {
+  const graphType = typeof node.graphType === 'string' ? node.graphType : 'metric';
   const variant: 'mini' | 'compact' | 'detailed' =
     node.variant === 'mini' ? 'mini' : node.variant === 'compact' ? 'compact' : 'detailed';
   const inlineValues = Array.isArray(node.values)
     ? (node.values as number[]).filter((v) => typeof v === 'number')
     : undefined;
-  const label = typeof node.title === 'string' ? node.title : labelForVital(vitalType);
+  const label = typeof node.title === 'string' ? node.title : labelForGraph(graphType);
   const description = typeof node.description === 'string' ? node.description : undefined;
-  const unit = typeof node.unit === 'string' ? node.unit : unitForVital(vitalType);
+  const unit = typeof node.unit === 'string' ? node.unit : unitForGraph(graphType);
 
   const config: DashboardWidgetConfig = useMemo(
     () => ({
       series: [
         {
-          id: vitalType,
+          id: graphType,
           label,
           chartType: variant === 'mini' ? 'sparkline' : 'bar',
           unit,
@@ -43,7 +44,7 @@ export function VitalsChartNode({ node, context }: NodeProps) {
           : undefined,
       placeholder: inlineValues && inlineValues.length > 0 ? 'none' : 'random',
     }),
-    [variant, label, unit, vitalType, inlineValues, node.ranges],
+    [variant, label, unit, graphType, inlineValues, node.ranges],
   );
 
   const { loading, error, series } = useDashboardData(config);
@@ -61,7 +62,7 @@ export function VitalsChartNode({ node, context }: NodeProps) {
   const surface = theme.surfaceColor ?? '#FFFFFF';
   const text = theme.textColor ?? '#1C3549';
   const textSecondary = theme.textSecondaryColor ?? '#8E8E93';
-  const background = theme.backgroundColor ?? '#EDF1F5';
+  const background = resolveBackground(theme, context.colorScheme ?? 'light');
   const radius = theme.button?.borderRadius ?? 12;
 
   const values = useMemo(() => {
@@ -71,12 +72,12 @@ export function VitalsChartNode({ node, context }: NodeProps) {
   const lastValue = values.length > 0 ? values[values.length - 1] : null;
   const chartColor = resolved?.color ?? secondary;
 
-  // Color overrides for specific vital types
-  const ringColor = vitalType === 'stress' ? '#C9A96E' : chartColor;
+  // Color overrides for specific graph types
+  const ringColor = graphType === 'stress' ? '#C9A96E' : chartColor;
 
   // ── Compact: card for horizontal "My Data" scroll ──
   if (variant === 'compact') {
-    const useBarChart = vitalType === 'steps';
+    const useBarChart = graphType === 'steps';
     const score = lastValue ?? (values.length > 0 ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : 70);
 
     return (
@@ -228,20 +229,20 @@ function formatNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
-function labelForVital(vital: string): string {
-  switch (vital) {
+function labelForGraph(graph: string): string {
+  switch (graph) {
     case 'heart_rate': return 'Heart Rate';
     case 'sleep_minutes':
     case 'sleep_hours': return 'Sleep';
     case 'steps': return 'Steps';
     case 'spo2': return 'Blood Oxygen';
     case 'stress': return 'Stress';
-    default: return vital.replace(/_/g, ' ');
+    default: return graph.replace(/_/g, ' ');
   }
 }
 
-function unitForVital(vital: string): string | undefined {
-  switch (vital) {
+function unitForGraph(graph: string): string | undefined {
+  switch (graph) {
     case 'heart_rate': return 'bpm';
     case 'sleep_minutes': return 'min';
     case 'steps': return 'steps';
@@ -255,30 +256,21 @@ const styles = StyleSheet.create({
   container: {
     padding: 14,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    ...cardShadow,
   },
-  title: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
-  description: { fontSize: 12, marginBottom: 10 },
+  title: { fontSize: 16, fontWeight: '700', marginBottom: 4, fontFamily: fontFamily.bold, includeFontPadding: false },
+  description: { fontSize: 12, marginBottom: 10, fontFamily: fontFamily.regular, includeFontPadding: false },
   rangeRow: { flexDirection: 'row', marginBottom: 12, flexWrap: 'wrap', gap: 6 },
   rangePill: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14 },
-  rangeText: { fontSize: 12, fontWeight: '600' },
-  lastValue: { fontSize: 12, marginBottom: 6 },
-  statusText: { fontSize: 13, fontStyle: 'italic', marginVertical: 6 },
-  errorText: { fontSize: 13, color: '#dc3545', marginVertical: 6 },
+  rangeText: { fontSize: 12, fontWeight: '600', fontFamily: fontFamily.semiBold, includeFontPadding: false },
+  lastValue: { fontSize: 12, marginBottom: 6, fontFamily: fontFamily.regular, includeFontPadding: false },
+  statusText: { fontSize: 13, fontStyle: 'italic', marginVertical: 6, fontFamily: fontFamily.regular, includeFontPadding: false },
+  errorText: { fontSize: 13, color: '#dc3545', marginVertical: 6, fontFamily: fontFamily.regular, includeFontPadding: false },
   /* Compact */
   compactCard: {
     width: 145,
     padding: 12,
-    marginRight: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    ...cardShadow,
   },
   compactHeader: {
     flexDirection: 'row',
@@ -286,8 +278,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
-  compactLabel: { fontSize: 13, fontWeight: '600' },
-  compactArrow: { fontSize: 16 },
+  compactLabel: { fontSize: 13, fontWeight: '600', fontFamily: fontFamily.semiBold, includeFontPadding: false },
+  compactArrow: { fontSize: 16, fontFamily: fontFamily.regular, includeFontPadding: false },
   compactChartArea: {
     paddingTop: 4,
   },
@@ -298,6 +290,8 @@ const styles = StyleSheet.create({
   ringValue: {
     position: 'absolute',
     fontSize: 22,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     fontWeight: '700',
   },
 });

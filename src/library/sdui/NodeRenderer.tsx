@@ -5,6 +5,7 @@ import { NodeErrorBoundary } from './NodeErrorBoundary';
 import { NodeRegistry } from './NodeRegistry';
 import { interpolateDeep } from './templating';
 import type { NodeProps, SDUIContext } from './types';
+import { fontFamily } from '../../theme/theme';
 
 interface NodeRendererProps {
   node: Node;
@@ -71,18 +72,23 @@ const styles = StyleSheet.create({
   },
   unknownTitle: {
     fontSize: 13,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     fontWeight: '700',
     color: '#dc3545',
     marginBottom: 4,
   },
   unknownBody: {
     fontSize: 12,
+    includeFontPadding: false,
     color: '#6c757d',
     fontFamily: 'monospace',
     marginBottom: 4,
   },
   unknownHint: {
     fontSize: 11,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
     color: '#6c757d',
     fontStyle: 'italic',
   },

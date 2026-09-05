@@ -1,12 +1,15 @@
-import React, { useEffect, useMemo } from 'react';
-import {
-  ActivityIndicator,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { StyleSheet, useColorScheme, View } from 'react-native';
 import firebase from '@react-native-firebase/app';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import {
+  useFonts,
+  Inter_300Light,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from '@expo-google-fonts/inter';
 
 import {
   CoreServicesProvider,
@@ -14,14 +17,16 @@ import {
   SDUIShell,
   createBundledBlueprintSource,
   eventBus,
+  getColorTokens,
+  layout,
   useAuth,
   useScheduleService,
+  LoadingScreen,
   type CoreServiceOverrides,
   type ThemeManifest,
-  type ProtocolConfig,
 } from '@radarbase/app-kit';
 
-import { createAsyncStorageService, LoginScreen } from './src';
+import { createAsyncStorageService, LoginScreen, PostEnrolmentFlow } from './src';
 import { DEFAULT_AUTH_CONFIG } from './src/auth';
 
 import appManifest from './config/app-manifest.json';
@@ -29,10 +34,13 @@ import homeBlueprint from './config/views/home.json';
 import profileBlueprint from './config/views/profile.json';
 import inboxHistoryBlueprint from './config/views/secondary/inbox-history.json';
 import questionnaireBlueprint from './config/views/secondary/questionnaire.json';
+import settingsBlueprint from './config/views/secondary/settings.json';
+import notificationsBlueprint from './config/views/secondary/notifications.json';
 import comingSoonBlueprint from './config/views/coming-soon.json';
+import calendarBlueprint from './config/views/calendar.json';
 
 import CustomDemoNode from './CustomDemoNode';
-import protocolConfig from './config/protocol.json';
+
 
 const BUNDLED_BLUEPRINTS: Record<string, unknown> = {
   'views/home.json': homeBlueprint,
@@ -40,6 +48,9 @@ const BUNDLED_BLUEPRINTS: Record<string, unknown> = {
   'views/coming-soon.json': comingSoonBlueprint,
   'views/secondary/inbox-history.json': inboxHistoryBlueprint,
   'views/secondary/questionnaire.json': questionnaireBlueprint,
+  'views/secondary/settings.json': settingsBlueprint,
+  'views/secondary/notifications.json': notificationsBlueprint,
+  'views/calendar.json': calendarBlueprint,
 };
 
 NodeRegistry.getInstance().register('CustomDemoNode', CustomDemoNode);
@@ -53,57 +64,121 @@ export default function App() {
     };
   }, []);
 
+  // Load Inter (the app's typeface — see the theme's `fontFamily`). Hold rendering until it's ready
+  // so text doesn't flash in the system font first.
+  const [fontsLoaded] = useFonts({
+    Inter_300Light,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
+
+  // While fonts load, paint the loading screen's own background color instead of white — so the
+  // reload flows straight into the loader with no white flash between them.
+  const scheme = useColorScheme();
+  const bootBackground = getColorTokens(
+    scheme === 'dark' ? 'dark' : 'light',
+    (appManifest.theme as ThemeManifest).brandColors,
+  ).background.primary;
+  if (!fontsLoaded) return <View style={[styles.root, { backgroundColor: bootBackground }]} />;
+
   return (
-    <CoreServicesProvider overrides={serviceOverrides}>
-      <AppRoot serviceOverrides={serviceOverrides} />
-    </CoreServicesProvider>
+    <SafeAreaProvider>
+      <CoreServicesProvider overrides={serviceOverrides}>
+        {/* Dark backdrop + a rounded, clipped frame: every screen rendered inside inherits rounded
+            corners (which reveal this backdrop) — one place instead of rounding each screen. */}
+        <View style={styles.appBackdrop}>
+          <View style={styles.screenFrame}>
+            <AppRoot serviceOverrides={serviceOverrides} />
+          </View>
+        </View>
+      </CoreServicesProvider>
+    </SafeAreaProvider>
   );
 }
 
-function useScheduleInit() {
+function useScheduleInit(): boolean {
   const schedule = useScheduleService();
+  const [ready, setReady] = useState(false);
   useEffect(() => {
+    let mounted = true;
     (async () => {
       await schedule.init();
-      await schedule.loadProtocol(protocolConfig as ProtocolConfig);
+      await schedule.fetchSchedule();
+      if (mounted) setReady(true);
     })();
-    return () => schedule.destroy();
+    return () => {
+      mounted = false;
+      schedule.destroy();
+    };
   }, [schedule]);
+  return ready;
 }
 
 function AppRoot({ serviceOverrides }: { serviceOverrides: CoreServiceOverrides }) {
   const { status } = useAuth();
   useFirebaseBootstrap();
-  useScheduleInit();
+  const scheduleReady = useScheduleInit();
+
+  // After a fresh authentication in THIS session (i.e. the user came through the login flow), show
+  // the post-enrolment flow (complete → enable notifications) before entering the app. Returning
+  // users who are already authenticated on launch never pass through unauthenticated/authenticating,
+  // so they skip straight in.
+  const [enteredApp, setEnteredApp] = useState(false);
+  const sawAuthFlow = useRef(false);
+  useEffect(() => {
+    if (status === 'unauthenticated' || status === 'authenticating') {
+      sawAuthFlow.current = true;
+    }
+  }, [status]);
 
   const theme = appManifest.theme as ThemeManifest;
-  const primary = theme.primaryColor;
-  const background = theme.backgroundColor ?? '#f8f9fa';
-  const textSecondary = theme.textSecondaryColor ?? '#6D6D80';
 
-  if (status === 'unknown') {
-    return (
-      <FullScreenStatus
-        background={background}
-        primary={primary}
-        text={textSecondary}
-        message="Preparing your session..."
-      />
-    );
-  }
+  // Boot loading overlay: covers the app until auth status resolves, then slides off to the left to
+  // reveal the first screen. Kept mounted (not early-returned) until its `onHidden` fires after the
+  // slide, so the exit animates without stranding a touch-blocking remnant — see LoadingScreen.
+  const [bootLoading, setBootLoading] = useState(true);
 
+  let content: React.ReactNode = null;
   if (status === 'unauthenticated' || status === 'authenticating') {
-    return <LoginScreen theme={theme} />;
+    content = (
+      <LoginScreen theme={theme} appName={appManifest.appName} description={appManifest.description} />
+    );
+  } else if (status !== 'unknown') {
+    // Authenticated. A fresh in-session enrolment runs the post-enrolment flow before the shell;
+    // returning users skip straight in.
+    content =
+      sawAuthFlow.current && !enteredApp ? (
+        <PostEnrolmentFlow onDone={() => setEnteredApp(true)} brandColors={theme.brandColors} />
+      ) : (
+        <View style={styles.shellWrapper}>
+          <SDUIShell
+            manifestSource={async () => appManifest}
+            blueprintSource={createBundledBlueprintSource(BUNDLED_BLUEPRINTS)}
+            serviceOverrides={serviceOverrides}
+            eventBus={{ emit: (event, data) => eventBus.emit(event, data) }}
+            // TEMPORARY placeholder: `useAuth()` doesn't expose any profile data yet (no
+            // firstName/name field), so there's nothing real to source this from. Replace
+            // with actual session/profile data once that's available — e.g. decoded from
+            // the OAuth access token or a profile-fetch call — for `header.showName` to
+            // show a real user rather than this static value.
+            templateContext={{ user: { firstName: 'User' } }}
+          />
+        </View>
+      );
   }
 
   return (
-    <View style={styles.shellWrapper}>
-      <SDUIShell
-        manifestSource={async () => appManifest}
-        blueprintSource={createBundledBlueprintSource(BUNDLED_BLUEPRINTS)}
-        serviceOverrides={serviceOverrides}
-        eventBus={{ emit: (event, data) => eventBus.emit(event, data) }}
-      />
+    <View style={styles.root}>
+      {content}
+      {bootLoading && (
+        <LoadingScreen
+          brandColors={theme.brandColors}
+          ready={status !== 'unknown' && (status === 'unauthenticated' || status === 'authenticating' || scheduleReady)}
+          onHidden={() => setBootLoading(false)}
+        />
+      )}
     </View>
   );
 }
@@ -119,38 +194,22 @@ function useFirebaseBootstrap() {
   }, []);
 }
 
-function FullScreenStatus({
-  background,
-  primary,
-  text,
-  message,
-}: {
-  background: string;
-  primary: string;
-  text: string;
-  message: string;
-}) {
-  return (
-    <SafeAreaView style={[styles.fullScreen, { backgroundColor: background }]}>
-      <ActivityIndicator size="large" color={primary} />
-      <Text style={[styles.fullScreenText, { color: text }]}>{message}</Text>
-    </SafeAreaView>
-  );
-}
-
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   shellWrapper: {
     flex: 1,
   },
-  fullScreen: {
+  // Dark bezel-like backdrop revealed at the rounded corners of every screen.
+  appBackdrop: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
+    backgroundColor: '#000000',
   },
-  fullScreenText: {
-    marginTop: 16,
-    fontSize: 16,
-    textAlign: 'center',
+  // Clips all app content to rounded corners.
+  screenFrame: {
+    flex: 1,
+    borderRadius: layout.radiusScreen,
+    overflow: 'hidden',
   },
 });

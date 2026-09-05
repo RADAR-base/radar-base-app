@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { NodeProps } from '../types';
+import { fontFamily, cardShadow } from '../../../theme/theme';
 
 /**
  * Device connection status indicator. Matches the Figma header sync style
@@ -74,11 +75,7 @@ export function ConnectDevicesMenuNode({ node, context }: NodeProps) {
 const styles = StyleSheet.create({
   container: {
     padding: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    ...cardShadow,
   },
   headerRow: {
     flexDirection: 'row',
@@ -91,15 +88,15 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginRight: 8,
   },
-  title: { fontSize: 15, fontWeight: '700' },
-  description: { fontSize: 12, opacity: 0.9, marginBottom: 4 },
-  lastSync: { fontSize: 12, opacity: 0.8 },
-  error: { color: '#dc3545', marginTop: 4, fontSize: 12 },
+  title: { fontSize: 15, fontWeight: '700', fontFamily: fontFamily.bold, includeFontPadding: false },
+  description: { fontSize: 12, opacity: 0.9, marginBottom: 4, fontFamily: fontFamily.regular, includeFontPadding: false },
+  lastSync: { fontSize: 12, opacity: 0.8, fontFamily: fontFamily.regular, includeFontPadding: false },
+  error: { color: '#dc3545', marginTop: 4, fontSize: 12, fontFamily: fontFamily.regular, includeFontPadding: false },
   syncBtn: {
     marginTop: 10,
     paddingHorizontal: 16,
     paddingVertical: 10,
     alignSelf: 'flex-start',
   },
-  syncBtnText: { fontWeight: '600', fontSize: 13, color: '#FFFFFF' },
+  syncBtnText: { fontWeight: '600', fontSize: 13, color: '#FFFFFF', fontFamily: fontFamily.semiBold, includeFontPadding: false },
 });

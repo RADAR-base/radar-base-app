@@ -1,11 +1,9 @@
+import { AppState, type NativeEventSubscription } from 'react-native';
 import type {
   ScheduleService,
-  ProtocolConfig,
-  AssessmentConfig,
-  TimeInterval,
-  TaskInstance,
-  TaskInstanceState,
   Task,
+  TaskState,
+  TaskView,
   StorageService,
   LoggerService,
   EventBus,
@@ -13,80 +11,127 @@ import type {
 } from '../types';
 import { EVENTS } from './EventBus';
 
-const STORAGE_KEYS = {
-  PROTOCOL: '@radarbase/schedule_protocol',
+export const STORAGE_KEYS = {
   INSTANCES: '@radarbase/schedule_instances',
+  OPENED: '@radarbase/schedule_opened_tasks',
+  ACTIVE_DAYS: '@radarbase/schedule_active_days',
+  NOTIFIED_READY: '@radarbase/schedule_notified_ready',
 };
 
-const DEFAULT_COMPLETION_WINDOW_MS = 86_400_000; // 1 day
-const DEFAULT_SCHEDULE_YEAR_COVERAGE = 1;
 const REFRESH_INTERVAL_MS = 60_000;
+const REFETCH_INTERVAL_MS = 15 * 60_000; // 15 minutes
 
-export class DefaultScheduleService implements ScheduleService {
-  private instances: TaskInstance[] = [];
-  private protocol: ProtocolConfig | null = null;
+/**
+ * Abstract schedule service — owns task state management, storage, refresh timer,
+ * and UI helpers. Subclasses implement `fetchSchedule()` to define how the schedule
+ * is obtained (appserver, local generation, etc.).
+ *
+ * Modelled after RADAR-Questionnaire's `ScheduleService` abstract class.
+ */
+export abstract class ScheduleServiceBase implements ScheduleService {
+  protected tasks: Task[] = [];
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
+  private refetchTimer: ReturnType<typeof setInterval> | null = null;
+  private appStateSubscription: NativeEventSubscription | null = null;
+  private lastAppState: string = AppState.currentState;
   private initialized = false;
+  private openedTaskIds = new Set<string>();
+  private activeDays = new Set<string>();
+  private notifiedReadyIds = new Set<string>();
 
   constructor(
-    private readonly storage: StorageService,
-    private readonly logger: LoggerService,
-    private readonly bus: EventBus,
-    private readonly appServer: AppServerService,
+    protected readonly storage: StorageService,
+    protected readonly logger: LoggerService,
+    protected readonly bus: EventBus,
+    protected readonly appServer: AppServerService,
   ) {}
+
+  // ---------------------------------------------------------------------------
+  // Lifecycle
+  // ---------------------------------------------------------------------------
 
   async init(): Promise<void> {
     if (this.initialized) return;
     this.initialized = true;
 
-    const [savedProtocol, savedInstances] = await Promise.all([
-      this.storage.get<ProtocolConfig>(STORAGE_KEYS.PROTOCOL),
-      this.storage.get<TaskInstance[]>(STORAGE_KEYS.INSTANCES),
-    ]);
+    const [savedTasks, savedOpened, savedActiveDays, savedNotifiedReady] =
+      await Promise.all([
+        this.storage.get<Task[]>(STORAGE_KEYS.INSTANCES),
+        this.storage.get<string[]>(STORAGE_KEYS.OPENED),
+        this.storage.get<string[]>(STORAGE_KEYS.ACTIVE_DAYS),
+        this.storage.get<string[]>(STORAGE_KEYS.NOTIFIED_READY),
+      ]);
 
-    if (savedProtocol) this.protocol = savedProtocol;
-    if (savedInstances) this.instances = savedInstances;
+    if (savedTasks) this.tasks = savedTasks;
+    if (savedOpened) this.openedTaskIds = new Set(savedOpened);
+    if (savedActiveDays) this.activeDays = new Set(savedActiveDays);
+    if (savedNotifiedReady) this.notifiedReadyIds = new Set(savedNotifiedReady);
+
+    const restoredCompleted = (savedTasks ?? []).filter(
+      (t) => t.state === 'completed' || t.state === 'skipped',
+    ).length;
+    console.log(
+      `[ScheduleService] init: restored ${savedTasks?.length ?? 0} task(s) (${restoredCompleted} completed/skipped)`,
+    );
 
     this.refreshTimer = setInterval(() => this.refreshStates(), REFRESH_INTERVAL_MS);
+    this.refetchTimer = setInterval(() => this.fetchSchedule(), REFETCH_INTERVAL_MS);
+
+    // Re-fetch schedule when app returns to foreground
+    this.appStateSubscription = AppState.addEventListener('change', (nextState) => {
+      if (this.lastAppState.match(/inactive|background/) && nextState === 'active') {
+        this.fetchSchedule();
+      }
+      this.lastAppState = nextState;
+    });
 
     await this.refreshStates();
     this.bus.emit(EVENTS.SCHEDULE_UPDATED, { reason: 'initialized' });
     this.logger.log('ScheduleService initialized');
   }
 
-  async loadProtocol(protocol: ProtocolConfig, referenceTimestamp?: number): Promise<void> {
-    this.protocol = protocol;
-    await this.storage.set(STORAGE_KEYS.PROTOCOL, protocol);
+  /** Subclasses implement this to fetch/generate the schedule. */
+  abstract fetchSchedule(): Promise<void>;
 
-    const refTimestamp = referenceTimestamp ?? setDateTimeToMidnightEpoch(new Date());
-    const generated = generateAllInstances(protocol, refTimestamp);
-    this.instances = mergeInstances(this.instances, generated);
-
-    await this.persist();
-    await this.refreshStates();
-    this.bus.emit(EVENTS.SCHEDULE_UPDATED, { reason: 'protocol_loaded' });
+  destroy(): void {
+    if (this.refreshTimer) {
+      clearInterval(this.refreshTimer);
+      this.refreshTimer = null;
+    }
+    if (this.refetchTimer) {
+      clearInterval(this.refetchTimer);
+      this.refetchTimer = null;
+    }
+    if (this.appStateSubscription) {
+      this.appStateSubscription.remove();
+      this.appStateSubscription = null;
+    }
   }
 
-  async getTasksForDate(date: Date): Promise<TaskInstance[]> {
+  // ---------------------------------------------------------------------------
+  // Queries — all operate on the local cache
+  // ---------------------------------------------------------------------------
+
+  async getTasksForDate(date: Date): Promise<Task[]> {
     const dayStart = startOfDay(date).getTime();
     const dayEnd = endOfDay(date).getTime();
-    return this.instances
-      .filter(i => i.timestamp >= dayStart && i.timestamp <= dayEnd)
+    return this.tasks
+      .filter(t => t.timestamp >= dayStart && t.timestamp <= dayEnd)
       .sort((a, b) => a.timestamp - b.timestamp);
   }
 
-  async getTasksForRange(startDate: Date, endDate: Date): Promise<TaskInstance[]> {
+  async getTasksForRange(startDate: Date, endDate: Date): Promise<Task[]> {
     const rangeStart = startOfDay(startDate).getTime();
     const rangeEnd = endOfDay(endDate).getTime();
-    return this.instances
-      .filter(i => i.timestamp >= rangeStart && i.timestamp <= rangeEnd)
+    return this.tasks
+      .filter(t => t.timestamp >= rangeStart && t.timestamp <= rangeEnd)
       .sort((a, b) => a.timestamp - b.timestamp);
   }
 
-  async getUpcomingTasks(limit = 10): Promise<TaskInstance[]> {
+  async getUpcomingTasks(limit = 10): Promise<Task[]> {
     const now = Date.now();
-    return this.instances
-      .filter(i => i.timestamp >= now && (i.state === 'pending' || i.state === 'overdue'))
+    return this.tasks
+      .filter(t => t.timestamp >= now && (t.state === 'pending' || t.state === 'overdue'))
       .sort((a, b) => a.timestamp - b.timestamp)
       .slice(0, limit);
   }
@@ -94,62 +139,120 @@ export class DefaultScheduleService implements ScheduleService {
   async getPendingCount(): Promise<number> {
     const todayStart = startOfDay(new Date()).getTime();
     const todayEnd = endOfDay(new Date()).getTime();
-    return this.instances.filter(
-      i => i.timestamp >= todayStart && i.timestamp <= todayEnd
-        && (i.state === 'pending' || i.state === 'overdue'),
+    return this.tasks.filter(
+      t => t.timestamp >= todayStart && t.timestamp <= todayEnd
+        && (t.state === 'pending' || t.state === 'overdue'),
     ).length;
   }
 
-  async completeTask(instanceId: string): Promise<TaskInstance> {
-    const instance = this.instances.find(i => i.instanceId === instanceId);
-    if (!instance) throw new Error(`Task instance not found: ${instanceId}`);
+  getActiveDaysCount(): number {
+    return this.activeDays.size;
+  }
 
-    instance.state = 'completed';
-    instance.stateChangedAt = new Date().toISOString();
+  // ---------------------------------------------------------------------------
+  // Task state mutations
+  // ---------------------------------------------------------------------------
+
+  /** A task can only be started once its timestamp has passed and its completion window is still open. */
+  isTaskStartable(task: Task): boolean {
+    const now = Date.now();
+    return task.timestamp <= now && !this.isTaskExpired(task);
+  }
+
+  /** A task is expired when its completion window has elapsed or it's already completed. */
+  isTaskExpired(task: Task): boolean {
+    return task.timestamp + task.completionWindow < Date.now() || task.completed;
+  }
+
+  async completeTask(taskId: string): Promise<Task> {
+    const task = this.tasks.find(t => t.id === taskId);
+    if (!task) throw new Error(`Task not found: ${taskId}`);
+    if (task.state === 'expired') throw new Error(`Task expired: ${taskId}`);
+    if (task.timestamp > Date.now()) throw new Error(`Task not yet available: ${taskId}`);
+
+    task.state = 'completed';
+    task.completed = true;
+    task.timeCompleted = Date.now();
+    task.stateChangedAt = new Date().toISOString();
+
+    const now = new Date();
+    const dayKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+    if (!this.activeDays.has(dayKey)) {
+      this.activeDays.add(dayKey);
+      await this.storage.set(STORAGE_KEYS.ACTIVE_DAYS, [...this.activeDays]);
+    }
 
     await this.persist();
-    this.bus.emit(EVENTS.TASK_COMPLETED, { instanceId, name: instance.name });
+    this.bus.emit(EVENTS.TASK_COMPLETED, { taskId, name: task.name });
     this.bus.emit(EVENTS.SCHEDULE_UPDATED, { reason: 'task_completed' });
 
-    this.syncTaskState(instance);
+    this.syncTaskState(task);
 
-    return instance;
+    return task;
   }
 
-  async skipTask(instanceId: string): Promise<TaskInstance> {
-    const instance = this.instances.find(i => i.instanceId === instanceId);
-    if (!instance) throw new Error(`Task instance not found: ${instanceId}`);
+  async skipTask(taskId: string): Promise<Task> {
+    const task = this.tasks.find(t => t.id === taskId);
+    if (!task) throw new Error(`Task not found: ${taskId}`);
+    if (task.state === 'expired') throw new Error(`Task expired: ${taskId}`);
 
-    instance.state = 'skipped';
-    instance.stateChangedAt = new Date().toISOString();
+    task.state = 'skipped';
+    task.stateChangedAt = new Date().toISOString();
 
     await this.persist();
-    this.bus.emit(EVENTS.TASK_SKIPPED, { instanceId, name: instance.name });
+    this.bus.emit(EVENTS.TASK_SKIPPED, { taskId, name: task.name });
     this.bus.emit(EVENTS.SCHEDULE_UPDATED, { reason: 'task_skipped' });
 
-    this.syncTaskState(instance);
+    this.syncTaskState(task);
 
-    return instance;
+    return task;
   }
+
+  // ---------------------------------------------------------------------------
+  // State refresh — 60s timer for pending -> overdue -> expired transitions
+  // ---------------------------------------------------------------------------
 
   async refreshStates(): Promise<void> {
     const now = Date.now();
     let changed = false;
+    let readyChanged = false;
 
-    for (const instance of this.instances) {
-      if (instance.state !== 'pending') continue;
+    for (const task of this.tasks) {
+      const expiresAt = task.timestamp + task.completionWindow;
 
-      const expiresAt = instance.timestamp + instance.completionWindow;
-      if (now > expiresAt) {
-        instance.state = 'expired';
-        instance.stateChangedAt = new Date().toISOString();
-        changed = true;
-      } else if (now > instance.timestamp) {
-        instance.state = 'overdue';
-        instance.stateChangedAt = new Date().toISOString();
-        changed = true;
-        this.bus.emit(EVENTS.TASK_OVERDUE, { instanceId: instance.instanceId, name: instance.name });
+      if (
+        task.state !== 'completed' &&
+        task.state !== 'skipped' &&
+        now >= task.timestamp &&
+        now < expiresAt &&
+        !this.notifiedReadyIds.has(task.id)
+      ) {
+        this.notifiedReadyIds.add(task.id);
+        readyChanged = true;
+        this.bus.emit(EVENTS.TASK_READY, {
+          taskId: task.id,
+          name: task.name,
+          title: task.title,
+          timestamp: task.timestamp,
+        });
       }
+
+      if (task.state !== 'pending') continue;
+
+      if (now > expiresAt) {
+        task.state = 'expired';
+        task.stateChangedAt = new Date().toISOString();
+        changed = true;
+      } else if (now > task.timestamp) {
+        task.state = 'overdue';
+        task.stateChangedAt = new Date().toISOString();
+        changed = true;
+        this.bus.emit(EVENTS.TASK_OVERDUE, { taskId: task.id, name: task.name });
+      }
+    }
+
+    if (readyChanged) {
+      await this.storage.set(STORAGE_KEYS.NOTIFIED_READY, [...this.notifiedReadyIds]);
     }
 
     if (changed) {
@@ -158,8 +261,12 @@ export class DefaultScheduleService implements ScheduleService {
     }
   }
 
-  toSDUITask(instance: TaskInstance): Task {
-    const statusMap: Record<TaskInstanceState, Task['status']> = {
+  // ---------------------------------------------------------------------------
+  // UI helpers
+  // ---------------------------------------------------------------------------
+
+  toTaskView(task: Task): TaskView {
+    const statusMap: Record<TaskState, TaskView['status']> = {
       pending: 'pending',
       completed: 'completed',
       skipped: 'completed',
@@ -167,189 +274,69 @@ export class DefaultScheduleService implements ScheduleService {
       expired: 'overdue',
     };
     return {
-      id: instance.instanceId,
-      title: instance.title,
-      description: instance.description,
-      dueTime: formatTime(instance.timestamp),
-      estimated_minutes: instance.estimatedCompletionTime ?? 0,
-      status: statusMap[instance.state],
-      timestamp: instance.timestamp,
-      completionWindow: instance.completionWindow,
-      completed: instance.state === 'completed',
+      id: task.id,
+      assessmentName: task.name,
+      title: task.title,
+      description: task.description,
+      dueTime: formatTime(task.timestamp),
+      estimated_minutes: task.estimatedCompletionTime ?? 0,
+      nQuestions: task.nQuestions,
+      status: statusMap[task.state],
+      timestamp: task.timestamp,
+      completionWindow: task.completionWindow,
+      completed: task.completed,
+      reminderTimestamp: task.reminderTimestamp,
+      isNew: !this.openedTaskIds.has(task.id),
+      iconUrl: task.icon,
     };
   }
 
-  destroy(): void {
-    if (this.refreshTimer) {
-      clearInterval(this.refreshTimer);
-      this.refreshTimer = null;
+  async markTaskOpened(taskId: string): Promise<void> {
+    if (this.openedTaskIds.has(taskId)) return;
+    this.openedTaskIds.add(taskId);
+    await this.storage.set(STORAGE_KEYS.OPENED, [...this.openedTaskIds]);
+    this.bus.emit(EVENTS.SCHEDULE_UPDATED, { reason: 'task-opened' });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Protected helpers — available to subclasses
+  // ---------------------------------------------------------------------------
+
+  protected async persist(): Promise<void> {
+    try {
+      await this.storage.set(STORAGE_KEYS.INSTANCES, this.tasks);
+      console.log(`[ScheduleService] persist: wrote ${this.tasks.length} task(s)`);
+    } catch (err) {
+      console.log('[ScheduleService] persist FAILED:', err);
+      throw err;
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Private
-  // ---------------------------------------------------------------------------
-
-  private async persist(): Promise<void> {
-    await this.storage.set(STORAGE_KEYS.INSTANCES, this.instances);
+  protected syncTaskState(task: Task): void {
+    this.appServer.updateTaskState(task.id, task.state.toUpperCase())
+      .then(() => { task.reportedCompletion = true; })
+      .catch(() => { task.reportedCompletion = false; });
   }
 
-  private syncTaskState(instance: TaskInstance): void {
-    this.appServer.updateTaskState(instance.instanceId, instance.state)
-      .then(() => { instance.syncedToServer = true; })
-      .catch(() => { instance.syncedToServer = false; });
+  /** Prune the opened/notified tracking sets to only include live task ids. */
+  protected async pruneTrackingSets(): Promise<void> {
+    const liveIds = new Set(this.tasks.map(t => t.id));
+    const prunedOpened = [...this.openedTaskIds].filter(id => liveIds.has(id));
+    if (prunedOpened.length !== this.openedTaskIds.size) {
+      this.openedTaskIds = new Set(prunedOpened);
+      await this.storage.set(STORAGE_KEYS.OPENED, prunedOpened);
+    }
+    const prunedReady = [...this.notifiedReadyIds].filter(id => liveIds.has(id));
+    if (prunedReady.length !== this.notifiedReadyIds.size) {
+      this.notifiedReadyIds = new Set(prunedReady);
+      await this.storage.set(STORAGE_KEYS.NOTIFIED_READY, prunedReady);
+    }
   }
 }
 
 // ---------------------------------------------------------------------------
-// Pure helpers — RADAR-Questionnaire compatible schedule generation
+// Date/time helpers
 // ---------------------------------------------------------------------------
-
-function generateAllInstances(
-  protocol: ProtocolConfig,
-  defaultRefTimestamp: number,
-): TaskInstance[] {
-  const instances: TaskInstance[] = [];
-  let indexOffset = 0;
-
-  for (const assessment of protocol.protocols) {
-    const tasks = buildTasksForAssessment(assessment, indexOffset, defaultRefTimestamp);
-    instances.push(...tasks);
-    indexOffset += tasks.length;
-  }
-
-  return instances;
-}
-
-/**
- * Mirrors RADAR-Questionnaire `ScheduleGeneratorService.buildTasksForSingleAssessment`.
- *
- * 1. Compute refTime from assessment's referenceTimestamp or use the default (enrollment midnight).
- * 2. Compute endTime by advancing refTime by SCHEDULE_YEAR_COVERAGE years.
- * 3. Outer loop: while refTime <= endTime, advance by repeatProtocol.
- * 4. Inner loop: for each offset in repeatQuestionnaire.unitsFromZero, create a task at
- *    `advanceRepeat(refTime, { unit: repeatQ.unit, amount: offset })`.
- * 5. Filter: only keep tasks where timestamp + completionWindow > today.
- */
-function buildTasksForAssessment(
-  assessment: AssessmentConfig,
-  indexOffset: number,
-  defaultRefTimestamp: number,
-): TaskInstance[] {
-  const tasks: TaskInstance[] = [];
-  const today = setDateTimeToMidnightEpoch(new Date());
-
-  const { repeatProtocol: repeatP, repeatQuestionnaire: repeatQ, completionWindow: completionWindowInterval } = assessment.protocol;
-
-  const completionWindow = completionWindowInterval
-    ? timeIntervalToMillis(completionWindowInterval)
-    : DEFAULT_COMPLETION_WINDOW_MS;
-
-  let refTime = assessment.protocol.referenceTimestamp
-    ? setDateTimeToMidnightEpoch(new Date(assessment.protocol.referenceTimestamp))
-    : defaultRefTimestamp;
-
-  const endTime = advanceRepeat(refTime, { unit: 'year', amount: DEFAULT_SCHEDULE_YEAR_COVERAGE });
-
-  const title = assessment.name;
-  const description = chooseText(assessment.startText) || chooseText(assessment.warn) || '';
-
-  while (refTime <= endTime) {
-    for (const amount of repeatQ.unitsFromZero) {
-      const taskTime = advanceRepeat(refTime, { unit: repeatQ.unit, amount });
-
-      tasks.push({
-        instanceId: `${assessment.name}_${taskTime}`,
-        name: assessment.name,
-        title,
-        description,
-        timestamp: taskTime,
-        completionWindow,
-        estimatedCompletionTime: assessment.estimatedCompletionTime,
-        state: 'pending',
-        stateChangedAt: new Date().toISOString(),
-        showInCalendar: assessment.showInCalendar ?? true,
-        isDemo: assessment.isDemo ?? false,
-        order: assessment.order ?? (indexOffset + tasks.length),
-        warning: chooseText(assessment.warn),
-        syncedToServer: false,
-      });
-    }
-
-    if (!repeatP) break;
-    refTime = advanceRepeat(refTime, repeatP);
-  }
-
-  // Only keep tasks whose window hasn't fully elapsed
-  return tasks.filter(t => t.timestamp + t.completionWindow > today);
-}
-
-/** Merge newly generated instances with existing ones, preserving completed/skipped state. */
-function mergeInstances(existing: TaskInstance[], generated: TaskInstance[]): TaskInstance[] {
-  const existingMap = new Map(existing.map(i => [i.instanceId, i]));
-
-  for (const inst of generated) {
-    const prev = existingMap.get(inst.instanceId);
-    if (prev && (prev.state === 'completed' || prev.state === 'skipped')) {
-      continue;
-    }
-    existingMap.set(inst.instanceId, inst);
-  }
-
-  return Array.from(existingMap.values());
-}
-
-/**
- * Advance a timestamp by an interval — mirrors RADAR-Questionnaire's `advanceRepeat`.
- * Handles: min, hour, day, week, month, year.
- */
-function advanceRepeat(timestamp: number, interval: TimeInterval): number {
-  const date = new Date(timestamp);
-  const result = new Date(timestamp);
-  switch (interval.unit) {
-    case 'min':
-      return result.setMinutes(date.getMinutes() + (interval.amount ?? 0));
-    case 'hour':
-      return result.setHours(date.getHours() + (interval.amount ?? 0));
-    case 'day':
-      return result.setDate(date.getDate() + (interval.amount ?? 0));
-    case 'week':
-      return result.setDate(date.getDate() + (interval.amount ?? 0) * 7);
-    case 'month':
-      return result.setMonth(date.getMonth() + (interval.amount ?? 0));
-    case 'year':
-      return result.setFullYear(date.getFullYear() + (interval.amount ?? 0));
-    default:
-      return result.setFullYear(date.getFullYear() + DEFAULT_SCHEDULE_YEAR_COVERAGE);
-  }
-}
-
-/** Convert a TimeInterval to milliseconds (approximate, matching RADAR-Questionnaire). */
-function timeIntervalToMillis(interval: TimeInterval): number {
-  const MILLIS: Record<string, number> = {
-    min: 60_000,
-    hour: 3_600_000,
-    day: 86_400_000,
-    week: 604_800_000,
-    month: 2_678_400_000,  // 31 days
-    year: 31_536_000_000,  // 365 days
-  };
-  const unit = interval.unit && interval.unit in MILLIS ? interval.unit : 'day';
-  const amount = interval.amount ?? 1;
-  return amount * MILLIS[unit];
-}
-
-function setDateTimeToMidnightEpoch(date: Date): number {
-  return new Date(date).setHours(0, 0, 0, 0);
-}
-
-/** Pick the English text from a MultiLanguageText, or first available. */
-function chooseText(text?: Record<string, string>): string | undefined {
-  if (!text) return undefined;
-  if (text.en) return text.en;
-  const values = Object.values(text).filter(Boolean);
-  return values[0] || undefined;
-}
 
 function startOfDay(date: Date): Date {
   const d = new Date(date);
@@ -367,19 +354,3 @@ function formatTime(epochMs: number): string {
   const d = new Date(epochMs);
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
-
-// ---------------------------------------------------------------------------
-// Factory
-// ---------------------------------------------------------------------------
-
-export const scheduleServiceFactory = (deps: {
-  storage: StorageService;
-  logger: LoggerService;
-  eventBus: EventBus;
-  appServer: AppServerService;
-}) => new DefaultScheduleService(
-  deps.storage,
-  deps.logger,
-  deps.eventBus,
-  deps.appServer,
-);

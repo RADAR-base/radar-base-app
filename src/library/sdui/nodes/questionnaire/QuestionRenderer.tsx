@@ -7,6 +7,7 @@ import { RangeInput } from './RangeInput';
 import { SliderInput } from './SliderInput';
 import { TextQuestionInput } from './TextQuestionInput';
 import { InfoScreen } from './InfoScreen';
+import { fontFamily } from '../../../../theme/theme';
 
 interface QuestionRendererProps {
   question: Question;
@@ -186,15 +187,17 @@ const styles = StyleSheet.create({
   container: { marginBottom: 20 },
   sectionHeader: {
     fontSize: 13,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
     fontWeight: '600',
     marginBottom: 8,
     paddingTop: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#e0e0e0',
   },
-  label: { fontSize: 15, fontWeight: '500', lineHeight: 21 },
+  label: { fontSize: 15, fontWeight: '500', lineHeight: 21, fontFamily: fontFamily.medium, includeFontPadding: false },
   required: { color: '#dc3545' },
-  note: { fontSize: 12, marginTop: 2, fontStyle: 'italic' },
+  note: { fontSize: 12, marginTop: 2, fontStyle: 'italic', fontFamily: fontFamily.regular, includeFontPadding: false },
   descriptive: { marginTop: 8, padding: 12, backgroundColor: '#f8f9fa', borderRadius: 8 },
-  descriptiveText: { fontSize: 14, lineHeight: 20 },
+  descriptiveText: { fontSize: 14, lineHeight: 20, fontFamily: fontFamily.regular, includeFontPadding: false },
 });

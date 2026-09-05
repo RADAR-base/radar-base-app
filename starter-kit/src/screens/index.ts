@@ -1,2 +1,10 @@
 export { LoginScreen } from './LoginScreen';
 export type { LoginScreenProps } from './LoginScreen';
+export { RegistrationFlow } from './RegistrationFlow';
+export type { RegistrationFlowProps } from './RegistrationFlow';
+export { RegistrationCompleteScreen } from './RegistrationCompleteScreen';
+export type { RegistrationCompleteScreenProps } from './RegistrationCompleteScreen';
+export { PostEnrolmentFlow } from './PostEnrolmentFlow';
+export type { PostEnrolmentFlowProps } from './PostEnrolmentFlow';
+export { CameraScanScreen } from './CameraScanScreen';
+export type { CameraScanScreenProps } from './CameraScanScreen';

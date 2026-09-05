@@ -5,6 +5,7 @@ import type { Answer, Question, QuestionnaireResult, QuestionTimestamp } from '.
 import type { NodeProps } from '../types';
 import { QuestionRenderer } from './questionnaire/QuestionRenderer';
 import { evaluateBranchingLogic } from './questionnaire/branchingLogic';
+import { fontFamily, cardShadow } from '../../../theme/theme';
 
 const ON_PRIMARY = '#FFFFFF';
 
@@ -137,6 +138,8 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
     }
   }, [questionnaireData, assessmentName, title, answers, timestamps, eventBus]);
 
+  const fullScreen = node.fullScreen === true;
+
   const theme = context.theme;
   const primary = theme.primaryColor;
   const surface = theme.surfaceColor ?? '#FFFFFF';
@@ -144,10 +147,14 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
   const textSecondary = theme.textSecondaryColor ?? '#6D6D80';
   const radius = theme.button?.borderRadius ?? 8;
 
+  const containerStyle = fullScreen
+    ? [styles.fullContainer, { backgroundColor: surface }]
+    : [styles.container, { backgroundColor: surface, borderRadius: radius }];
+
   // --- Introduction Screen ---
   if (phase === 'intro') {
     return (
-      <View style={[styles.container, { backgroundColor: surface, borderRadius: radius }]}>
+      <View style={containerStyle}>
         <Text style={[styles.title, { color: text }]}>{title}</Text>
         {startText && <Text style={[styles.introText, { color: textSecondary }]}>{startText}</Text>}
         <TouchableOpacity
@@ -168,7 +175,7 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
   // --- Completion Screen ---
   if (phase === 'done') {
     return (
-      <View style={[styles.container, { backgroundColor: surface, borderRadius: radius }]}>
+      <View style={containerStyle}>
         <Text style={[styles.title, { color: text }]}>{title}</Text>
         <Text style={[styles.doneText, { color: textSecondary }]}>{endText}</Text>
         <Text style={[styles.doneSubtext, { color: textSecondary }]}>
@@ -181,7 +188,7 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
   // --- Questions Screen ---
   if (allQuestions.length === 0) {
     return (
-      <View style={[styles.container, { backgroundColor: surface, borderRadius: radius }]}>
+      <View style={containerStyle}>
         <Text style={[styles.title, { color: text }]}>{title}</Text>
         <Text style={[styles.emptyText, { color: textSecondary }]}>No questions available</Text>
       </View>
@@ -194,7 +201,7 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
   const canProceed = !isRequired || hasAnswer || isInfoType;
 
   return (
-    <View style={[styles.container, { backgroundColor: surface, borderRadius: radius }]}>
+    <View style={containerStyle}>
       {/* Progress bar */}
       <View style={styles.progressRow}>
         <Text style={[styles.progressText, { color: textSecondary }]}>
@@ -208,7 +215,7 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
       <Text style={[styles.title, { color: text }]}>{title}</Text>
 
       {/* Current question */}
-      <ScrollView style={styles.questionArea} contentContainerStyle={styles.questionContent}>
+      <ScrollView style={fullScreen ? styles.questionAreaFull : styles.questionArea} contentContainerStyle={styles.questionContent}>
         {currentQuestion && (
           <QuestionRenderer
             question={currentQuestion}
@@ -258,18 +265,18 @@ const styles = StyleSheet.create({
   container: {
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    ...cardShadow,
+  },
+  fullContainer: {
+    flex: 1,
+    padding: 16,
   },
   progressRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
   },
-  progressText: { fontSize: 12, fontWeight: '600', marginRight: 10 },
+  progressText: { fontSize: 12, fontWeight: '600', marginRight: 10, fontFamily: fontFamily.semiBold, includeFontPadding: false },
   progressBar: {
     flex: 1,
     height: 6,
@@ -278,12 +285,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: { height: '100%', borderRadius: 3 },
-  title: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
-  introText: { fontSize: 14, lineHeight: 20, marginBottom: 20 },
-  doneText: { fontSize: 14, lineHeight: 20, marginBottom: 8 },
-  doneSubtext: { fontSize: 12, fontStyle: 'italic' },
-  emptyText: { fontSize: 13, fontStyle: 'italic', marginTop: 8 },
+  title: { fontSize: 18, fontWeight: '700', marginBottom: 8, fontFamily: fontFamily.bold, includeFontPadding: false },
+  introText: { fontSize: 14, lineHeight: 20, marginBottom: 20, fontFamily: fontFamily.regular, includeFontPadding: false },
+  doneText: { fontSize: 14, lineHeight: 20, marginBottom: 8, fontFamily: fontFamily.regular, includeFontPadding: false },
+  doneSubtext: { fontSize: 12, fontStyle: 'italic', fontFamily: fontFamily.regular, includeFontPadding: false },
+  emptyText: { fontSize: 13, fontStyle: 'italic', marginTop: 8, fontFamily: fontFamily.regular, includeFontPadding: false },
   questionArea: { maxHeight: 400 },
+  questionAreaFull: { flex: 1 },
   questionContent: { paddingBottom: 8 },
   navRow: {
     flexDirection: 'row',
@@ -296,7 +304,7 @@ const styles = StyleSheet.create({
   },
   navButton: { paddingVertical: 10, paddingHorizontal: 16 },
   navButtonDisabled: { opacity: 0.4 },
-  navButtonText: { fontSize: 14, fontWeight: '600' },
+  navButtonText: { fontSize: 14, fontWeight: '600', fontFamily: fontFamily.semiBold, includeFontPadding: false },
   primaryButton: {
     paddingVertical: 12,
     paddingHorizontal: 24,
@@ -304,6 +312,8 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: ON_PRIMARY,
     fontSize: 15,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
     fontWeight: '600',
     textAlign: 'center',
   },

@@ -1,54 +1,43 @@
 {
   "appName": "RADAR Active App",
+  "description": "Track your health data and complete your daily study tasks.",
   "version": "1.0.0",
   "configSchemaVersion": "1",
   "clinicalTemplate": null,
   "theme": {
-    "primaryColor": "#1C3549",
-    "secondaryColor": "#8FA764",
-    "backgroundColor": "#EDF1F5",
-    "surfaceColor": "#FFFFFF",
-    "textColor": "#1C3549",
-    "textSecondaryColor": "#8E8E93",
-    "fontFamily": "Inter, sans-serif",
-    "fontSize": 16,
-    "button": {
-      "borderRadius": 12
-    }
+      "brand": "#1E90FF",
+      "background": "#200023"
   },
   "header": {
-    "title": "RADAR Active App",
-    "greeting": "Hello User",
+    "title": "Welcome",
     "subtitle": "Track your data and complete your daily tasks",
-    "backgroundColor": "#1C3549",
-    "textColor": "#FFFFFF",
-    "showBackButton": false,
-    "showSettings": true
+    "showSettings": true,
+    "showNotifications": true,
+    "profileIcon": true,
+    "settingsViewPath": "views/secondary/settings.json",
+    "notificationsViewPath": "views/secondary/notifications.json"
   },
   "tabs": [
     {
       "id": "tab_home",
       "label": "Home",
+      "showLabel": false,
       "icon": "home",
       "viewPath": "views/home.json"
     },
     {
       "id": "tab_calendar",
       "label": "Calendar",
+      "showLabel": false,
       "icon": "calendar",
-      "viewPath": "views/coming-soon.json"
+      "viewPath": "views/calendar.json"
     },
     {
       "id": "tab_profile",
       "label": "Profile",
+      "showLabel": false,
       "icon": "person",
       "viewPath": "views/profile.json"
-    },
-    {
-      "id": "tab_more",
-      "label": "More",
-      "icon": "grid",
-      "viewPath": "views/coming-soon.json"
     }
   ],
   "secondaryViews": {

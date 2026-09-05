@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { SelectChoice } from '../../../../types';
+import { fontFamily } from '../../../../theme/theme';
 
 interface RadioInputProps {
   choices: SelectChoice[];
@@ -60,5 +61,5 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 5,
   },
-  label: { fontSize: 14, flex: 1 },
+  label: { fontSize: 14, flex: 1, fontFamily: fontFamily.regular, includeFontPadding: false },
 });
