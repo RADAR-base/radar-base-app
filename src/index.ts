@@ -21,12 +21,14 @@ export {
   useAuthService,
   useNotificationService,
   useScheduleService,
+  useScheduleInit,
   useQuestionnaireDataService,
 } from './core/CoreServicesContext';
 export { useAuth } from './core/useAuth';
 export type { UseAuthResult } from './core/useAuth';
 export type { CoreServiceOverrides } from './core/CoreServicesContext';
 export { dataService } from './core/DataService';
+export { createAsyncStorageService } from './core/AsyncStorageService';
 export { apiService } from './core/ApiService';
 export { eventBus } from './core/EventBus';
 export { appServerServiceFactory } from './core/AppServerService';

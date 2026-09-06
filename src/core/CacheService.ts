@@ -1,260 +1,138 @@
 import { CacheService, StorageService, LoggerService } from '../types';
 
-interface CacheEntry {
-  data: any;
-  timestamp: number;
+/** Lightweight manifest entry — stored as an array, no payload data. */
+interface ManifestEntry {
+  key: string;
   type: string;
-  size: number;
+  timestamp: number;
 }
 
-export class DefaultCacheService implements CacheService {
-  private readonly CACHE_KEY = 'KAFKA_CACHE';
-  private readonly CACHE_SIZE_KEY = 'KAFKA_CACHE_SIZE';
-  private readonly MAX_CACHE_SIZE = 50 * 1024 * 1024; // 50MB max cache size
-  private readonly CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days TTL
+const MANIFEST_KEY = '@cache:manifest';
+const ENTRY_PREFIX = '@cache:entry:';
 
-  private cache: Record<string, CacheEntry> = {};
-  private cacheSize = 0;
-  private isInitialized = false;
+export class DefaultCacheService implements CacheService {
+  private manifest: ManifestEntry[] = [];
+  private data = new Map<string, any>();
+  private initialized = false;
 
   constructor(
     private readonly storage: StorageService,
-    private readonly logger: LoggerService
+    private readonly logger: LoggerService,
   ) {}
 
   async init(): Promise<void> {
-    if (this.isInitialized) return;
+    if (this.initialized) return;
 
     try {
-      await this.loadCacheFromStorage();
-      await this.cleanExpiredEntries();
-      this.isInitialized = true;
-      this.logger.log(`Cache initialized with ${Object.keys(this.cache).length} entries`);
+      const saved = await this.storage.get<ManifestEntry[]>(MANIFEST_KEY);
+      if (saved && saved.length) {
+        // Load each entry from its own storage key
+        for (const meta of saved) {
+          const value = await this.storage.get(`${ENTRY_PREFIX}${meta.key}`);
+          if (value !== null) {
+            this.manifest.push(meta);
+            this.data.set(meta.key, value);
+
+          }
+        }
+      }
+      this.initialized = true;
+      this.logger.log(`Cache initialized with ${this.manifest.length} entries`);
     } catch (error) {
+      this.manifest = [];
+      this.data.clear();
+      this.initialized = true;
       this.logger.error('Failed to initialize cache', error);
-      // Initialize with empty cache if loading fails
-      this.cache = {};
-      this.cacheSize = 0;
-      this.isInitialized = true;
     }
   }
 
-  async getCache(): Promise<Record<string, any>> {
-    await this.ensureInitialized();
-    // Return only the data portion, not the metadata
+  async store(key: string, data: any): Promise<void> {
+    await this.ensureInit();
+
+    // Remove existing entry if key already exists (dedup overwrite)
+    const existing = this.manifest.findIndex(m => m.key === key);
+    if (existing !== -1) {
+      this.manifest.splice(existing, 1);
+    }
+
+    this.manifest.push({ key, type: key.split(':')[0] || '', timestamp: Date.now() });
+    this.data.set(key, data);
+
+    // Per-entry write: 1 small entry + 1 small manifest (no payload in manifest)
+    await this.storage.set(`${ENTRY_PREFIX}${key}`, data);
+    await this.persistManifest();
+  }
+
+  async get(key: string): Promise<any | null> {
+    await this.ensureInit();
+    return this.data.get(key) ?? null;
+  }
+
+  async getAll(): Promise<Record<string, any>> {
+    await this.ensureInit();
     const result: Record<string, any> = {};
-    for (const [key, entry] of Object.entries(this.cache)) {
-      result[key] = entry.data;
+    for (const [key, value] of this.data) {
+      result[key] = value;
     }
     return result;
   }
 
-  async getCacheSize(): Promise<number> {
-    await this.ensureInitialized();
-    return Object.keys(this.cache).length;
+  keys(): string[] {
+    return this.manifest.map(m => m.key);
   }
 
-  async storeInCache(type: string, value: any, cacheValue: any): Promise<void> {
-    await this.ensureInitialized();
+  size(): number {
+    return this.manifest.length;
+  }
 
-    const key = this.generateCacheKey(type, value);
-    const serialized = JSON.stringify(cacheValue);
-    const size = new Blob([serialized]).size;
+  async remove(key: string): Promise<void> {
+    await this.ensureInit();
+    const idx = this.manifest.findIndex(m => m.key === key);
+    if (idx === -1) return;
 
-    // Check if adding this entry would exceed max cache size
-    if (this.cacheSize + size > this.MAX_CACHE_SIZE) {
-      await this.evictOldestEntries(size);
+    this.manifest.splice(idx, 1);
+    this.data.delete(key);
+
+    await this.storage.remove(`${ENTRY_PREFIX}${key}`);
+    await this.persistManifest();
+  }
+
+  async removeMultiple(keys: string[]): Promise<void> {
+    await this.ensureInit();
+    const keySet = new Set(keys);
+    const toRemove = this.manifest.filter(m => keySet.has(m.key));
+    if (!toRemove.length) return;
+
+    for (const entry of toRemove) {
+      this.data.delete(entry.key);
+      await this.storage.remove(`${ENTRY_PREFIX}${entry.key}`);
     }
 
-    const entry: CacheEntry = {
-      data: cacheValue,
-      timestamp: Date.now(),
-      type,
-      size,
-    };
+    this.manifest = this.manifest.filter(m => !keySet.has(m.key));
+    await this.persistManifest();
+  }
 
-    // Remove old entry size if it exists
-    if (this.cache[key]) {
-      this.cacheSize -= this.cache[key].size;
+  async clear(): Promise<void> {
+    for (const meta of this.manifest) {
+      await this.storage.remove(`${ENTRY_PREFIX}${meta.key}`);
     }
-
-    this.cache[key] = entry;
-    this.cacheSize += size;
-
-    await this.persistCache();
-    this.logger.log(`Cached entry: ${key} (${size} bytes)`);
+    this.manifest = [];
+    this.data.clear();
+    await this.storage.remove(MANIFEST_KEY);
   }
 
-  async removeFromCache(key: string): Promise<void> {
-    await this.ensureInitialized();
-    
-    if (this.cache[key]) {
-      this.cacheSize -= this.cache[key].size;
-      delete this.cache[key];
-      await this.persistCache();
-      this.logger.log(`Removed cache entry: ${key}`);
-    }
+  // ---------------------------------------------------------------------------
+  // Private
+  // ---------------------------------------------------------------------------
+
+  private async ensureInit(): Promise<void> {
+    if (!this.initialized) await this.init();
   }
 
-  async removeFromCacheMultiple(keys: string[]): Promise<void> {
-    await this.ensureInitialized();
-    
-    let removedCount = 0;
-    for (const key of keys) {
-      if (this.cache[key]) {
-        this.cacheSize -= this.cache[key].size;
-        delete this.cache[key];
-        removedCount++;
-      }
-    }
-
-    if (removedCount > 0) {
-      await this.persistCache();
-      this.logger.log(`Removed ${removedCount} cache entries`);
-    }
+  private async persistManifest(): Promise<void> {
+    await this.storage.set(MANIFEST_KEY, this.manifest);
   }
 
-  async setCache(cache: Record<string, any>): Promise<void> {
-    await this.ensureInitialized();
-    
-    this.cache = {};
-    this.cacheSize = 0;
-
-    for (const [key, value] of Object.entries(cache)) {
-      const serialized = JSON.stringify(value);
-      const size = new Blob([serialized]).size;
-      
-      this.cache[key] = {
-        data: value,
-        timestamp: Date.now(),
-        type: 'imported',
-        size,
-      };
-      this.cacheSize += size;
-    }
-
-    await this.persistCache();
-    this.logger.log(`Cache reset with ${Object.keys(cache).length} entries`);
-  }
-
-  async clearCache(): Promise<void> {
-    this.cache = {};
-    this.cacheSize = 0;
-    await this.storage.set(this.CACHE_KEY, null);
-    await this.storage.set(this.CACHE_SIZE_KEY, 0);
-    this.logger.log('Cache cleared');
-  }
-
-  private async ensureInitialized(): Promise<void> {
-    if (!this.isInitialized) {
-      await this.init();
-    }
-  }
-
-  private generateCacheKey(type: string, value: any): string {
-    const timestamp = value.time || value.timestamp || Date.now();
-    const identifier = value.id || value.key || Math.random().toString(36).substr(2, 9);
-    return `${type}_${timestamp}_${identifier}`;
-  }
-
-  private async loadCacheFromStorage(): Promise<void> {
-    const cachedData = await this.storage.get<Record<string, CacheEntry>>(this.CACHE_KEY);
-    const cachedSize = await this.storage.get<number>(this.CACHE_SIZE_KEY);
-
-    if (cachedData) {
-      this.cache = cachedData;
-      this.cacheSize = cachedSize || this.calculateCacheSize();
-    } else {
-      this.cache = {};
-      this.cacheSize = 0;
-    }
-  }
-
-  private async persistCache(): Promise<void> {
-    try {
-      await this.storage.set(this.CACHE_KEY, this.cache);
-      await this.storage.set(this.CACHE_SIZE_KEY, this.cacheSize);
-    } catch (error) {
-      this.logger.error('Failed to persist cache', error);
-      throw error;
-    }
-  }
-
-  private calculateCacheSize(): number {
-    let size = 0;
-    for (const entry of Object.values(this.cache)) {
-      size += entry.size || 0;
-    }
-    return size;
-  }
-
-  private async cleanExpiredEntries(): Promise<void> {
-    const now = Date.now();
-    const expiredKeys: string[] = [];
-
-    for (const [key, entry] of Object.entries(this.cache)) {
-      if (now - entry.timestamp > this.CACHE_TTL) {
-        expiredKeys.push(key);
-      }
-    }
-
-    if (expiredKeys.length > 0) {
-      await this.removeFromCacheMultiple(expiredKeys);
-      this.logger.log(`Cleaned ${expiredKeys.length} expired cache entries`);
-    }
-  }
-
-  private async evictOldestEntries(requiredSpace: number): Promise<void> {
-    const entries = Object.entries(this.cache)
-      .map(([key, entry]) => ({ key, ...entry }))
-      .sort((a, b) => a.timestamp - b.timestamp);
-
-    let freedSpace = 0;
-    const keysToRemove: string[] = [];
-
-    for (const entry of entries) {
-      keysToRemove.push(entry.key);
-      freedSpace += entry.size;
-      
-      if (freedSpace >= requiredSpace) {
-        break;
-      }
-    }
-
-    await this.removeFromCacheMultiple(keysToRemove);
-    this.logger.log(`Evicted ${keysToRemove.length} entries to free ${freedSpace} bytes`);
-  }
-
-  // Utility methods for cache management
-  async getCacheStats(): Promise<{
-    entryCount: number;
-    totalSize: number;
-    oldestEntry: number | null;
-    newestEntry: number | null;
-  }> {
-    await this.ensureInitialized();
-    
-    const timestamps = Object.values(this.cache).map(entry => entry.timestamp);
-    
-    return {
-      entryCount: Object.keys(this.cache).length,
-      totalSize: this.cacheSize,
-      oldestEntry: timestamps.length > 0 ? Math.min(...timestamps) : null,
-      newestEntry: timestamps.length > 0 ? Math.max(...timestamps) : null,
-    };
-  }
-
-  async getCacheByType(type: string): Promise<Record<string, any>> {
-    await this.ensureInitialized();
-    
-    const result: Record<string, any> = {};
-    for (const [key, entry] of Object.entries(this.cache)) {
-      if (entry.type === type) {
-        result[key] = entry.data;
-      }
-    }
-    return result;
-  }
 }
 
 export const cacheServiceFactory = (deps: {

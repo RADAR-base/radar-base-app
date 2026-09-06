@@ -269,17 +269,22 @@ function formatClock(task: Task): string {
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * The card state for a task on the day starting at `dayStart`. Completed always wins. Otherwise the
- * *day* decides first: a day that's already fully elapsed makes every unfinished task **missed**
- * (covers previous days even when a task carries no completion window of its own), and a day still in
- * the future makes everything **not-ready**. Only for *today* do we fall back to the task's own timing.
+ * The card state for a task on the day starting at `dayStart`. Completed always wins. Then we check
+ * the task's actual completion window — a task scheduled at 9am with a 24h window is still available
+ * until 9am the next day, even when viewing the previous day's calendar. Only tasks without a
+ * completion window fall back to the day-based "past day = missed" rule.
  */
 function deriveState(task: Task, dayStart: number): CalendarTaskState {
   if (task.status === 'completed') return 'done';
   const now = Date.now();
-  if (dayStart + DAY_MS <= now) return 'missed';
-  if (dayStart > now) return 'notReady';
+  // Check actual completion window first — respects windows that span past midnight
   if (isExpired(task)) return 'missed';
+  // Tasks without completion window info: fall back to day-based check
+  if ((task.timestamp == null || task.completionWindow == null) && dayStart + DAY_MS <= now) {
+    return 'missed';
+  }
+  // Future day or future task within today
+  if (dayStart > now) return 'notReady';
   if (task.timestamp != null && task.timestamp > now) return 'notReady';
   return 'available';
 }

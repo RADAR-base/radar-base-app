@@ -3,13 +3,16 @@ import {
   KafkaService,
   AnalyticsService,
   CacheService,
-  TokenService,
+  DataPipelineService,
   RemoteConfigService,
   StorageService,
   LoggerService,
-  DataService
+  DataService,
 } from '../types';
 // Note: Avoid direct RN Firebase imports for web compatibility. Use injected RemoteConfigService instead.
+
+/** Storage key for the platform base URL. Shared with KafkaService (reads directly from storage). */
+export const BASE_URI_KEY = 'BASE_URI';
 
 export class DefaultConfigService implements ConfigService {
   private isInitialized = false;
@@ -18,11 +21,11 @@ export class DefaultConfigService implements ConfigService {
     private readonly kafka: KafkaService,
     private readonly analytics: AnalyticsService,
     private readonly cache: CacheService,
-    private readonly token: TokenService,
+    private readonly pipeline: DataPipelineService,
     private readonly remoteConfig: RemoteConfigService,
     private readonly storage: StorageService,
     private readonly logger: LoggerService,
-    private readonly dataService: DataService
+    private readonly dataService: DataService,
   ) {}
 
   async init(): Promise<any> {
@@ -45,10 +48,19 @@ export class DefaultConfigService implements ConfigService {
         this.logger.log('Analytics init failed; continuing without analytics');
       }
       await this.cache.init();
-      await this.kafka.init();
-      
+
       this.isInitialized = true;
-      
+
+      // If user is already authenticated from a previous session, init Kafka
+      // and flush any unsent cached data
+      const baseUrl = await this.storage.get<string>(BASE_URI_KEY);
+      if (baseUrl) {
+        await this.kafka.init();
+        this.sendCachedData().catch(e =>
+          this.logger.log(`Startup cache flush failed: ${e}`),
+        );
+      }
+
       this.logger.log('Config Service initialized successfully');
       this.sendConfigChangeEvent('CONFIG_INITIALIZED', null, true, null, { timestamp: Date.now() });
       
@@ -121,6 +133,31 @@ export class DefaultConfigService implements ConfigService {
     }
   }
 
+  async getBaseUrl(): Promise<string> {
+    const uri = await this.storage.get<string>(BASE_URI_KEY);
+    if (!uri) {
+      throw new Error('Base URL not set. Please complete authentication first.');
+    }
+    return uri;
+  }
+
+  async setBaseUrl(uri: string): Promise<string> {
+    if (!uri) {
+      throw new Error('Base URL cannot be null or empty');
+    }
+    try {
+      const url = new URL(uri);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        throw new Error('Invalid base URL. Please use a valid HTTP/HTTPS URL.');
+      }
+    } catch {
+      throw new Error('Invalid base URL format. Please use a valid URL.');
+    }
+    const cleanUri = uri.replace(/\/+$/, '');
+    await this.storage.set(BASE_URI_KEY, cleanUri);
+    return cleanUri;
+  }
+
   async sendCachedData(): Promise<{ successKeys: string[]; failedKeys: string[] }> {
     await this.ensureInitialized();
     
@@ -128,7 +165,7 @@ export class DefaultConfigService implements ConfigService {
       this.logger.log('Starting to send cached data...');
       this.sendConfigChangeEvent('CACHE_SEND_STARTED', null, null, null, { timestamp: Date.now() });
       
-      const result = await this.kafka.sendAllFromCache();
+      const result = await this.pipeline.flush();
       
       this.analytics.logDataSent('cached_data', result.successKeys.length, result.failedKeys.length === 0);
       this.sendConfigChangeEvent('CACHE_SEND_COMPLETED', null, null, null, { 
@@ -145,10 +182,6 @@ export class DefaultConfigService implements ConfigService {
       this.sendConfigChangeEvent('CACHE_SEND_FAILED', null, null, error, { timestamp: Date.now() });
       throw error;
     }
-  }
-
-  getKafkaService(): KafkaService {
-    return this.kafka;
   }
 
   sendConfigChangeEvent(type: string, previous?: any, current?: any, error?: any, data?: any): void {
@@ -189,7 +222,7 @@ export class DefaultConfigService implements ConfigService {
       }
       
       // Also clear cache if requested
-      await this.cache.clearCache();
+      await this.cache.clear();
       
       this.sendConfigChangeEvent('CONFIG_RESET_TO_DEFAULTS', null, defaults, null, { timestamp: Date.now() });
       this.analytics.logEvent('config_reset', { reason: 'user_action' });
@@ -204,17 +237,7 @@ export class DefaultConfigService implements ConfigService {
 
   async getCacheStats(): Promise<any> {
     await this.ensureInitialized();
-    
-    if ('getCacheStats' in this.cache) {
-      return (this.cache as any).getCacheStats();
-    }
-    
-    return {
-      entryCount: await this.cache.getCacheSize(),
-      totalSize: 0,
-      oldestEntry: null,
-      newestEntry: null,
-    };
+    return { entryCount: this.cache.size() };
   }
 
   async validateConfiguration(): Promise<{ isValid: boolean; errors: string[] }> {
@@ -334,18 +357,19 @@ export const configServiceFactory = (deps: {
   kafka: KafkaService;
   analytics: AnalyticsService;
   cache: CacheService;
-  token: TokenService;
+  pipeline: DataPipelineService;
   remoteConfig: RemoteConfigService;
   storage: StorageService;
   logger: LoggerService;
   dataService: DataService;
-}) => new DefaultConfigService(
-  deps.kafka,
-  deps.analytics,
-  deps.cache,
-  deps.token,
-  deps.remoteConfig,
-  deps.storage,
-  deps.logger,
-  deps.dataService
-);
+}) =>
+  new DefaultConfigService(
+    deps.kafka,
+    deps.analytics,
+    deps.cache,
+    deps.pipeline,
+    deps.remoteConfig,
+    deps.storage,
+    deps.logger,
+    deps.dataService,
+  );

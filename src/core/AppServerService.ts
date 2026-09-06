@@ -42,13 +42,20 @@ export class DefaultAppServerService implements IAppServerService {
     if (!this.APP_SERVER_URL) await this.updateAppServerURL();
     const accessToken = await this.token.getAccessToken();
     if (!accessToken) throw new Error('No access token available');
-    this.api.setHeaders({ 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' });
-    return ({});
+    return {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    };
+  }
+
+  /** Build a full URL by prepending the appserver base. */
+  private url(path: string): string {
+    return `${this.APP_SERVER_URL}${path}`;
   }
 
   async getProject(projectId: string): Promise<any> {
-    await this.getHeaders();
-    return this.api.get(`/${this.PROJECT_PATH}/${projectId}`);
+    const headers = await this.getHeaders();
+    return this.api.get(this.url(`/${this.PROJECT_PATH}/${projectId}`), { headers });
   }
 
   async addProjectIfMissing(projectId: string): Promise<any> {
@@ -61,13 +68,13 @@ export class DefaultAppServerService implements IAppServerService {
   }
 
   async addProjectToServer(projectId: string): Promise<any> {
-    await this.getHeaders();
-    return this.api.post(`/${this.PROJECT_PATH}`, { projectId });
+    const headers = await this.getHeaders();
+    return this.api.post(this.url(`/${this.PROJECT_PATH}`), { projectId }, { headers });
   }
 
   async getSubject(projectId: string, subjectId: string): Promise<any> {
-    await this.getHeaders();
-    return this.api.get(`/${this.PROJECT_PATH}/${projectId}/${this.SUBJECT_PATH}/${subjectId}`);
+    const headers = await this.getHeaders();
+    return this.api.get(this.url(`/${this.PROJECT_PATH}/${projectId}/${this.SUBJECT_PATH}/${subjectId}`), { headers });
   }
 
   async addSubjectIfMissing(
@@ -103,8 +110,8 @@ export class DefaultAppServerService implements IAppServerService {
     fcmToken?: string,
     attributes?: Record<string, unknown>
   ): Promise<any> {
-    await this.getHeaders();
-    return this.api.post(`/${this.PROJECT_PATH}/${projectId}/${this.SUBJECT_PATH}`, {
+    const headers = await this.getHeaders();
+    return this.api.post(this.url(`/${this.PROJECT_PATH}/${projectId}/${this.SUBJECT_PATH}`), {
       enrolmentDate: new Date(enrolmentDate).toISOString(),
       projectId,
       subjectId,
@@ -112,20 +119,20 @@ export class DefaultAppServerService implements IAppServerService {
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       language: this.localization.getLanguage().value,
       attributes,
-    });
+    }, { headers });
   }
 
   async updateSubject(subject: any, properties: Record<string, unknown>): Promise<any> {
-    await this.getHeaders();
+    const headers = await this.getHeaders();
     const updatedSubject = { ...subject, ...properties };
     const projectId = subject.projectId;
     const subjectId = subject.subjectId;
-    return this.api.post(`/${this.PROJECT_PATH}/${projectId}/${this.SUBJECT_PATH}/${subjectId}`, updatedSubject);
+    return this.api.post(this.url(`/${this.PROJECT_PATH}/${projectId}/${this.SUBJECT_PATH}/${subjectId}`), updatedSubject, { headers });
   }
 
   async fetchFromGithub(githubUrl: string): Promise<any> {
-    await this.getHeaders();
-    return this.api.get(`/${this.GITHUB_CONTENT_PATH}?url=${encodeURIComponent(githubUrl)}`);
+    const headers = await this.getHeaders();
+    return this.api.get(this.url(`/${this.GITHUB_CONTENT_PATH}?url=${encodeURIComponent(githubUrl)}`), { headers });
   }
 
   async getProtocol(): Promise<any> {
@@ -133,8 +140,8 @@ export class DefaultAppServerService implements IAppServerService {
       this.subjectConfig.getParticipantLogin(),
       this.subjectConfig.getProjectName(),
     ]);
-    await this.getHeaders();
-    return this.api.get(`/${this.PROJECT_PATH}/${projectId}/${this.SUBJECT_PATH}/${subjectId}/protocols`);
+    const headers = await this.getHeaders();
+    return this.api.get(this.url(`/${this.PROJECT_PATH}/${projectId}/${this.SUBJECT_PATH}/${subjectId}/protocols`), { headers });
   }
 
   async getSchedule(): Promise<any> {
@@ -142,8 +149,8 @@ export class DefaultAppServerService implements IAppServerService {
       this.subjectConfig.getParticipantLogin(),
       this.subjectConfig.getProjectName(),
     ]);
-    await this.getHeaders();
-    return this.api.get(`/${this.PROJECT_PATH}/${projectId}/${this.SUBJECT_PATH}/${subjectId}/${this.QUESTIONNAIRE_SCHEDULE_PATH}`);
+    const headers = await this.getHeaders();
+    return this.api.get(this.url(`/${this.PROJECT_PATH}/${projectId}/${this.SUBJECT_PATH}/${subjectId}/${this.QUESTIONNAIRE_SCHEDULE_PATH}`), { headers });
   }
 
   async getScheduleForDates(startTime: Date, endTime: Date): Promise<any> {
@@ -151,10 +158,10 @@ export class DefaultAppServerService implements IAppServerService {
       this.subjectConfig.getParticipantLogin(),
       this.subjectConfig.getProjectName(),
     ]);
-    await this.getHeaders();
+    const headers = await this.getHeaders();
     const params = new URLSearchParams({ startTime: startTime.toISOString(), endTime: endTime.toISOString() });
     try {
-      return await this.api.get(`/${this.PROJECT_PATH}/${projectId}/${this.SUBJECT_PATH}/${subjectId}/${this.QUESTIONNAIRE_SCHEDULE_PATH}?${params.toString()}`);
+      return await this.api.get(this.url(`/${this.PROJECT_PATH}/${projectId}/${this.SUBJECT_PATH}/${subjectId}/${this.QUESTIONNAIRE_SCHEDULE_PATH}?${params.toString()}`), { headers });
     } catch {
       return [];
     }
@@ -165,18 +172,18 @@ export class DefaultAppServerService implements IAppServerService {
       this.subjectConfig.getParticipantLogin(),
       this.subjectConfig.getProjectName(),
     ]);
-    await this.getHeaders();
-    return this.api.post(`/${this.PROJECT_PATH}/${projectId}/${this.SUBJECT_PATH}/${subjectId}/${this.QUESTIONNAIRE_SCHEDULE_PATH}`, {});
+    const headers = await this.getHeaders();
+    return this.api.post(this.url(`/${this.PROJECT_PATH}/${projectId}/${this.SUBJECT_PATH}/${subjectId}/${this.QUESTIONNAIRE_SCHEDULE_PATH}`), {}, { headers });
   }
 
   async pullAllPublishedNotifications(subject: { projectId: string; subjectId: string }): Promise<any> {
-    await this.getHeaders();
-    return this.api.get(`/${this.PROJECT_PATH}/${subject.projectId}/${this.SUBJECT_PATH}/${subject.subjectId}/${this.NOTIFICATIONS_PATH}`);
+    const headers = await this.getHeaders();
+    return this.api.get(this.url(`/${this.PROJECT_PATH}/${subject.projectId}/${this.SUBJECT_PATH}/${subject.subjectId}/${this.NOTIFICATIONS_PATH}`), { headers });
   }
 
   async deleteNotification(subject: { projectId: string; subjectId: string }, notification: { id: string | number }): Promise<any> {
-    await this.getHeaders();
-    return this.api.post(`/${this.PROJECT_PATH}/${subject.projectId}/${this.SUBJECT_PATH}/${subject.subjectId}/${this.NOTIFICATIONS_PATH}/${notification.id}`, { _method: 'DELETE' });
+    const headers = await this.getHeaders();
+    return this.api.post(this.url(`/${this.PROJECT_PATH}/${subject.projectId}/${this.SUBJECT_PATH}/${subject.subjectId}/${this.NOTIFICATIONS_PATH}/${notification.id}`), { _method: 'DELETE' }, { headers });
   }
 
   async updateTaskState(taskId: string | number, state: string): Promise<any> {
@@ -184,27 +191,30 @@ export class DefaultAppServerService implements IAppServerService {
       this.subjectConfig.getParticipantLogin(),
       this.subjectConfig.getProjectName(),
     ]);
-    await this.getHeaders();
+    const headers = await this.getHeaders();
     return this.api.post(
-      `/${this.PROJECT_PATH}/${projectId}/${this.SUBJECT_PATH}/${subjectId}/${this.QUESTIONNAIRE_SCHEDULE_PATH}/${taskId}/${this.QUESTIONNAIRE_STATE_EVENTS_PATH}`,
-      { taskId, state, time: new Date().toISOString(), associatedInfo: '' }
+      this.url(`/${this.PROJECT_PATH}/${projectId}/${this.SUBJECT_PATH}/${subjectId}/${this.QUESTIONNAIRE_SCHEDULE_PATH}/${taskId}/${this.QUESTIONNAIRE_STATE_EVENTS_PATH}`),
+      { taskId, state, time: new Date().toISOString(), associatedInfo: '' },
+      { headers },
     );
   }
 
   async updateNotificationState(subject: { projectId: string; subjectId: string }, notificationId: string | number, state: string): Promise<any> {
-    await this.getHeaders();
+    const headers = await this.getHeaders();
     return this.api.post(
-      `/${this.PROJECT_PATH}/${subject.projectId}/${this.SUBJECT_PATH}/${subject.subjectId}/${this.NOTIFICATIONS_PATH}/${notificationId}/${this.STATE_EVENTS_PATH}`,
-      { notificationId, state, time: new Date().toISOString() }
+      this.url(`/${this.PROJECT_PATH}/${subject.projectId}/${this.SUBJECT_PATH}/${subject.subjectId}/${this.NOTIFICATIONS_PATH}/${notificationId}/${this.STATE_EVENTS_PATH}`),
+      { notificationId, state, time: new Date().toISOString() },
+      { headers },
     );
   }
 
   async addNotification(notification: { notificationDto: any }, subjectId: string, projectId: string): Promise<any> {
-    await this.getHeaders();
+    const headers = await this.getHeaders();
     try {
       const res = await this.api.post(
-        `/${this.PROJECT_PATH}/${projectId}/${this.SUBJECT_PATH}/${subjectId}/${this.NOTIFICATIONS_PATH}`,
-        notification.notificationDto
+        this.url(`/${this.PROJECT_PATH}/${projectId}/${this.SUBJECT_PATH}/${subjectId}/${this.NOTIFICATIONS_PATH}`),
+        notification.notificationDto,
+        { headers },
       );
       this.logger.log('Successfully sent! Updating notification Id');
       return res;
@@ -225,9 +235,8 @@ export class DefaultAppServerService implements IAppServerService {
   async updateAppServerURL(): Promise<string> {
     const cfg = await this.remoteConfig.forceFetch();
     const url = cfg.getOrDefault('APP_SERVER_URL', this.DEFAULT_APPSERVER_URL);
-    this.APP_SERVER_URL = url;
-    this.api.setBaseUrl(url);
-    return url;
+    this.APP_SERVER_URL = url.replace(/\/$/, '');
+    return this.APP_SERVER_URL;
   }
 
   getAppServerURL(): string | null {

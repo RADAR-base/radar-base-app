@@ -11,14 +11,14 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
-import { layout, useAuth, useSlideOverlay, type ThemeManifest } from '@radarbase/app-kit';
+import { layout, useAuth, useSlideOverlay, type ThemeColorOverrides } from '@radarbase/app-kit';
 
 import { GradientMeshBackground, StudyNameModal, WelcomeCard } from '../components';
 import { RegistrationFlow } from './RegistrationFlow';
 
 export interface LoginScreenProps {
-  /** Theme tokens from the loaded manifest's `theme` block. Drives all colors on this screen. */
-  theme: ThemeManifest;
+  /** Brand color overrides from the manifest's `theme` block. */
+  brandColors?: ThemeColorOverrides;
   /** Study/app name for the welcome card. Sourced from the manifest's `appName`. */
   appName?: string;
   /** Description copy for the welcome card. Sourced from the manifest's `description`. */
@@ -32,7 +32,7 @@ export interface LoginScreenProps {
 }
 
 export function LoginScreen({
-  theme,
+  brandColors,
   appName,
   description,
   title = 'Welcome',
@@ -61,9 +61,8 @@ export function LoginScreen({
     <View style={styles.root}>
       <Animated.View style={[StyleSheet.absoluteFill, enrolment.baseStyle]}>
         <GradientMeshBackground
-          primaryColor={theme.brandColors?.primary}
-          secondaryColor={theme.brandColors?.secondary}
-          tertiaryColor={theme.brandColors?.tertiary}
+          primaryColor={brandColors?.brand}
+          tertiaryColor={brandColors?.accent}
           frosted
           paused={enrolment.visible}
         />
@@ -78,7 +77,7 @@ export function LoginScreen({
             onGetStarted={enrolment.open}
             onSignUp={() => setSignUpOpen(true)}
             safeAreaBottomInset={insets.bottom}
-            brandColors={theme.brandColors}
+            brandColors={brandColors}
           />
             {/* <View style={styles.legacyContent}>
               <View style={styles.contentWrapper}>
@@ -129,7 +128,7 @@ export function LoginScreen({
         visible={signUpOpen}
         onClose={() => setSignUpOpen(false)}
         onSubmit={() => setSignUpOpen(false)}
-        brandColors={theme.brandColors}
+        brandColors={brandColors}
       />
 
       {/* "Enter Login Details" opens this study-ID prompt (same modal as Sign Up). Pressing Search
@@ -146,7 +145,7 @@ export function LoginScreen({
         description="Enter your study ID and we'll find your login portal"
         placeholder="Study ID"
         ctaLabel="Search"
-        brandColors={theme.brandColors}
+        brandColors={brandColors}
       />
 
       {enrolment.visible && (
@@ -156,7 +155,7 @@ export function LoginScreen({
             onEnterLoginDetails={() => setLoginIdOpen(true)}
             onResetLogin={cancelLogin}
             isAuthenticating={isAuthenticating}
-            brandColors={theme.brandColors}
+            brandColors={brandColors}
           />
         </Animated.View>
       )}
