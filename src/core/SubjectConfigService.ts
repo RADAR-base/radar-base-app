@@ -125,11 +125,7 @@ export class ManagementPortalSubjectConfigService implements SubjectConfigServic
   }
 
   private async requireAccessToken(): Promise<string> {
-    let access = await this.token.getAccessToken();
-    if (!access) {
-      const pair = await this.token.refresh();
-      access = pair.access_token;
-    }
+    const access = await this.token.getAccessToken();
     if (!access) throw new Error('No access token available for Management Portal subject lookup.');
     return access;
   }

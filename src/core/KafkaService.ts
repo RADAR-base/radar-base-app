@@ -117,9 +117,10 @@ export class DefaultKafkaService implements KafkaService {
   /** Headers for Kafka REST proxy requests (produce). */
   private async getHeaders(): Promise<Record<string, string>> {
     try {
-      const tokens = await this.token.refresh();
+      const accessToken = await this.token.getAccessToken();
+      if (!accessToken) throw new Error('No access token');
       return {
-        Authorization: `Bearer ${tokens.access_token}`,
+        Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/vnd.kafka.avro.v2+json',
         Accept: 'application/vnd.kafka.v2+json',
       };
@@ -134,9 +135,10 @@ export class DefaultKafkaService implements KafkaService {
   /** Headers for schema registry requests. */
   private async getSchemaHeaders(): Promise<Record<string, string>> {
     try {
-      const tokens = await this.token.refresh();
+      const accessToken = await this.token.getAccessToken();
+      if (!accessToken) throw new Error('No access token');
       return {
-        Authorization: `Bearer ${tokens.access_token}`,
+        Authorization: `Bearer ${accessToken}`,
         Accept: 'application/vnd.schemaregistry.v1+json, application/json',
       };
     } catch {

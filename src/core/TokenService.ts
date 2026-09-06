@@ -71,6 +71,14 @@ export class DefaultTokenService implements TokenService {
         if (typeof status === 'number' && status >= 400 && status < 500) {
           break;
         }
+        // Don't retry on missing prerequisites (no refresh token, no client_id, no endpoint)
+        // — retrying won't help if the data isn't there.
+        if (!error?.status && error instanceof Error && (
+          error.message.includes('No refresh token') ||
+          error.message.includes('not configured')
+        )) {
+          break;
+        }
         if (attempt < MAX_REFRESH_ATTEMPTS - 1) {
           this.logger.log(`[TokenService] refresh attempt ${attempt + 1} failed, retrying...`);
           await new Promise(r => setTimeout(r, REFRESH_RETRY_DELAY_MS));
@@ -227,6 +235,11 @@ export class DefaultTokenService implements TokenService {
     if (!accessToken) return null;
 
     if (await this.isTokenExpired()) {
+      // Don't attempt a refresh if there's no refresh token — the user is unauthenticated
+      // and hitting the token endpoint would just produce a needless failed request.
+      const refreshToken = await this.storage.get<string>(this.TOKEN_STORE.REFRESH_TOKEN);
+      if (!refreshToken) return null;
+
       try {
         const tokens = await this.refresh();
         return tokens.access_token;
