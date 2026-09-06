@@ -92,25 +92,33 @@ export function SDUIShell(props: SDUIShellProps) {
     // whatever mode was active on first load.
   }, [props.manifestSource, props.manifestFallback, colorScheme]);
 
-  // Pre-warm the blueprint cache for every tab in the background once the manifest loads, so the
-  // first switch to each tab is instant (no loader flash) — TabView then reads them synchronously.
+  // Pre-warm the blueprint cache for tabs and secondary views once the manifest loads, so the
+  // first switch/open is instant (no loader flash).
   useEffect(() => {
     if (!manifest) return;
     for (const tab of manifest.tabs) {
       void blueprintLoader.load(tab.viewPath).catch(() => {});
+    }
+    if (manifest.secondaryViews) {
+      for (const viewPath of Object.values(manifest.secondaryViews)) {
+        void blueprintLoader.load(viewPath).catch(() => {});
+      }
     }
   }, [manifest, blueprintLoader]);
 
   const openSecondaryView = useCallback(
     async (viewUrl: string) => {
       try {
-        const blueprint = await blueprintLoader.load(viewUrl);
+        // Resolve logical names (e.g. "daily_questionnaire") to file paths via
+        // the manifest's secondaryViews map; fall back to the raw viewUrl for direct paths.
+        const resolvedPath = manifest?.secondaryViews?.[viewUrl] ?? viewUrl;
+        const blueprint = await blueprintLoader.load(resolvedPath);
         setSecondaryStack((stack) => [...stack, { viewUrl, blueprint }]);
       } catch (err) {
         console.error(`[SDUI] Failed to open secondary view "${viewUrl}":`, err);
       }
     },
-    [blueprintLoader],
+    [blueprintLoader, manifest],
   );
 
   const popSecondaryView = useCallback(() => {

@@ -43,6 +43,7 @@ export {
 // SDUI engine — the primary public surface
 export {
   SDUIShell,
+  AppShell,
   NodeRegistry,
   NodeRenderer,
   NodeErrorBoundary,
@@ -51,6 +52,7 @@ export {
   parseManifest,
   parseBlueprint,
   createBundledBlueprintSource,
+  createRemoteBlueprintSource,
   createActionDispatcher,
   interpolate,
   interpolateDeep,
@@ -112,6 +114,7 @@ export {
 } from './library/sdui';
 export type {
   SDUIShellProps,
+  AppShellProps,
   NodeComponent,
   NodeProps,
   SDUIContext,

@@ -6,6 +6,8 @@
 
 export { SDUIShell } from './SDUIShell';
 export type { SDUIShellProps } from './SDUIShell';
+export { AppShell } from './AppShell';
+export type { AppShellProps } from './AppShell';
 
 export { NodeRegistry } from './NodeRegistry';
 export type { NodeComponent, NodeProps, SDUIContext, TemplateContext, ActionPayload } from './types';
@@ -20,6 +22,7 @@ export {
   BlueprintLoader,
   parseBlueprint,
   createBundledBlueprintSource,
+  createRemoteBlueprintSource,
 } from './BlueprintLoader';
 export type { BlueprintSource } from './BlueprintLoader';
 

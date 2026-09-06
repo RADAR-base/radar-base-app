@@ -41,10 +41,15 @@ export const HeaderSchema = z
     textColor: z.string().optional(),
     showBackButton: z.boolean().optional(),
     showSettings: z.boolean().optional(),
+    showNotifications: z.boolean().optional(),
     /** Leading header icon: `true` (default) shows the profile picture, `false` the RadarBase wordmark. */
     profileIcon: z.boolean().optional(),
     /** When true, appends the signed-in user's name (from `SDUIContext.template.user`) after `title`. */
     showName: z.boolean().optional(),
+    /** View path for the settings secondary view. */
+    settingsViewPath: z.string().optional(),
+    /** View path for the notifications secondary view. */
+    notificationsViewPath: z.string().optional(),
   })
   .passthrough();
 
@@ -89,9 +94,12 @@ export const AlertsSchema = z.object({
 export const ManifestSchema = z
   .object({
     appName: z.string(),
+    description: z.string().optional(),
     version: z.string(),
     configSchemaVersion: z.string(),
     clinicalTemplate: z.string().nullable().optional(),
+    /** Base URL for fetching blueprint JSONs remotely. View paths are resolved relative to this. */
+    blueprintBaseUrl: z.string().optional(),
     theme: ThemeSchema,
     // Optional: the dashboard header can instead live in each tab's blueprint as a leading
     // `HeaderNode` (rendered inline by `ViewNode`, so it scrolls with the page). When a manifest

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { StyleSheet, useColorScheme, View } from 'react-native';
 import firebase from '@react-native-firebase/app';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -12,61 +12,23 @@ import {
 } from '@expo-google-fonts/inter';
 
 import {
-  CoreServicesProvider,
-  NodeRegistry,
-  SDUIShell,
-  createBundledBlueprintSource,
-  eventBus,
+  AppShell,
   getColorTokens,
   layout,
-  useAuth,
-  useScheduleInit,
-  useSubjectConfigService,
   createAsyncStorageService,
-  LoadingScreen,
-  LoginScreen,
-  PostEnrolmentFlow,
-  type CoreServiceOverrides,
   type ThemeColorOverrides,
 } from '@radarbase/app-kit';
 
-import appManifest from './config/app-manifest.json';
-import homeBlueprint from './config/views/home.json';
-import profileBlueprint from './config/views/profile.json';
-import inboxHistoryBlueprint from './config/views/secondary/inbox-history.json';
-import questionnaireBlueprint from './config/views/secondary/questionnaire.json';
-import settingsBlueprint from './config/views/secondary/settings.json';
-import notificationsBlueprint from './config/views/secondary/notifications.json';
-import comingSoonBlueprint from './config/views/coming-soon.json';
-import calendarBlueprint from './config/views/calendar.json';
-
+import appConfig from './config';
 import CustomDemoNode from './CustomDemoNode';
 
-
-const BUNDLED_BLUEPRINTS: Record<string, unknown> = {
-  'views/home.json': homeBlueprint,
-  'views/profile.json': profileBlueprint,
-  'views/coming-soon.json': comingSoonBlueprint,
-  'views/secondary/inbox-history.json': inboxHistoryBlueprint,
-  'views/secondary/questionnaire.json': questionnaireBlueprint,
-  'views/secondary/settings.json': settingsBlueprint,
-  'views/secondary/notifications.json': notificationsBlueprint,
-  'views/calendar.json': calendarBlueprint,
-};
-
-NodeRegistry.getInstance().register('CustomDemoNode', CustomDemoNode);
+const PLUGINS = { CustomDemoNode };
 
 export default function App() {
-  const serviceOverrides = useMemo<CoreServiceOverrides>(() => {
-    const storage = createAsyncStorageService();
-    return {
-      storage,
-      authConfig: appManifest.auth,
-    };
-  }, []);
+  const storage = useMemo(() => createAsyncStorageService(), []);
 
-  // Load Inter (the app's typeface — see the theme's `fontFamily`). Hold rendering until it's ready
-  // so text doesn't flash in the system font first.
+  useFirebaseBootstrap();
+
   const [fontsLoaded] = useFonts({
     Inter_300Light,
     Inter_400Regular,
@@ -75,125 +37,25 @@ export default function App() {
     Inter_700Bold,
   });
 
-  // While fonts load, paint the loading screen's own background color instead of white — so the
-  // reload flows straight into the loader with no white flash between them.
   const scheme = useColorScheme();
   const bootBackground = getColorTokens(
     scheme === 'dark' ? 'dark' : 'light',
-    appManifest.theme as ThemeColorOverrides,
+    (appConfig.theme as Record<string, unknown>)?.brandColors as ThemeColorOverrides,
   ).background.primary;
   if (!fontsLoaded) return <View style={[styles.root, { backgroundColor: bootBackground }]} />;
 
   return (
     <SafeAreaProvider>
-      <CoreServicesProvider overrides={serviceOverrides}>
-        {/* Dark backdrop + a rounded, clipped frame: every screen rendered inside inherits rounded
-            corners (which reveal this backdrop) — one place instead of rounding each screen. */}
-        <View style={styles.appBackdrop}>
-          <View style={styles.screenFrame}>
-            <AppRoot serviceOverrides={serviceOverrides} />
-          </View>
-        </View>
-      </CoreServicesProvider>
-    </SafeAreaProvider>
-  );
-}
-
-
-function AppRoot({ serviceOverrides }: { serviceOverrides: CoreServiceOverrides }) {
-  const { status, logout } = useAuth();
-  const subjectConfig = useSubjectConfigService();
-  useFirebaseBootstrap();
-  const scheduleReady = useScheduleInit();
-
-  // Wire settings "Sign out" action to auth reset
-  useEffect(() => {
-    const handler = () => { logout(); };
-    eventBus.on('auth.sign_out', handler);
-    return () => eventBus.off('auth.sign_out', handler);
-  }, [logout]);
-
-  // Build template context from SubjectConfigService + manifest
-  const [templateContext, setTemplateContext] = useState<Record<string, Record<string, unknown>>>({
-    user: { firstName: 'User' },
-    app: { version: appManifest.version },
-  });
-  useEffect(() => {
-    if (status !== 'authenticated') return;
-    (async () => {
-      const [login, project, enrolmentDate] = await Promise.all([
-        subjectConfig.getParticipantLogin(),
-        subjectConfig.getProjectName(),
-        subjectConfig.getEnrolmentDate(),
-      ]);
-      setTemplateContext({
-        user: { firstName: login, login },
-        study: {
-          name: project,
-          enrollmentDate: enrolmentDate
-            ? new Date(enrolmentDate).toLocaleDateString()
-            : '',
-          status: 'Active',
-        },
-        app: { version: appManifest.version },
-      });
-    })().catch(() => {});
-  }, [status, subjectConfig]);
-
-  // After a fresh authentication in THIS session (i.e. the user came through the login flow), show
-  // the post-enrolment flow (complete → enable notifications) before entering the app. Returning
-  // users who are already authenticated on launch never pass through unauthenticated/authenticating,
-  // so they skip straight in.
-  const [enteredApp, setEnteredApp] = useState(false);
-  const sawAuthFlow = useRef(false);
-  useEffect(() => {
-    if (status === 'unauthenticated' || status === 'authenticating') {
-      sawAuthFlow.current = true;
-    }
-  }, [status]);
-
-  const theme = appManifest.theme as ThemeColorOverrides;
-
-  // Boot loading overlay: covers the app until auth status resolves, then slides off to the left to
-  // reveal the first screen. Kept mounted (not early-returned) until its `onHidden` fires after the
-  // slide, so the exit animates without stranding a touch-blocking remnant — see LoadingScreen.
-  const [bootLoading, setBootLoading] = useState(true);
-
-  let content: React.ReactNode = null;
-  if (status === 'unauthenticated' || status === 'authenticating') {
-    content = (
-      <LoginScreen brandColors={theme} appName={appManifest.appName} description={appManifest.description} />
-    );
-  } else if (status !== 'unknown') {
-    // Authenticated. A fresh in-session enrolment runs the post-enrolment flow before the shell;
-    // returning users skip straight in.
-    content =
-      sawAuthFlow.current && !enteredApp ? (
-        <PostEnrolmentFlow onDone={() => setEnteredApp(true)} brandColors={theme} />
-      ) : (
-        <View style={styles.shellWrapper}>
-          <SDUIShell
-            manifestSource={async () => appManifest}
-            blueprintSource={createBundledBlueprintSource(BUNDLED_BLUEPRINTS)}
-            serviceOverrides={serviceOverrides}
-            eventBus={{ emit: (event, data) => eventBus.emit(event, data) }}
-            templateContext={templateContext}
+      <View style={styles.appBackdrop}>
+        <View style={styles.screenFrame}>
+          <AppShell
+            manifest={appConfig}
+            storage={storage}
+            plugins={PLUGINS}
           />
         </View>
-      );
-  }
-
-  return (
-    <View style={styles.root}>
-      {content}
-      {bootLoading && (
-        <LoadingScreen
-          brandColors={theme}
-          ready={status !== 'unknown' && (status === 'unauthenticated' || status === 'authenticating' || scheduleReady)}
-          onHidden={() => setBootLoading(false)}
-        />
-      )}
-    </View>
+      </View>
+    </SafeAreaProvider>
   );
 }
 
@@ -212,15 +74,10 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
   },
-  shellWrapper: {
-    flex: 1,
-  },
-  // Dark bezel-like backdrop revealed at the rounded corners of every screen.
   appBackdrop: {
     flex: 1,
     backgroundColor: '#000000',
   },
-  // Clips all app content to rounded corners.
   screenFrame: {
     flex: 1,
     borderRadius: layout.radiusScreen,
