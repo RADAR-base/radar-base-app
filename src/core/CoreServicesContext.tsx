@@ -121,6 +121,7 @@ interface CoreServices {
   schedule: ScheduleService;
   questionnaireData: QuestionnaireDataService;
   dataPipeline: DataPipelineService;
+  subjectConfig: SubjectConfigService;
 }
 
 const CoreServicesContext = createContext<CoreServices | null>(null);
@@ -302,6 +303,7 @@ export function CoreServicesProvider({
     schedule,
     questionnaireData,
     dataPipeline,
+    subjectConfig,
   };
 
   // Fire-and-forget config init on mount (Kafka init + cache flush for returning users)
@@ -342,6 +344,7 @@ export const useNotificationService = () => useCoreServices().notifications;
 export const useScheduleService = () => useCoreServices().schedule;
 export const useQuestionnaireDataService = () => useCoreServices().questionnaireData;
 export const useDataPipeline = () => useCoreServices().dataPipeline;
+export const useSubjectConfigService = () => useCoreServices().subjectConfig;
 
 /** Init the schedule service, fetch schedule, clean up on unmount. Returns true when ready. */
 export function useScheduleInit(): boolean {

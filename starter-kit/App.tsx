@@ -21,6 +21,7 @@ import {
   layout,
   useAuth,
   useScheduleInit,
+  useSubjectConfigService,
   createAsyncStorageService,
   LoadingScreen,
   type CoreServiceOverrides,
@@ -101,9 +102,44 @@ export default function App() {
 
 
 function AppRoot({ serviceOverrides }: { serviceOverrides: CoreServiceOverrides }) {
-  const { status } = useAuth();
+  const { status, logout } = useAuth();
+  const subjectConfig = useSubjectConfigService();
   useFirebaseBootstrap();
   const scheduleReady = useScheduleInit();
+
+  // Wire settings "Sign out" action to auth reset
+  useEffect(() => {
+    const handler = () => { logout(); };
+    eventBus.on('auth.sign_out', handler);
+    return () => eventBus.off('auth.sign_out', handler);
+  }, [logout]);
+
+  // Build template context from SubjectConfigService + manifest
+  const [templateContext, setTemplateContext] = useState<Record<string, Record<string, unknown>>>({
+    user: { firstName: 'User' },
+    app: { version: appManifest.version },
+  });
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    (async () => {
+      const [login, project, enrolmentDate] = await Promise.all([
+        subjectConfig.getParticipantLogin(),
+        subjectConfig.getProjectName(),
+        subjectConfig.getEnrolmentDate(),
+      ]);
+      setTemplateContext({
+        user: { firstName: login, login },
+        study: {
+          name: project,
+          enrollmentDate: enrolmentDate
+            ? new Date(enrolmentDate).toLocaleDateString()
+            : '',
+          status: 'Active',
+        },
+        app: { version: appManifest.version },
+      });
+    })().catch(() => {});
+  }, [status, subjectConfig]);
 
   // After a fresh authentication in THIS session (i.e. the user came through the login flow), show
   // the post-enrolment flow (complete → enable notifications) before entering the app. Returning
@@ -142,12 +178,7 @@ function AppRoot({ serviceOverrides }: { serviceOverrides: CoreServiceOverrides 
             blueprintSource={createBundledBlueprintSource(BUNDLED_BLUEPRINTS)}
             serviceOverrides={serviceOverrides}
             eventBus={{ emit: (event, data) => eventBus.emit(event, data) }}
-            // TEMPORARY placeholder: `useAuth()` doesn't expose any profile data yet (no
-            // firstName/name field), so there's nothing real to source this from. Replace
-            // with actual session/profile data once that's available — e.g. decoded from
-            // the OAuth access token or a profile-fetch call — for `header.showName` to
-            // show a real user rather than this static value.
-            templateContext={{ user: { firstName: 'User' } }}
+            templateContext={templateContext}
           />
         </View>
       );

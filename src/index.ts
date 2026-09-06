@@ -22,6 +22,7 @@ export {
   useNotificationService,
   useScheduleService,
   useScheduleInit,
+  useSubjectConfigService,
   useQuestionnaireDataService,
 } from './core/CoreServicesContext';
 export { useAuth } from './core/useAuth';
