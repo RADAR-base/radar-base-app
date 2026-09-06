@@ -1,4 +1,4 @@
-import React, { createContext, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { dataService } from './DataService';
 import { eventBus } from './EventBus';
 import { apiService } from './ApiService';
@@ -14,6 +14,7 @@ import {
   scheduleServiceFactory,
   questionnaireDataServiceFactory,
   subjectConfigServiceFactory,
+  dataPipelineFactory,
 } from './index';
 
 let remoteConfigModule: any;
@@ -46,12 +47,13 @@ import type {
   NotificationService,
   ScheduleService,
   QuestionnaireDataService,
+  DataPipelineService,
   OAuthConfig,
 } from '../types';
 
 // Enhanced no-op implementations to satisfy dependencies; apps can override via a higher-level provider if needed
-const noopLogger: LoggerService = { 
-  log: (message: string, meta?: unknown) => console.log(message, meta), 
+const noopLogger: LoggerService = {
+  log: (message: string, meta?: unknown) => console.log(message, meta),
   error: (message: string, meta?: unknown) => {
     console.error(message, meta);
     // Do not throw in noop logger to avoid crashing UI in web/demo
@@ -97,20 +99,8 @@ const noopSubjectConfig: SubjectConfigService = {
 const noopStorage: StorageService = {
   get: async () => null,
   set: async () => {},
+  remove: async () => {},
   observe: () => ({ subscribe: () => ({ unsubscribe: () => {} }) }) as any,
-};
-
-const noopToken: TokenService = {
-  refresh: async () => ({ access_token: 'mock_token' }),
-  register: async () => {},
-  configureOAuthClient: async () => {},
-  getRefreshParams: (token: string) => ({ refresh_token: token }),
-  getURI: async () => 'http://localhost',
-  setURI: async (uri: string) => uri,
-  setTokenEndpoint: async () => {},
-  getTokenEndpoint: async () => 'http://localhost/oauth/token',
-  getAccessToken: async () => 'mock_token',
-  clearTokens: async () => {},
 };
 
 interface CoreServices {
@@ -130,6 +120,7 @@ interface CoreServices {
   notifications: NotificationService;
   schedule: ScheduleService;
   questionnaireData: QuestionnaireDataService;
+  dataPipeline: DataPipelineService;
 }
 
 const CoreServicesContext = createContext<CoreServices | null>(null);
@@ -209,9 +200,8 @@ export function CoreServicesProvider({
     logger,
   });
 
-  // Create kafka service
+  // Create kafka service (pure sender — no caching or batching)
   const kafka = kafkaServiceFactory({
-    cache,
     api: apiService,
     token,
     logger,
@@ -219,12 +209,15 @@ export function CoreServicesProvider({
     storage,
   });
 
+  // Create data pipeline (orchestrates convert → cache → flush)
+  const dataPipeline = dataPipelineFactory({ cache, kafka, logger, storage, subjectConfig });
+
   // Create config service (orchestrates other services)
   const config = configServiceFactory({
     kafka,
     analytics,
     cache,
-    token,
+    pipeline: dataPipeline,
     remoteConfig,
     storage,
     logger,
@@ -267,6 +260,9 @@ export function CoreServicesProvider({
     storage,
     logger,
     eventBus: eventBus,
+    dataPipeline,
+    appServer,
+    remoteConfig,
   });
 
   // Create schedule service (depends on questionnaireData for protocol-driven definition loading)
@@ -294,7 +290,7 @@ export function CoreServicesProvider({
     eventBus: eventBus,
     api: apiService,
     appServer,
-    
+
     // New services
     token,
     analytics,
@@ -305,7 +301,16 @@ export function CoreServicesProvider({
     notifications,
     schedule,
     questionnaireData,
+    dataPipeline,
   };
+
+  // Fire-and-forget config init on mount (Kafka init + cache flush for returning users)
+  const initRef = useRef(false);
+  useEffect(() => {
+    if (initRef.current) return;
+    initRef.current = true;
+    config.init().catch(() => {});
+  }, []);
 
   return (
     <CoreServicesContext.Provider value={services}>
@@ -336,3 +341,23 @@ export const useAuthService = () => useCoreServices().auth;
 export const useNotificationService = () => useCoreServices().notifications;
 export const useScheduleService = () => useCoreServices().schedule;
 export const useQuestionnaireDataService = () => useCoreServices().questionnaireData;
+export const useDataPipeline = () => useCoreServices().dataPipeline;
+
+/** Init the schedule service, fetch schedule, clean up on unmount. Returns true when ready. */
+export function useScheduleInit(): boolean {
+  const schedule = useScheduleService();
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      await schedule.init();
+      await schedule.fetchSchedule();
+      if (mounted) setReady(true);
+    })().catch(() => {});
+    return () => {
+      mounted = false;
+      schedule.destroy();
+    };
+  }, [schedule]);
+  return ready;
+}
