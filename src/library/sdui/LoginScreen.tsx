@@ -11,9 +11,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
-import { layout, useAuth, useSlideOverlay, type ThemeColorOverrides } from '@radarbase/app-kit';
+import { layout, type ThemeColorOverrides } from '../../theme/theme';
+import { useAuth } from '../../core/useAuth';
+import { useSlideOverlay } from './useSlideOverlay';
 
-import { GradientMeshBackground, StudyNameModal, WelcomeCard } from '../components';
+import { GradientMeshBackground } from './GradientMeshBackground';
+import { StudyNameModal } from './StudyNameModal';
+import { WelcomeCard } from './WelcomeCard';
 import { RegistrationFlow } from './RegistrationFlow';
 
 export interface LoginScreenProps {

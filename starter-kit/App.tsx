@@ -24,12 +24,11 @@ import {
   useSubjectConfigService,
   createAsyncStorageService,
   LoadingScreen,
+  LoginScreen,
+  PostEnrolmentFlow,
   type CoreServiceOverrides,
   type ThemeColorOverrides,
 } from '@radarbase/app-kit';
-
-import { LoginScreen, PostEnrolmentFlow } from './src';
-import { DEFAULT_AUTH_CONFIG } from './src/auth';
 
 import appManifest from './config/app-manifest.json';
 import homeBlueprint from './config/views/home.json';
@@ -62,7 +61,7 @@ export default function App() {
     const storage = createAsyncStorageService();
     return {
       storage,
-      authConfig: DEFAULT_AUTH_CONFIG,
+      authConfig: appManifest.auth,
     };
   }, []);
 

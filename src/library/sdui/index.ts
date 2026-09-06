@@ -105,3 +105,19 @@ export {
   QuestionRenderer,
   evaluateBranchingLogic,
 } from './nodes/questionnaire';
+
+// Login / registration / enrolment screens
+export { LoginScreen } from './LoginScreen';
+export type { LoginScreenProps } from './LoginScreen';
+export { PostEnrolmentFlow } from './PostEnrolmentFlow';
+export type { PostEnrolmentFlowProps } from './PostEnrolmentFlow';
+export { GradientMeshBackground } from './GradientMeshBackground';
+export type { GradientMeshBackgroundProps } from './GradientMeshBackground';
+export { WelcomeCard } from './WelcomeCard';
+export type { WelcomeCardProps } from './WelcomeCard';
+export { StudyNameModal } from './StudyNameModal';
+export type { StudyNameModalProps } from './StudyNameModal';
+export { RegistrationFlow } from './RegistrationFlow';
+export type { RegistrationFlowProps } from './RegistrationFlow';
+export { CameraScanScreen } from './CameraScanScreen';
+export type { CameraScanScreenProps } from './CameraScanScreen';

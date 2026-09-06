@@ -14,11 +14,11 @@ import {
   fontFamily,
   getColorTokens,
   layout,
-  LoginIcon,
-  QrCodeIcon,
   type ThemeColorOverrides,
   type ThemeMode,
-} from '@radarbase/app-kit';
+} from '../../theme/theme';
+import QrCodeIcon from '../../theme/icons/qrcode.svg';
+import LoginIcon from '../../theme/icons/login.svg';
 
 /**
  * "Choose your login method" step — Figma node 3060:3279. First step of the registration flow: a

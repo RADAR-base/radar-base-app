@@ -102,6 +102,13 @@ export {
   InfoScreen,
   QuestionRenderer,
   evaluateBranchingLogic,
+  LoginScreen,
+  PostEnrolmentFlow,
+  GradientMeshBackground,
+  WelcomeCard,
+  StudyNameModal,
+  RegistrationFlow,
+  CameraScanScreen,
 } from './library/sdui';
 export type {
   SDUIShellProps,
@@ -131,6 +138,13 @@ export type {
   TaskInstructionsScreenProps,
   LoadingDotsProps,
   LoadingScreenProps,
+  LoginScreenProps,
+  PostEnrolmentFlowProps,
+  GradientMeshBackgroundProps,
+  WelcomeCardProps,
+  StudyNameModalProps,
+  RegistrationFlowProps,
+  CameraScanScreenProps,
 } from './library/sdui';
 
 // SDUI contracts

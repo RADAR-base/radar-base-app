@@ -5,8 +5,8 @@
   "configSchemaVersion": "1",
   "clinicalTemplate": null,
   "theme": {
-      "brand": "#1E90FF",
-      "background": "#200023"
+    "brand": "#1e3557",
+    "background": "#200023"
   },
   "header": {
     "title": "Welcome",
@@ -99,5 +99,15 @@
   "cms": {
     "articlesEndpoint": "https://cms.radar-base.org/articles",
     "cacheTTLMinutes": 60
+  },
+  "auth": {
+    "clientId": "aRMT",
+    "clientSecret": "",
+    "endpoint": "https://dev.radarbasedev.co.uk",
+    "scopes": "SUBJECT.READ SUBJECT.UPDATE PROJECT.READ MEASUREMENT.CREATE offline_access",
+    "audience": "res_ManagementPortal res_gateway res_AppServer",
+    "redirectUri": "com.radarbase.starter://enrol",
+    "authPath": "/hydra/oauth2/auth",
+    "tokenPath": "/hydra/oauth2/token"
   }
 }

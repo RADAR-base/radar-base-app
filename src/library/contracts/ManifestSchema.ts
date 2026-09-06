@@ -109,6 +109,18 @@ export const ManifestSchema = z
       })
       .passthrough()
       .optional(),
+    auth: z
+      .object({
+        clientId: z.string(),
+        clientSecret: z.string().optional(),
+        endpoint: z.string(),
+        scopes: z.string(),
+        audience: z.string(),
+        redirectUri: z.string(),
+        authPath: z.string().optional(),
+        tokenPath: z.string().optional(),
+      })
+      .optional(),
   })
   .passthrough();
 

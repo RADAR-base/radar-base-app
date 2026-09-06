@@ -12,11 +12,11 @@ import {
   tracking,
   fontFamily,
   getColorTokens,
-  HintCard,
   layout,
-  useTopInset,
   type ThemeColorOverrides,
-} from '@radarbase/app-kit';
+} from '../../theme/theme';
+import { HintCard } from './HintCard';
+import { useTopInset } from './useTopInset';
 
 /**
  * Camera / QR scan view — Figma node 3066:3803. Shown when the user taps "Scan QR Code" on the

@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
-import { tracking, fontFamily, getColorTokens, layout, type ThemeMode, type ThemeColorOverrides } from '@radarbase/app-kit';
+import { tracking, fontFamily, getColorTokens, layout, type ThemeMode, type ThemeColorOverrides } from '../../theme/theme';
 
 /** Base vertical padding inside the card (Figma py-64). Bottom padding also adds the safe-area inset. */
 const CARD_VERTICAL_PADDING = 32;
