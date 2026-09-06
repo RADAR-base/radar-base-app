@@ -22,6 +22,7 @@ import { NavbarNode } from './navbar/NavbarNode';
 import { QuestionnaireNode } from './QuestionnaireNode';
 import { RelativeActivityTodayNode } from './RelativeActivityTodayNode';
 import { SectionNode } from './SectionNode';
+import { SettingsRowNode } from './SettingsRowNode';
 import { SurveyTaskListNode } from './SurveyTaskListNode';
 import { TextNode } from './TextNode';
 import { ViewNode } from './ViewNode';
@@ -77,6 +78,9 @@ export function registerBuiltInNodes(): void {
   registry.register('RelativeActivityTodayNode', RelativeActivityTodayNode);
   registry.register('AlertBannerNode', AlertBannerNode);
 
+  // Settings
+  registry.register('SettingsRowNode', SettingsRowNode);
+
   registered = true;
 }
 
@@ -103,6 +107,7 @@ export {
   QuestionnaireNode,
   RelativeActivityTodayNode,
   SectionNode,
+  SettingsRowNode,
   SurveyTaskListNode,
   TextNode,
   ViewNode,
