@@ -67,30 +67,6 @@ export const WidgetRegistryEntrySchema = z.object({
   module: z.string(),
 });
 
-export const AlertActionSchema = z
-  .object({
-    type: z.string(),
-  })
-  .passthrough();
-
-export const AlertRuleSchema = z
-  .object({
-    id: z.string(),
-    metric: z.string(),
-    condition: z.string(),
-    threshold: z.number(),
-    windowDays: z.number().optional(),
-    actions: z.array(AlertActionSchema).optional(),
-    severity: z.string().optional(),
-    message: z.string().optional(),
-  })
-  .passthrough();
-
-export const AlertsSchema = z.object({
-  enabled: z.boolean(),
-  rules: z.array(AlertRuleSchema).optional(),
-});
-
 export const ManifestSchema = z
   .object({
     appName: z.string(),
@@ -108,7 +84,6 @@ export const ManifestSchema = z
     tabs: z.array(TabConfigSchema).min(1, 'At least one tab is required'),
     secondaryViews: z.record(z.string()).optional(),
     widgetsRegistry: z.array(WidgetRegistryEntrySchema).optional(),
-    alerts: AlertsSchema.optional(),
     roles: z.record(z.string()).optional(),
     cms: z
       .object({
@@ -136,5 +111,4 @@ export type ThemeManifest = z.infer<typeof ThemeSchema>;
 export type HeaderManifest = z.infer<typeof HeaderSchema>;
 export type TabManifest = z.infer<typeof TabConfigSchema>;
 export type WidgetRegistryEntry = z.infer<typeof WidgetRegistryEntrySchema>;
-export type AlertRule = z.infer<typeof AlertRuleSchema>;
 export type AppManifest = z.infer<typeof ManifestSchema>;

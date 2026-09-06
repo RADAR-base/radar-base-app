@@ -158,7 +158,6 @@ export type {
   HeaderManifest,
   TabManifest,
   WidgetRegistryEntry,
-  AlertRule,
   ScreenBlueprint,
   Node,
 } from './library/contracts';

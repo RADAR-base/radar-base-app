@@ -167,7 +167,7 @@ export function SDUIShell(props: SDUIShellProps) {
 
   return (
     <CoreServicesProvider overrides={props.serviceOverrides}>
-      <NotificationsProvider alerts={manifest.alerts}>
+      <NotificationsProvider>
       <View
         style={[
           styles.container,
