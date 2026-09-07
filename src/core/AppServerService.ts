@@ -35,7 +35,7 @@ export class DefaultAppServerService implements IAppServerService {
       this.getFCMToken(),
     ]);
     await this.addProjectIfMissing(projectId);
-    return this.addSubjectIfMissing(subjectId, projectId, enrolmentDate, attributes, fcmToken || undefined);
+    return this.addSubjectIfMissing(subjectId, projectId, enrolmentDate, attributes, fcmToken ?? undefined);
   }
 
   private async getHeaders(): Promise<Record<string, string>> {
@@ -85,8 +85,6 @@ export class DefaultAppServerService implements IAppServerService {
     fcmToken?: string
   ): Promise<any> {
     try {
-      // TODO: Temporary placeholder until FCM token is properly retrieved from the device. In a real implementation, this should be replaced with actual logic to get the FCM token.
-      fcmToken = "fcmToken"
       const subject = await this.getSubject(projectId, subjectId);
       return this.updateSubject(subject, {
         fcmToken,

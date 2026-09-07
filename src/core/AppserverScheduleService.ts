@@ -3,6 +3,7 @@ import type {
   TaskState,
   ProtocolConfig,
   AssessmentConfig,
+  MultiLanguageText,
   StorageService,
   LoggerService,
   EventBus,
@@ -152,6 +153,12 @@ export class AppserverScheduleService extends ScheduleServiceBase {
 // Server task mapping
 // ---------------------------------------------------------------------------
 
+/** Pick the English value from a `MultiLanguageText`, falling back to the first available key. */
+function resolveMLText(mlt?: MultiLanguageText): string | undefined {
+  if (!mlt) return undefined;
+  return mlt.en ?? mlt[Object.keys(mlt)[0]] ?? undefined;
+}
+
 function mapServerTask(task: any, assessments: Map<string, AssessmentConfig>): Task {
   const timestamp = task.timestamp || 0;
   const completionWindow = task.completionWindow || 86_400_000;
@@ -185,6 +192,8 @@ function mapServerTask(task: any, assessments: Map<string, AssessmentConfig>): T
     reminderTimestamp: task.reminderTimestamp,
     requiresInClinicCompletion: task.requiresInClinicCompletion ?? false,
     notifications: task.notifications || [],
+    startText: resolveMLText(assessment?.startText),
+    endText: resolveMLText(assessment?.endText),
   };
 }
 
