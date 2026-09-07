@@ -43,7 +43,9 @@ export function EnrolmentCompleteView({
   const resolvedMode: ThemeMode = mode ?? (deviceScheme === 'dark' ? 'dark' : 'light');
   const tokens = getColorTokens(resolvedMode, brandColors);
 
-  const heading = tokens.button.background; // navy heading (matches the flow's other headings)
+  // Brand-colored heading + illustration. Raw brand so it tracks the override in *both* themes — in
+  // dark mode the theme's `button.background` is a fixed navy that doesn't follow the brand.
+  const heading = brandColors?.brand ?? tokens.button.background;
   const bodyText = tokens.card.hint.text; // #0E5474 — description
 
   const illoWidth = Math.min(width - 64, ILLO_W);

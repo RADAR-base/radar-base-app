@@ -7,11 +7,21 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useColorScheme,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
-import { layout, useAuth, useSlideOverlay, type ThemeManifest } from '@radarbase/app-kit';
+import {
+  getColorTokens,
+  layout,
+  mix,
+  resolveBackground,
+  useAuth,
+  useSlideOverlay,
+  type ThemeManifest,
+  type ThemeMode,
+} from '@radarbase/app-kit';
 
 import { GradientMeshBackground, StudyNameModal, WelcomeCard } from '../components';
 import { RegistrationFlow } from './RegistrationFlow';
@@ -48,6 +58,21 @@ export function LoginScreen({
   // Pushes the enrolment page in from the right; the welcome screen slides left in lockstep.
   const enrolment = useSlideOverlay();
 
+  // The gradient mesh is brand-derived. In light mode it uses the brand colors directly; in dark mode
+  // it uses the *same* darkened brand the rest of the app uses (via getColorTokens / resolveBackground),
+  // so the welcome screen isn't a bright peach panel against the near-black dark app. The frost haze
+  // and the pre-Skia fallback flip dark too.
+  const deviceScheme = useColorScheme();
+  const mode: ThemeMode = deviceScheme === 'dark' ? 'dark' : 'light';
+  const dark = mode === 'dark';
+  const brand = theme.brandColors?.brand;
+  const accent = theme.brandColors?.accent;
+  const background = theme.brandColors?.background;
+  const meshPrimary = dark ? getColorTokens('dark', theme.brandColors).header.headerBackground : brand;
+  const meshSecondary = dark && accent ? mix(accent, '#000000', 0.8) : accent;
+  const meshTertiary = dark ? resolveBackground(theme, 'dark') : background;
+  const meshFallback = dark ? resolveBackground(theme, 'dark') : '#482fc4';
+
   const onPressLogin = async () => {
     if (error) clearError();
     try {
@@ -58,13 +83,15 @@ export function LoginScreen({
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: meshFallback }]}>
       <Animated.View style={[StyleSheet.absoluteFill, enrolment.baseStyle]}>
         <GradientMeshBackground
-          primaryColor={theme.brandColors?.primary}
-          secondaryColor={theme.brandColors?.secondary}
-          tertiaryColor={theme.brandColors?.tertiary}
+          mode={mode}
+          primaryColor={meshPrimary}
+          secondaryColor={meshSecondary}
+          tertiaryColor={meshTertiary}
           frosted
+          frostTint={dark ? 'rgba(0, 0, 0, 0.28)' : undefined}
           paused={enrolment.visible}
         />
         <KeyboardAvoidingView
@@ -143,7 +170,7 @@ export function LoginScreen({
           void onPressLogin();
         }}
         title="Enter Study ID"
-        description="Enter your study ID and we'll find your login portal"
+        description={`We'll take you to the right login portal, where you can sign in with your email and password.`}
         placeholder="Study ID"
         ctaLabel="Search"
         brandColors={theme.brandColors}

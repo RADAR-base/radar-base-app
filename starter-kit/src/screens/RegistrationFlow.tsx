@@ -5,6 +5,7 @@ import {
   getColorTokens,
   layout,
   PageHeader,
+  resolveBackground,
   StepSlider,
   useSlideOverlay,
   useStepFlow,
@@ -87,7 +88,7 @@ export function RegistrationFlow({
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: tokens.background.primary }]}>
+    <View style={[styles.root, { backgroundColor: resolveBackground({ brandColors }, resolvedMode) }]}>
       <PageHeader
         onBack={handleBack}
         progress={STEP_PROGRESS[flow.index]}

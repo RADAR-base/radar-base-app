@@ -3,6 +3,7 @@ import { StyleSheet, useColorScheme, View } from 'react-native';
 import {
   getColorTokens,
   PageHeader,
+  resolveBackground,
   type ThemeColorOverrides,
   type ThemeMode,
 } from '@radarbase/app-kit';
@@ -37,7 +38,7 @@ export function RegistrationCompleteScreen({
   const tokens = getColorTokens(resolvedMode, brandColors);
 
   return (
-    <View style={[styles.root, { backgroundColor: tokens.background.primary }]}>
+    <View style={[styles.root, { backgroundColor: resolveBackground({ brandColors }, resolvedMode) }]}>
       <PageHeader
         onBack={() => {}}
         progress={1}
