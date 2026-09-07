@@ -98,6 +98,8 @@ export function CalendarTaskView({ context, date }: CalendarTaskViewProps) {
       duration: task.estimated_minutes > 0 ? `${task.estimated_minutes} min` : undefined,
       expirationTime: formatExpiration(task),
       questionNumber: task.nQuestions ? `x${task.nQuestions}` : undefined,
+      startText: task.startText,
+      endText: task.endText,
     });
   };
 

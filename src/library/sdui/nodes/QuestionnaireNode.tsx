@@ -18,25 +18,23 @@ const ON_PRIMARY = '#FFFFFF';
  *   3. Falls back to a placeholder if neither is available
  *
  * Features:
- *   - Introduction screen (configurable via `node.startText`)
  *   - Branching logic (REDCap-style conditional question display)
  *   - Progress tracking with visual bar
- *   - Completion screen (configurable via `node.endText`)
  *   - Answer timestamps per question
  *   - Submits QuestionnaireResult via QuestionnaireDataService
+ *
+ * Introduction and completion screens are handled by the parent
+ * (TaskInstructionsScreen / TaskCompletionScreen in SDUIShell).
  */
 export function QuestionnaireNode({ node, context }: NodeProps) {
   const { questionnaireData, eventBus } = useCoreServices();
 
   const assessmentName = typeof node.assessmentName === 'string' ? node.assessmentName : undefined;
   const title = typeof node.title === 'string' ? node.title : (assessmentName ?? 'Questionnaire');
-  const startText = typeof node.startText === 'string' ? node.startText : undefined;
-  const endText = typeof node.endText === 'string' ? node.endText : 'Thank you for completing this questionnaire.';
-  const showIntro = node.showIntroduction !== false && !!startText;
 
   const [allQuestions, setAllQuestions] = useState<Question[]>([]);
-  const [phase, setPhase] = useState<'intro' | 'questions' | 'done'>(showIntro ? 'intro' : 'questions');
   const [currentIndex, setCurrentIndex] = useState(0);
+  const submittedRef = useRef(false);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [timestamps, setTimestamps] = useState<Record<string, QuestionTimestamp>>({});
   const questionStartTime = useRef(Date.now());
@@ -107,9 +105,8 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
     if (currentIndex < total - 1) {
       setCurrentIndex(currentIndex + 1);
       questionStartTime.current = Date.now();
-    } else {
-      // Finish
-      setPhase('done');
+    } else if (!submittedRef.current) {
+      submittedRef.current = true;
       submitResult();
     }
   }, [currentIndex, total, currentQuestion, timestamps]);
@@ -150,40 +147,6 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
   const containerStyle = fullScreen
     ? [styles.fullContainer, { backgroundColor: surface }]
     : [styles.container, { backgroundColor: surface, borderRadius: radius }];
-
-  // --- Introduction Screen ---
-  if (phase === 'intro') {
-    return (
-      <View style={containerStyle}>
-        <Text style={[styles.title, { color: text }]}>{title}</Text>
-        {startText && <Text style={[styles.introText, { color: textSecondary }]}>{startText}</Text>}
-        <TouchableOpacity
-          accessibilityRole="button"
-          onPress={() => {
-            setPhase('questions');
-            startTimeRef.current = Date.now();
-            questionStartTime.current = Date.now();
-          }}
-          style={[styles.primaryButton, { backgroundColor: primary, borderRadius: radius }]}
-        >
-          <Text style={styles.primaryButtonText}>Start</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  // --- Completion Screen ---
-  if (phase === 'done') {
-    return (
-      <View style={containerStyle}>
-        <Text style={[styles.title, { color: text }]}>{title}</Text>
-        <Text style={[styles.doneText, { color: textSecondary }]}>{endText}</Text>
-        <Text style={[styles.doneSubtext, { color: textSecondary }]}>
-          {answeredCount} of {total} questions answered
-        </Text>
-      </View>
-    );
-  }
 
   // --- Questions Screen ---
   if (allQuestions.length === 0) {
@@ -286,9 +249,6 @@ const styles = StyleSheet.create({
   },
   progressFill: { height: '100%', borderRadius: 3 },
   title: { fontSize: 18, fontWeight: '700', marginBottom: 8, fontFamily: fontFamily.bold, includeFontPadding: false },
-  introText: { fontSize: 14, lineHeight: 20, marginBottom: 20, fontFamily: fontFamily.regular, includeFontPadding: false },
-  doneText: { fontSize: 14, lineHeight: 20, marginBottom: 8, fontFamily: fontFamily.regular, includeFontPadding: false },
-  doneSubtext: { fontSize: 12, fontStyle: 'italic', fontFamily: fontFamily.regular, includeFontPadding: false },
   emptyText: { fontSize: 13, fontStyle: 'italic', marginTop: 8, fontFamily: fontFamily.regular, includeFontPadding: false },
   questionArea: { maxHeight: 400 },
   questionAreaFull: { flex: 1 },

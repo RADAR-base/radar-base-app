@@ -294,6 +294,8 @@ export abstract class ScheduleServiceBase implements ScheduleService {
       reminderTimestamp: task.reminderTimestamp,
       isNew: !this.openedTaskIds.has(task.id),
       iconUrl: task.icon,
+      startText: task.startText,
+      endText: task.endText,
     };
   }
 

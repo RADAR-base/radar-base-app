@@ -24,6 +24,7 @@ import { TabActiveContext } from './TabActiveContext';
 import { PageHeader } from './PageHeader';
 import { NotificationsProvider } from './useNotifications';
 import { TaskInstructionsScreen } from './TaskInstructionsScreen';
+import { TaskCompletionScreen } from './TaskCompletionScreen';
 import type { TaskCardType } from './nodes/card/TaskCardNode';
 import { fontFamily, navbarLayout, layout as layoutTokens, resolveBackground } from '../../theme/theme';
 import type { SDUIContext, TemplateContext } from './types';
@@ -285,6 +286,10 @@ export interface TaskInstructionsPayload {
   duration?: string;
   expirationTime?: string;
   questionNumber?: string;
+  /** Pre-task instruction text from the protocol's `startText`. Shown on the instructions screen. */
+  startText?: string;
+  /** Post-task completion text from the protocol's `endText`. Shown on the completion screen. */
+  endText?: string;
 }
 
 /**
@@ -297,7 +302,7 @@ export interface TaskInstructionsPayload {
 function TaskInstructionsHost({ context }: { context: SDUIContext }) {
   const { schedule, eventBus, questionnaireData } = useCoreServices();
   const [payload, setPayload] = useState<TaskInstructionsPayload | null>(null);
-  const [phase, setPhase] = useState<'instructions' | 'questionnaire'>('instructions');
+  const [phase, setPhase] = useState<'instructions' | 'questionnaire' | 'completed'>('instructions');
   const overlay = useSlideOverlay();
 
   useEffect(() => {
@@ -324,16 +329,26 @@ function TaskInstructionsHost({ context }: { context: SDUIContext }) {
     setPhase('questionnaire');
   };
 
-  // Listen for questionnaire completion → mark task complete and close
+  // Listen for questionnaire completion → mark task complete, show completion screen
   useEffect(() => {
     if (phase !== 'questionnaire' || !payload) return;
     const handler = () => {
       void schedule.completeTask(payload.taskId).catch(() => {});
-      overlay.close();
+      setPhase('completed');
     };
     eventBus.on(EVENTS.QUESTIONNAIRE_COMPLETED, handler);
     return () => eventBus.off(EVENTS.QUESTIONNAIRE_COMPLETED, handler);
-  }, [phase, payload, schedule, eventBus, overlay]);
+  }, [phase, payload, schedule, eventBus]);
+
+  const handleHome = useCallback(() => {
+    overlay.close();
+    context.dispatch({ type: 'Navigate', tabId: 'home' });
+  }, [overlay, context]);
+
+  const handleCalendar = useCallback(() => {
+    overlay.close();
+    context.dispatch({ type: 'Navigate', tabId: 'calendar' });
+  }, [overlay, context]);
 
   if (!payload && !overlay.visible) return null;
 
@@ -345,7 +360,7 @@ function TaskInstructionsHost({ context }: { context: SDUIContext }) {
       {payload && phase === 'instructions' && (
         <TaskInstructionsScreen
           taskName={payload.taskName}
-          description={payload.description}
+          description={payload.startText ?? payload.description}
           taskType={payload.taskType}
           duration={payload.duration}
           expirationTime={payload.expirationTime}
@@ -376,6 +391,16 @@ function TaskInstructionsHost({ context }: { context: SDUIContext }) {
             context={context}
           />
         </View>
+      )}
+      {payload && phase === 'completed' && (
+        <TaskCompletionScreen
+          taskName={payload.taskName}
+          message={payload.endText}
+          onHome={handleHome}
+          onCalendar={handleCalendar}
+          mode={context.colorScheme ?? 'light'}
+          brandColors={context.theme.brandColors}
+        />
       )}
     </Animated.View>
   );

@@ -58,6 +58,8 @@ export { ConnectHealthScreen } from './ConnectHealthScreen';
 export type { ConnectHealthScreenProps } from './ConnectHealthScreen';
 export { TaskInstructionsScreen } from './TaskInstructionsScreen';
 export type { TaskInstructionsScreenProps } from './TaskInstructionsScreen';
+export { TaskCompletionScreen } from './TaskCompletionScreen';
+export type { TaskCompletionScreenProps } from './TaskCompletionScreen';
 export { LoadingDots, LoadingScreen } from './LoadingScreen';
 export type { LoadingDotsProps, LoadingScreenProps } from './LoadingScreen';
 export { useDashboardData } from './useDashboardData';

@@ -121,6 +121,10 @@ export interface TaskView {
   isNew?: boolean;
   /** Optional study-supplied icon URL. Falls back to default glyph on load error. */
   iconUrl?: string;
+  /** Pre-task instruction text from the protocol's `startText`. */
+  startText?: string;
+  /** Post-task completion text from the protocol's `endText`. */
+  endText?: string;
 }
 
 export interface DataExportConfig {
@@ -333,6 +337,8 @@ export interface NotificationService {
   publishCustomNotification(user: Subject, timestamp: number, title: string, text: string): Promise<any>;
   cancelAllNotifications(user: Subject): Promise<any>;
   cancelSingleNotification(user: Subject, notificationId: string | number): Promise<any>;
+  /** Returns the current FCM token, or null if unavailable. */
+  getFCMToken(): Promise<string | null>;
 }
 
 export enum NotificationActionType {
@@ -493,6 +499,10 @@ export interface Task {
   reminderTimestamp?: number;
   requiresInClinicCompletion?: boolean;
   notifications: any[];
+  /** Pre-task instruction text from the protocol's `startText`. */
+  startText?: string;
+  /** Post-task completion text from the protocol's `endText`. */
+  endText?: string;
 }
 
 export interface ScheduleService {
