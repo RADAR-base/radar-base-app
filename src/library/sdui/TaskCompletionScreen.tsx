@@ -13,6 +13,7 @@ import Svg, { Path } from 'react-native-svg';
 import {
   fontFamily,
   getColorTokens,
+  readableTextColor,
   tracking,
   type ThemeColorOverrides,
   type ThemeMode,
@@ -56,10 +57,10 @@ export function TaskCompletionScreen({
   const topInset = useTopInset();
   const bottomInset = useBottomInset(16);
 
-  const brand = tokens.button.background;
-  const textPrimary = resolvedMode === 'dark' ? '#FFFFFF' : '#000000';
-  const textSecondary = tokens.card.hint.text;
-  const illustrationColor = textPrimary;
+  const brand = brandColors?.brand ?? tokens.button.background;
+  const brandOnBrand = readableTextColor(brand);
+  const textPrimary = tokens.text.primary;
+  const textSecondary = tokens.text.brand;
 
   // Entry animation: scale up + fade in the illustration
   const scale = useSharedValue(0.3);
@@ -103,7 +104,7 @@ export function TaskCompletionScreen({
       <View style={styles.body}>
         <View style={styles.illustrationContainer}>
           <Animated.View style={illustrationStyle}>
-            <StarburstIllustration size={240} color={illustrationColor} />
+            <StarburstIllustration size={240} color={brand} />
           </Animated.View>
         </View>
 
@@ -123,7 +124,7 @@ export function TaskCompletionScreen({
             pressed && styles.pressed,
           ]}
         >
-          <Text style={[styles.buttonLabel, { color: brand }]}>Home</Text>
+          <Text style={[styles.buttonLabel, { color: brandOnBrand }]}>Home</Text>
         </Pressable>
 
         <Pressable
@@ -136,7 +137,7 @@ export function TaskCompletionScreen({
             pressed && styles.pressed,
           ]}
         >
-          <Text style={[styles.buttonLabel, { color: tokens.navbar.text.primary }]}>Calendar</Text>
+          <Text style={[styles.buttonLabel, { color: brand }]}>Calendar</Text>
         </Pressable>
       </View>
     </View>
