@@ -40,8 +40,8 @@ class AssessmentConverter implements Converter {
       name,
       version: metadata.version || 'version',
       answers: this.processAnswers(data.answers, data.timestamps),
-      time: data.time || data.startTime,
-      timeCompleted: data.timeCompleted || data.endTime,
+      time: getSeconds(data.time || data.startTime),
+      timeCompleted: getSeconds(data.timeCompleted || data.endTime),
       timeNotification: task.timestamp ? getSeconds(task.timestamp) : 0,
     };
   }
@@ -53,8 +53,8 @@ class AssessmentConverter implements Converter {
     return Object.entries(answers).map(([key, value]) => ({
       questionId: key,
       value: String(value),
-      startTime: timestamps[key]?.startTime,
-      endTime: timestamps[key]?.endTime,
+      startTime: timestamps[key]?.startTime ? getSeconds(timestamps[key].startTime) : 0,
+      endTime: timestamps[key]?.endTime ? getSeconds(timestamps[key].endTime) : 0,
     }));
   }
 

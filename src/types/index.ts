@@ -95,6 +95,8 @@ export interface QuestionnaireResult {
   timestamps: Record<string, QuestionTimestamp>;
   startTime: number;
   endTime: number;
+  /** The scheduled task's timestamp (ms since epoch). Used for the `timeNotification` Kafka field. */
+  taskTimestamp?: number;
 }
 
 export interface TaskListConfig {

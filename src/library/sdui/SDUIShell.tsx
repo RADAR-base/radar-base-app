@@ -286,6 +286,8 @@ export interface TaskInstructionsPayload {
   duration?: string;
   expirationTime?: string;
   questionNumber?: string;
+  /** The scheduled task's timestamp (ms since epoch). */
+  taskTimestamp?: number;
   /** Pre-task instruction text from the protocol's `startText`. Shown on the instructions screen. */
   startText?: string;
   /** Post-task completion text from the protocol's `endText`. Shown on the completion screen. */
@@ -300,7 +302,7 @@ export interface TaskInstructionsPayload {
  * Flow: instructions → "Lets Start" → questionnaire → auto-complete task on finish.
  */
 function TaskInstructionsHost({ context }: { context: SDUIContext }) {
-  const { schedule, eventBus, questionnaireData } = useCoreServices();
+  const { schedule, eventBus } = useCoreServices();
   const [payload, setPayload] = useState<TaskInstructionsPayload | null>(null);
   const [phase, setPhase] = useState<'instructions' | 'questionnaire' | 'completed'>('instructions');
   const overlay = useSlideOverlay();
@@ -386,6 +388,7 @@ function TaskInstructionsHost({ context }: { context: SDUIContext }) {
               id: `questionnaire-${payload.taskId}`,
               assessmentName: payload.assessmentName,
               title: payload.taskName,
+              taskTimestamp: payload.taskTimestamp,
               fullScreen: true,
             }}
             context={context}

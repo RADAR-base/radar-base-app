@@ -31,6 +31,7 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
 
   const assessmentName = typeof node.assessmentName === 'string' ? node.assessmentName : undefined;
   const title = typeof node.title === 'string' ? node.title : (assessmentName ?? 'Questionnaire');
+  const taskTimestamp = typeof node.taskTimestamp === 'number' ? node.taskTimestamp : undefined;
 
   const [allQuestions, setAllQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -126,6 +127,7 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
       timestamps,
       startTime: startTimeRef.current,
       endTime: Date.now(),
+      taskTimestamp,
     };
     try {
       await questionnaireData.submitResult(result);

@@ -124,7 +124,7 @@ export class DefaultQuestionnaireDataService implements QuestionnaireDataService
 
   async submitResult(result: QuestionnaireResult): Promise<void> {
     await this.pipeline.submit(SchemaType.ASSESSMENT, {
-      task: { name: result.assessmentName },
+      task: { name: result.assessmentName, timestamp: result.taskTimestamp },
       data: {
         answers: result.answers,
         timestamps: result.timestamps,
