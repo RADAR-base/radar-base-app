@@ -6,6 +6,7 @@ import {
   fontFamily,
   getColorTokens,
   layout,
+  readableTextColor,
   type ThemeColorOverrides,
   type ThemeMode,
 } from '../../theme/theme';
@@ -29,7 +30,14 @@ export function QrInstructionsView({ onScan, mode, brandColors }: QrInstructions
   const deviceScheme = useColorScheme();
   const resolvedMode: ThemeMode = mode ?? (deviceScheme === 'dark' ? 'dark' : 'light');
   const tokens = getColorTokens(resolvedMode, brandColors);
-  const heading = tokens.button.background; // navy heading
+  // Brand-colored heading/illustration + Scan button. Raw brand so it tracks the override in *both*
+  // themes — in dark mode the theme's `button.background` is a fixed navy that doesn't follow the brand.
+  const heading = brandColors?.brand ?? tokens.button.background;
+  // Scan-button label: white in light mode (unchanged); readable on the brand fill in dark mode.
+  const scanLabel =
+    resolvedMode === 'dark'
+      ? readableTextColor(heading, { preferred: tokens.navbar.text.primary })
+      : tokens.navbar.text.primary;
 
   return (
     <View style={[styles.content, { paddingBottom: insets.bottom + 16 }]}>
@@ -44,9 +52,9 @@ export function QrInstructionsView({ onScan, mode, brandColors }: QrInstructions
       <TouchableOpacity
         accessibilityRole="button"
         onPress={onScan}
-        style={[styles.button, { backgroundColor: tokens.button.background }]}
+        style={[styles.button, { backgroundColor: heading }]}
       >
-        <Text style={[styles.buttonLabel, { color: tokens.navbar.text.primary }]}>Scan QR Code</Text>
+        <Text style={[styles.buttonLabel, { color: scanLabel }]}>Scan QR Code</Text>
       </TouchableOpacity>
     </View>
   );

@@ -4,6 +4,7 @@ import Animated from 'react-native-reanimated';
 import {
   getColorTokens,
   layout,
+  resolveBackground,
   type ThemeColorOverrides,
   type ThemeMode,
 } from '../../theme/theme';
@@ -87,7 +88,7 @@ export function RegistrationFlow({
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: tokens.background.primary }]}>
+    <View style={[styles.root, { backgroundColor: resolveBackground({ brandColors }, resolvedMode) }]}>
       <PageHeader
         onBack={handleBack}
         progress={STEP_PROGRESS[flow.index]}

@@ -107,3 +107,20 @@ export function withAlpha(color: string, alpha: number): string {
   const a = Math.max(0, Math.min(1, alpha));
   return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`;
 }
+
+/**
+ * Linearly blend two colors in sRGB space: `t = 0` returns `a`, `t = 1` returns `b`. Used to derive a
+ * tonal ramp from a single brand color — e.g. lightening a brand navy toward white for a raised
+ * surface, or pre-blending an accent over it for an opaque highlight. Returns a hex string; falls back
+ * to `a` if either color can't be parsed.
+ */
+export function mix(a: string, b: string, t: number): string {
+  const ca = parseColor(a);
+  const cb = parseColor(b);
+  if (!ca || !cb) return a;
+  const k = Math.max(0, Math.min(1, t));
+  const channel = (i: number) => Math.round(ca[i] + (cb[i] - ca[i]) * k);
+  return `#${[channel(0), channel(1), channel(2)]
+    .map((n) => n.toString(16).padStart(2, '0'))
+    .join('')}`;
+}

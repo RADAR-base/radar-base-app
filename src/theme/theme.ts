@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
 import type { ThemeManifest } from '../library/contracts/ManifestSchema';
-import { readableTextColor } from './contrast';
+import { mix, readableTextColor, relativeLuminance } from './contrast';
 
 export {
   readableTextColor,
@@ -9,6 +9,7 @@ export {
   meetsContrast,
   relativeLuminance,
   withAlpha,
+  mix,
   WCAG_AA_NORMAL,
   WCAG_AA_LARGE,
 } from './contrast';
@@ -522,6 +523,39 @@ function withReadableText(t: ColorTokens): ColorTokens {
   };
 }
 
+/** How far the card fills are blended toward the brand `accent` — a faint "branded surface" wash that
+ *  keeps card text and colored card content (pills, charts, badges) readable. Bump for more punch. */
+const CARD_ACCENT_TINT = 0.25;
+
+/** Relative luminance (0–1) above which a `brand` color is too light to paint dark-mode chrome as-is.
+ *  A brand brighter than this is darkened (not dropped) so dark mode stays brand-derived. */
+const DARK_BRAND_MAX_LUMINANCE = 0.35;
+/** How far a too-light brand is mixed toward black for dark-mode chrome — keeps the hue, drops the
+ *  lightness (e.g. peach → warm espresso near-black). 1 = pure black; tune for more/less warmth. */
+const DARK_BRAND_DARKEN = 0.5;
+/** How far the brand `background` is mixed toward black for the dark-mode page — a near-black that
+ *  keeps the brand's hue instead of a neutral default. */
+const DARK_BG_DARKEN = 0.9;
+
+/**
+ * Blend the three card fills (`card.background`, `card.task.background`, `card.stats.background`)
+ * toward `accent` by {@link CARD_ACCENT_TINT}. Each keeps its own light/dark base — a white light-mode
+ * card just gains a faint accent wash; a dark card a faint accent-violet. Leaves pills, badges, and the
+ * hint/tooltip surface untinted so the wash reads as a surface, not as content.
+ */
+function tintCardSurfaces(t: ColorTokens, accent: string): ColorTokens {
+  const tint = (c: string) => mix(c, accent, CARD_ACCENT_TINT);
+  return {
+    ...t,
+    card: {
+      ...t.card,
+      background: tint(t.card.background),
+      task: { ...t.card.task, background: tint(t.card.task.background) },
+      stats: { ...t.card.stats, background: tint(t.card.stats.background) },
+    },
+  };
+}
+
 export function getColorTokens(mode: ThemeMode, overrides?: ThemeColorOverrides): ColorTokens {
   const base = mode === 'dark' ? darkTheme : lightTheme;
   if (!overrides) return withReadableText(base);
@@ -533,6 +567,13 @@ export function getColorTokens(mode: ThemeMode, overrides?: ThemeColorOverrides)
     secondary: overrides.secondary,
     tertiary: overrides.accent ?? overrides.tertiary,
   };
+  // Dark mode: a brand too light to serve as dark chrome (e.g. a pastel/peach) would repaint the
+  // near-black header/navbar surfaces light — a light-mode panel bleeding into dark mode. Instead of
+  // dropping it (which would revert to the neutral navy default), darken it to a near-black that keeps
+  // the brand hue, so dark mode stays derived from the brand (peach → warm espresso, not cold navy).
+  if (mode === 'dark' && resolved.primary && relativeLuminance(resolved.primary) > DARK_BRAND_MAX_LUMINANCE) {
+    resolved.primary = mix(resolved.primary, '#000000', DARK_BRAND_DARKEN);
+  }
   // Map each overridden color's *default* palette value -> the new color, then swap every token that
   // used it. Palette values are unique, so this only repaints the intended color.
   const slots = BRAND_SLOTS[mode];
@@ -542,16 +583,18 @@ export function getColorTokens(mode: ThemeMode, overrides?: ThemeColorOverrides)
     if (next) for (const entry of slots[slot]) swaps[palette[entry]] = next;
   }
   const themed = Object.keys(swaps).length ? deepReplace(base, swaps) : base;
-  return withReadableText(themed);
+  const readable = withReadableText(themed);
+  // Give card surfaces a faint wash of the brand accent (10% color = the manifest's "pop"), so cards
+  // read as branded without accent overwhelming them. Only when an accent is actually set.
+  const accent = resolved.tertiary;
+  return accent ? tintCardSurfaces(readable, accent) : readable;
 }
 
 /**
- * The page background (the 60% brand color): the `brandColors.background` override, else the
- * (mode-resolved) top-level `backgroundColor`, else the design-system default light grey.
- *
- * `brandColors.background` is treated as a *light-mode* brand surface — in dark mode we defer to the
- * mode-resolved `backgroundColor` so a light custom background doesn't overwrite dark mode. Pass the
- * active color scheme so this stays correct in both.
+ * The page background (the 60% brand color). In light mode it's the `brandColors.background` override
+ * directly; in dark mode that same brand background is darkened to a near-black that keeps its hue, so
+ * dark mode is derived from the brand (a warm dark for a peach brand) rather than a neutral default.
+ * Falls back to the (mode-resolved) top-level `backgroundColor`, then the design-system default.
  */
 export function resolveBackground(
   theme?: {
@@ -560,8 +603,11 @@ export function resolveBackground(
   },
   mode: ThemeMode = 'light',
 ): string {
-  const custom = mode === 'dark' ? undefined : theme?.brandColors?.background;
-  return custom ?? theme?.backgroundColor ?? '#EDF1F5';
+  const brandBg = theme?.brandColors?.background;
+  if (mode === 'dark') {
+    return brandBg ? mix(brandBg, '#000000', DARK_BG_DARKEN) : theme?.backgroundColor ?? '#111111';
+  }
+  return brandBg ?? theme?.backgroundColor ?? '#EDF1F5';
 }
 
 /**
@@ -590,6 +636,52 @@ export const cardShadow =
         shadowRadius: 12,
         elevation: 0,
       } as const);
+
+/**
+ * Task-status styling shared by the task cards (`TaskCardNode`, `CalendarTaskCard`) and the calendar
+ * day-timeline markers (`CalendarTaskView`). Fixed brand colors (not brand-overridable, like
+ * `toDoStatus`) that flip light/dark: light mode is a pale `card` with dark-shade `label`/`name`, dark
+ * mode a dark `card` with light-shade text. The badge `circle` and `pillText` are constant across
+ * modes (they sit on a light chip / white pill respectively). The rail dots reuse each state's
+ * `circle`. Transcribed from Figma calendar cards 3753:5144 / 5158 / 5172.
+ */
+export const taskStatusColors = {
+  /** "New Task!" pill background (green/200). */
+  newBadge: '#9CB167',
+  done: {
+    circle: '#E3FAE4', // light-green chip
+    icon: '#9CB167', // green/200 — the badge glyph (swaps with `circle` in dark mode)
+    pillText: '#639922', // green/400 on the white pill
+    light: { card: '#C0DD97', label: '#639922', name: '#27500A' }, // green 100 / 400 / 800
+    dark: { card: '#26351E', label: '#9CB167', name: '#C0DD97' }, //  deep green / 200 / 100
+  },
+  missed: {
+    circle: '#E3F4FA', // sky/50 chip
+    icon: '#1778A0', // sky/600 — the badge glyph (swaps with `circle` in dark mode)
+    pillText: '#2196C4', // sky/500 on the white pill
+    light: { card: '#7EC8E8', label: '#1778A0', name: '#0E5474' }, // sky 200 / 600 / 800
+    dark: { card: '#123141', label: '#7EC8E8', name: '#B5DFF2' }, //  deep sky / 200 / 100
+  },
+  notReady: {
+    circle: '#F6F5F8', // neutral/400 chip
+    icon: '#A8A9B2', // neutral/600 — the badge glyph (swaps with `circle` in dark mode)
+    pillText: '#79787F', // neutral/800 on the white pill
+    light: { card: '#CACBD4', label: '#79787F', name: '#28313B' }, // neutral 500 / 800 / slate
+    dark: { card: '#2B2D31', label: '#CACBD4', name: '#E5E5EA' }, //  dark grey / 500 / light
+  },
+} as const;
+
+/**
+ * Geometry + fixed colors for the calendar day-timeline rail (`CalendarTaskView`). `grey` is the
+ * not-ready line/ring (reads in both themes); the "reached" color is the theme navy in light mode and
+ * `reachedDark` (a light blue) in dark mode so the line/rings don't vanish on the dark page.
+ */
+export const calendarRail = {
+  nodeSize: 30,
+  lineWidth: 6,
+  grey: '#A8A9B2', // neutral/600
+  reachedDark: '#A8C4E0', // light blue — the "reached" rail color in dark mode
+} as const;
 
 /**
  * Adapts the Figma color tokens to the SDUI engine's `ThemeManifest` shape

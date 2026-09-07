@@ -4,11 +4,19 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  useColorScheme,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
-import { layout, type ThemeColorOverrides } from '../../theme/theme';
+import {
+  getColorTokens,
+  layout,
+  mix,
+  resolveBackground,
+  type ThemeColorOverrides,
+  type ThemeMode,
+} from '../../theme/theme';
 import { useAuth } from '../../core/useAuth';
 import { useSlideOverlay } from './useSlideOverlay';
 
@@ -18,13 +26,13 @@ import { WelcomeCard } from './WelcomeCard';
 import { RegistrationFlow } from './RegistrationFlow';
 
 export interface LoginScreenProps {
-  /** Brand color overrides from the manifest's `theme` block. */
+  /** Brand color overrides driving the gradient mesh and all themed elements. */
   brandColors?: ThemeColorOverrides;
   /** Study/app name for the welcome card. Sourced from the manifest's `appName`. */
   appName?: string;
   /** Description copy for the welcome card. Sourced from the manifest's `description`. */
   description?: string;
-  /** Show the "Sign Up" button on the welcome card. Defaults to `true`. */
+  /** Whether to show the sign-up action on the welcome card. Defaults to `true`. */
   showSignUp?: boolean;
 }
 
@@ -43,6 +51,21 @@ export function LoginScreen({
   // Pushes the enrolment page in from the right; the welcome screen slides left in lockstep.
   const enrolment = useSlideOverlay();
 
+  // The gradient mesh is brand-derived. In light mode it uses the brand colors directly; in dark mode
+  // it uses the *same* darkened brand the rest of the app uses (via getColorTokens / resolveBackground),
+  // so the welcome screen isn't a bright peach panel against the near-black dark app.
+  const deviceScheme = useColorScheme();
+  const mode: ThemeMode = deviceScheme === 'dark' ? 'dark' : 'light';
+  const dark = mode === 'dark';
+  const brand = brandColors?.brand;
+  const accent = brandColors?.accent;
+  const background = brandColors?.background;
+  const themeObj = { brandColors } as { brandColors?: ThemeColorOverrides };
+  const meshPrimary = dark ? getColorTokens('dark', brandColors).header.headerBackground : brand;
+  const meshSecondary = dark && accent ? mix(accent, '#000000', 0.8) : accent;
+  const meshTertiary = dark ? resolveBackground(themeObj, 'dark') : background;
+  const meshFallback = dark ? resolveBackground(themeObj, 'dark') : '#482fc4';
+
   const onPressLogin = async () => {
     if (error) clearError();
     try {
@@ -53,12 +76,15 @@ export function LoginScreen({
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: meshFallback }]}>
       <Animated.View style={[StyleSheet.absoluteFill, enrolment.baseStyle]}>
         <GradientMeshBackground
-          primaryColor={brandColors?.brand}
-          tertiaryColor={brandColors?.accent}
+          mode={mode}
+          primaryColor={meshPrimary}
+          secondaryColor={meshSecondary}
+          tertiaryColor={meshTertiary}
           frosted
+          frostTint={dark ? 'rgba(0, 0, 0, 0.28)' : undefined}
           paused={enrolment.visible}
         />
         <KeyboardAvoidingView
@@ -86,9 +112,6 @@ export function LoginScreen({
         brandColors={brandColors}
       />
 
-      {/* "Enter Login Details" opens this study-ID prompt (same modal as Sign Up). Pressing Search
-          kicks off the OAuth login in the browser, exactly as the button used to do directly. The
-          entered ID isn't yet used to resolve the portal URL — that stays the configured default. */}
       <StudyNameModal
         visible={loginIdOpen}
         onClose={() => setLoginIdOpen(false)}
@@ -97,7 +120,7 @@ export function LoginScreen({
           void onPressLogin();
         }}
         title="Enter Study ID"
-        description="Enter your study ID and we'll find your login portal"
+        description={`We'll take you to the right login portal, where you can sign in with your email and password.`}
         placeholder="Study ID"
         ctaLabel="Search"
         brandColors={brandColors}
@@ -121,16 +144,11 @@ export function LoginScreen({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    // Fallback shown for the first frame before the Skia canvas paints.
     backgroundColor: '#482fc4',
   },
-  // Rounds the sliding registration overlay so it reads as a rounded card over the welcome screen.
   roundedOverlay: {
     borderRadius: layout.radiusScreen,
     overflow: 'hidden',
-  },
-  safeArea: {
-    flex: 1,
   },
   flex: {
     flex: 1,
