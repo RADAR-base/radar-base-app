@@ -15,19 +15,8 @@ import {
   questionnaireDataServiceFactory,
   subjectConfigServiceFactory,
   dataPipelineFactory,
+  remoteConfigServiceFactory,
 } from './index';
-
-let remoteConfigModule: any;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  remoteConfigModule = require('@react-native-firebase/remote-config');
-} catch {
-  remoteConfigModule = null;
-}
-const remoteConfig: any = remoteConfigModule?.default || remoteConfigModule || (() => ({
-  fetchAndActivate: async () => {},
-  getValue: (_k: string) => ({ asString: () => '' })
-}));
 import type {
   DataService,
   EventBus,
@@ -62,31 +51,6 @@ const noopLogger: LoggerService = {
 };
 
 const noopLocalization: LocalizationService = { getLanguage: () => ({ value: 'en' }) };
-
-// Real RemoteConfigService backed by RN Firebase remote-config
-const firebaseRemoteConfigService: RemoteConfigService = {
-  forceFetch: async () => {
-    try {
-      if (typeof (remoteConfig as any) === 'function') {
-        await (remoteConfig as any)().fetchAndActivate();
-      }
-    } catch {}
-    return {
-      getOrDefault: (k: string, d: string) => {
-        try {
-          if (typeof (remoteConfig as any) === 'function') {
-            const val = (remoteConfig as any)().getValue(k);
-            const str = val.asString();
-            return str !== '' ? (str as unknown as string) : d;
-          }
-          return d;
-        } catch {
-          return d;
-        }
-      }
-    } as any;
-  }
-} as any;
 
 const noopSubjectConfig: SubjectConfigService = {
   getParticipantLogin: async () => 'anonymous',
@@ -173,7 +137,7 @@ function CoreServicesProviderInner({
   if (!stableRef.current) {
     const logger = overrides.logger || noopLogger;
     const localization = overrides.localization || noopLocalization;
-    const rc = overrides.remoteConfig || firebaseRemoteConfigService;
+    const rc = overrides.remoteConfig || remoteConfigServiceFactory({ logger });
     const storage = overrides.storage || noopStorage;
 
     const token = tokenServiceFactory({
@@ -211,7 +175,9 @@ function CoreServicesProviderInner({
       token, analytics, logger, config, subjectConfig,
       eventBus, storage, oauthConfig: overrides.authConfig,
     });
-    const notifications = notificationServiceFactory({ storage, logger, remoteConfig: rc, analytics });
+    const notifications = notificationServiceFactory({
+      storage, logger, remoteConfig: rc, analytics, subjectConfig, eventBus,
+    });
     const appServer = appServerServiceFactory({
       api: apiService, storage, subjectConfig, logger, remoteConfig: rc, localization, token,
     });

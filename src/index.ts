@@ -33,6 +33,9 @@ export { createAsyncStorageService } from './core/AsyncStorageService';
 export { apiService } from './core/ApiService';
 export { eventBus } from './core/EventBus';
 export { appServerServiceFactory } from './core/AppServerService';
+export { analyticsServiceFactory, DefaultAnalyticsService, FirebaseAnalyticsService } from './core/AnalyticsService';
+export { remoteConfigServiceFactory, DefaultRemoteConfigService, FirebaseRemoteConfigService } from './core/RemoteConfigService';
+export { notificationServiceFactory, DefaultNotificationService, FirebaseNotificationService } from './core/NotificationService';
 export { scheduleServiceFactory } from './core/AppserverScheduleService';
 export { questionnaireDataServiceFactory } from './core/QuestionnaireDataService';
 export {
@@ -99,6 +102,7 @@ export {
   NotificationsScreen,
   ConnectHealthScreen,
   TaskInstructionsScreen,
+  TaskCompletionScreen,
   LoadingDots,
   LoadingScreen,
   InfoScreen,
@@ -139,6 +143,7 @@ export type {
   NotificationsScreenProps,
   ConnectHealthScreenProps,
   TaskInstructionsScreenProps,
+  TaskCompletionScreenProps,
   LoadingDotsProps,
   LoadingScreenProps,
   LoginScreenProps,

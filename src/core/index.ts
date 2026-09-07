@@ -7,14 +7,18 @@ export { appServerServiceFactory, DefaultAppServerService } from './AppServerSer
 
 // New Services - Migrated from RADAR-Questionnaire
 export { tokenServiceFactory, DefaultTokenService } from './TokenService';
-export { analyticsServiceFactory, DefaultAnalyticsService } from './AnalyticsService';
+export { analyticsServiceFactory, DefaultAnalyticsService, FirebaseAnalyticsService } from './AnalyticsService';
+export type { AnalyticsServiceDeps } from './AnalyticsService';
+export { remoteConfigServiceFactory, DefaultRemoteConfigService, FirebaseRemoteConfigService } from './RemoteConfigService';
+export type { RemoteConfigServiceDeps } from './RemoteConfigService';
 export { cacheServiceFactory, DefaultCacheService } from './CacheService';
 export { kafkaServiceFactory, DefaultKafkaService } from './KafkaService';
 export { configServiceFactory, DefaultConfigService, BASE_URI_KEY } from './ConfigService';
 export { authServiceFactory, DefaultAuthService } from './AuthService';
 export { useAuth } from './useAuth';
 export type { UseAuthResult } from './useAuth';
-export { notificationServiceFactory, DefaultNotificationService } from './NotificationService';
+export { notificationServiceFactory, DefaultNotificationService, FirebaseNotificationService } from './NotificationService';
+export type { NotificationServiceDeps, NotificationMessage, ScheduledNotification } from './NotificationService';
 export { ScheduleServiceBase } from './ScheduleService';
 export { AppserverScheduleService, scheduleServiceFactory } from './AppserverScheduleService';
 export { questionnaireDataServiceFactory, DefaultQuestionnaireDataService } from './QuestionnaireDataService';
