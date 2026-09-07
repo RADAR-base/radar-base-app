@@ -7,15 +7,157 @@
     "title": "Profile",
     "children": [
       {
-        "id": "card_study_info",
+        "id": "card_study_name",
         "type": "CardNode",
         "isCanvas": true,
         "children": [
           {
-            "id": "text_study_title",
+            "id": "text_study_name",
             "type": "TextNode",
-            "text": "Coming Soon",
+            "text": "{{study.name}}",
             "style": "heading3"
+          }
+        ]
+      },
+
+      {
+        "id": "section_activity",
+        "type": "SectionNode",
+        "title": "My Activity",
+        "children": [
+          {
+            "id": "section_stats_grid",
+            "type": "CardSectionNode",
+            "layout": "grid",
+            "children": [
+              {
+                "id": "card_active_days",
+                "type": "StatCardNode",
+                "statsType": "activeDays",
+                "metric": "active_days",
+                "size": "small"
+              },
+              {
+                "id": "card_checkins",
+                "type": "StatCardNode",
+                "statsType": "checkIn",
+                "metric": "task_completed",
+                "label": "Total Check-ins",
+                "size": "small"
+              },
+              {
+                "id": "card_streak",
+                "type": "StatCardNode",
+                "statsType": "currentStreak",
+                "size": "large"
+              },
+              {
+                "id": "wheel_days_study",
+                "type": "DataWheelCardNode",
+                "size": "large",
+                "title": "Days in the study",
+                "metric": "active_days",
+                "showOpenButton": false
+              }
+            ]
+          }
+        ]
+      },
+
+      {
+        "id": "section_what_we_do",
+        "type": "SectionNode",
+        "title": "What we do",
+        "children": [
+          {
+            "id": "card_what_we_do",
+            "type": "CardNode",
+            "isCanvas": true,
+            "children": [
+              {
+                "id": "text_what_we_do",
+                "type": "TextNode",
+                "text": "We are exploring how continuous remote monitoring can support people. The study collects passive data from wearables and smartphones. The study enrolls 800 participants across four NHS sites and is a collaboration between respiratory clinicians, academic researchers and digital health partners, with all data managed in line with leading security and privacy standards.",
+                "style": "body"
+              }
+            ]
+          }
+        ]
+      },
+
+      {
+        "id": "section_aims",
+        "type": "SectionNode",
+        "title": "Our aims",
+        "children": [
+          {
+            "id": "card_aim_1",
+            "type": "CardNode",
+            "isCanvas": true,
+            "children": [
+              {
+                "id": "text_aim_1_title",
+                "type": "TextNode",
+                "text": "Detect early signals of change",
+                "style": "heading3"
+              },
+              {
+                "id": "text_aim_1_desc",
+                "type": "TextNode",
+                "text": "Identify patterns in passively collected data",
+                "style": "body"
+              }
+            ]
+          },
+          {
+            "id": "card_aim_2",
+            "type": "CardNode",
+            "isCanvas": true,
+            "children": [
+              {
+                "id": "text_aim_2",
+                "type": "TextNode",
+                "text": "Lower the rate of emergency admissions compared with standard care.",
+                "style": "body"
+              }
+            ]
+          },
+          {
+            "id": "card_aim_3",
+            "type": "CardNode",
+            "isCanvas": true,
+            "children": [
+              {
+                "id": "text_aim_3",
+                "type": "TextNode",
+                "text": "Improve accuracy on wearables",
+                "style": "body"
+              }
+            ]
+          }
+        ]
+      },
+
+      {
+        "id": "section_helping",
+        "type": "SectionNode",
+        "title": "How you are helping",
+        "children": [
+          {
+            "id": "text_helping_desc",
+            "type": "TextNode",
+            "text": "The amount of data we collected from participants throughout the study",
+            "style": "body"
+          },
+          {
+            "id": "chart_contributions",
+            "type": "BarChartCardNode",
+            "size": "large",
+            "title": "Monthly Data",
+            "description": "Data collected per month across the study.",
+            "metric": "monthly_contributions",
+            "unit": "records",
+            "values": [45, 62, 78, 85, 72, 58, 40]
           }
         ]
       }
