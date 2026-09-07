@@ -119,6 +119,8 @@ function AppShellInner({
   const version = manifest.version as string | undefined;
   const themeBlock = manifest.theme as Record<string, unknown> | undefined;
   const theme = (themeBlock?.brandColors as ThemeColorOverrides | undefined) ?? themeBlock as ThemeColorOverrides | undefined;
+  const loginBlock = manifest.login as Record<string, unknown> | undefined;
+  const showSignUp = loginBlock?.showSignUp !== false;
   const blueprintBaseUrl = manifest.blueprintBaseUrl as string | undefined;
   const inlineBlueprints = manifest.blueprints as Record<string, unknown> | undefined;
 
@@ -188,7 +190,7 @@ function AppShellInner({
   let content: React.ReactNode = null;
   if (status === 'unauthenticated' || status === 'authenticating') {
     content = (
-      <LoginScreen brandColors={theme} appName={appName} description={description} />
+      <LoginScreen brandColors={theme} appName={appName} description={description} showSignUp={showSignUp} />
     );
   } else if (status !== 'unknown') {
     content =

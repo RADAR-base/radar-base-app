@@ -36,6 +36,8 @@ export interface WelcomeCardProps {
   mode?: ThemeMode;
   /** Manifest brand colors that override the theme (see `getColorTokens`). */
   brandColors?: ThemeColorOverrides;
+  /** Show the "Sign Up" button. Defaults to `true`. Set to `false` to hide it. */
+  showSignUp?: boolean;
 }
 
 export function WelcomeCard({
@@ -50,6 +52,7 @@ export function WelcomeCard({
   safeAreaBottomInset = 0,
   mode,
   brandColors,
+  showSignUp = true,
 }: WelcomeCardProps) {
   const deviceScheme = useColorScheme();
   const resolvedMode: ThemeMode = mode ?? (deviceScheme === 'dark' ? 'dark' : 'light');
@@ -89,16 +92,18 @@ export function WelcomeCard({
           </TouchableOpacity>
         </View>
 
-        <View style={styles.actionGroup}>
-          <Text style={[styles.prompt, { color: contentColor }]}>{signUpPrompt}</Text>
-          <TouchableOpacity
-            accessibilityRole="button"
-            onPress={onSignUp}
-            style={[styles.button, styles.outlineButton, { borderColor: contentColor }]}
-          >
-            <Text style={[styles.buttonLabel, { color: contentColor }]}>{signUpLabel}</Text>
-          </TouchableOpacity>
-        </View>
+        {showSignUp && (
+          <View style={styles.actionGroup}>
+            <Text style={[styles.prompt, { color: contentColor }]}>{signUpPrompt}</Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={onSignUp}
+              style={[styles.button, styles.outlineButton, { borderColor: contentColor }]}
+            >
+              <Text style={[styles.buttonLabel, { color: contentColor }]}>{signUpLabel}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </View>
   );

@@ -92,6 +92,12 @@ export const ManifestSchema = z
       })
       .passthrough()
       .optional(),
+    login: z
+      .object({
+        /** Show the "Sign Up" button on the welcome card. Defaults to `true`. */
+        showSignUp: z.boolean().optional(),
+      })
+      .optional(),
     auth: z
       .object({
         clientId: z.string(),
