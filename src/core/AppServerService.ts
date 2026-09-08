@@ -35,7 +35,8 @@ export class DefaultAppServerService implements IAppServerService {
       this.getFCMToken(),
     ]);
     await this.addProjectIfMissing(projectId);
-    return this.addSubjectIfMissing(subjectId, projectId, enrolmentDate, attributes, fcmToken ?? undefined);
+    // TODO: Temporary fcm token for dev testing
+    return this.addSubjectIfMissing(subjectId, projectId, enrolmentDate, attributes, fcmToken ?? "test-" + Math.random().toString(36).substring(2, 15));
   }
 
   private async getHeaders(): Promise<Record<string, string>> {
