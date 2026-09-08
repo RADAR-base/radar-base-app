@@ -20,6 +20,7 @@ import { InboxItemListCoordinatorNode } from './InboxItemListCoordinatorNode';
 import { InboxItemListNode } from './InboxItemListNode';
 import { NavbarNode } from './navbar/NavbarNode';
 import { QuestionnaireNode } from './QuestionnaireNode';
+import { QuestionnaireScreenNode } from './QuestionnaireScreenNode';
 import { RelativeActivityTodayNode } from './RelativeActivityTodayNode';
 import { SectionNode } from './SectionNode';
 import { SurveyTaskListNode } from './SurveyTaskListNode';
@@ -67,6 +68,7 @@ export function registerBuiltInNodes(): void {
   // Feature nodes
   registry.register('SurveyTaskListNode', SurveyTaskListNode);
   registry.register('QuestionnaireNode', QuestionnaireNode);
+  registry.register('QuestionnaireScreenNode', QuestionnaireScreenNode);
   registry.register('GraphDataNode', GraphDataNode);
   registry.register('ConnectDevicesMenuNode', ConnectDevicesMenuNode);
   registry.register('CalendarNode', CalendarNode);
@@ -101,6 +103,7 @@ export {
   InboxItemListNode,
   NavbarNode,
   QuestionnaireNode,
+  QuestionnaireScreenNode,
   RelativeActivityTodayNode,
   SectionNode,
   SurveyTaskListNode,

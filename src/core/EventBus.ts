@@ -101,6 +101,9 @@ export const EVENTS = {
 
   // Questionnaire Events
   QUESTIONNAIRE_COMPLETED: 'questionnaireCompleted',
+  // The questionnaire asked its host to dismiss it — either abandoned before finishing (the
+  // first-question "Exit" button) or closed from the "Well done" screen after completing.
+  QUESTIONNAIRE_EXIT: 'questionnaireExit',
 
   // App Events
   APP_STATE_CHANGED: 'appStateChanged',

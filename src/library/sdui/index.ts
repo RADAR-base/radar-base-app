@@ -86,6 +86,7 @@ export {
   InboxItemListNode,
   NavbarNode,
   QuestionnaireNode,
+  QuestionnaireScreenNode,
   RelativeActivityTodayNode,
   SectionNode,
   SurveyTaskListNode,
@@ -102,6 +103,8 @@ export {
   SliderInput,
   TextQuestionInput,
   InfoScreen,
+  SpeechInput,
   QuestionRenderer,
   evaluateBranchingLogic,
 } from './nodes/questionnaire';
+export type { SpeechRecording } from './nodes/questionnaire';
