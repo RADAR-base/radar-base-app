@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { NodeProps } from '../types';
+import { fontFamily, cardShadow } from '../../../theme/theme';
 
 /**
  * Activity summary grid matching the Figma "My Activity" design.
@@ -75,11 +76,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 14,
     justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    ...cardShadow,
     minHeight: 140,
   },
   rightColumn: {
@@ -89,11 +86,7 @@ const styles = StyleSheet.create({
   cardSmall: {
     flex: 1,
     padding: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    ...cardShadow,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -102,6 +95,8 @@ const styles = StyleSheet.create({
   },
   cardLabel: {
     fontSize: 12,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
     fontWeight: '600',
   },
   iconCircle: {
@@ -113,9 +108,13 @@ const styles = StyleSheet.create({
   },
   iconEmoji: {
     fontSize: 14,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
   },
   bigNumber: {
     fontSize: 36,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     fontWeight: '700',
   },
   badge: {
@@ -126,6 +125,8 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: 11,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
     fontWeight: '600',
   },
   streakRow: {
@@ -136,9 +137,13 @@ const styles = StyleSheet.create({
   },
   streakNumber: {
     fontSize: 28,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     fontWeight: '700',
   },
   streakIcon: {
     fontSize: 22,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
   },
 });

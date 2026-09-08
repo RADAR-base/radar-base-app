@@ -1,0 +1,16 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="App-Icon-/-Apple-/-Health-/-Light">
+<path id="Origin-Color" d="M200 0H0V200H200V0Z" fill="white"/>
+<path id="Health-Icon" fill-rule="evenodd" clip-rule="evenodd" d="M143.638 33.3984C134.286 33.3984 126.724 36.5794 122.036 43.3825C121.982 43.4606 121.929 43.5388 121.876 43.6172C121.822 43.5404 121.769 43.4614 121.714 43.3825C117.029 36.5836 109.474 33.3984 101.786 33.3984C94.2602 33.3984 87.6143 36.2912 82.8491 41.0677C78.0798 45.8485 75.1953 52.5153 75.1953 60.0526C75.1953 70.949 80.2685 81.9323 88.3478 91.4771C96.9422 101.63 108.94 110.156 121.877 115.221C132.501 111.607 145.144 102.468 154.593 91.3044C162.766 81.6498 168.555 70.4788 168.555 60.0526C168.555 52.6126 165.744 46.0208 161.286 41.2533C156.717 36.3682 150.417 33.3984 143.638 33.3984Z" fill="url(#paint0_linear_0_31)" stroke="url(#paint1_linear_0_31)" stroke-width="2"/>
+</g>
+<defs>
+<linearGradient id="paint0_linear_0_31" x1="121.875" y1="33.3984" x2="121.875" y2="115.221" gradientUnits="userSpaceOnUse">
+<stop stop-color="#FF61AD"/>
+<stop offset="1" stop-color="#FF2719"/>
+</linearGradient>
+<linearGradient id="paint1_linear_0_31" x1="121.875" y1="33.3984" x2="121.875" y2="115.221" gradientUnits="userSpaceOnUse">
+<stop stop-color="#FD4C94"/>
+<stop offset="1" stop-color="#FF0000"/>
+</linearGradient>
+</defs>
+</svg>

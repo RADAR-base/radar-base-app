@@ -1,107 +1,302 @@
-import { Assessment, AssessmentType, LoggerService, LocalizationService, QuestionnaireService, StorageService, Task, TaskState } from '../types';
-import { DefaultAppServerService } from './AppServerService';
+import type {
+  Task,
+  TaskState,
+  ProtocolConfig,
+  AssessmentConfig,
+  MultiLanguageText,
+  StorageService,
+  LoggerService,
+  EventBus,
+  AppServerService,
+  QuestionnaireDataService,
+} from '../types';
+import { EVENTS } from './EventBus';
+import { ScheduleServiceBase } from './ScheduleService';
 
-function setDateTimeToMidnight(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-function setDateTimeToMidnightEpoch(date: Date): number {
-  return setDateTimeToMidnight(date).getTime();
-}
-function getMilliseconds({ days = 0, hours = 0, minutes = 0 }: { days?: number; hours?: number; minutes?: number }) {
-  return ((days * 24 + hours) * 60 + minutes) * 60 * 1000;
-}
+const FETCH_TIMEOUT_MS = 8_000;
+const MAX_RETRY_ATTEMPTS = 3;
+const RETRY_BASE_DELAY_MS = 1_000;
+const PROTOCOL_VERSION_KEY = '@radarbase/protocol_version';
+const PROTOCOL_CACHE_KEY = '@radarbase/protocol';
 
-export class AppserverScheduleService {
-  constructor(
-    private readonly store: StorageService,
-    private readonly logger: LoggerService,
-    private readonly appServer: DefaultAppServerService,
-    private readonly localization: LocalizationService,
-    private readonly questionnaire: QuestionnaireService
-  ) {}
-
-  init() {}
-
-  async getTasksForDate(date: Date, type: AssessmentType): Promise<Task[]> {
-    const startTime = setDateTimeToMidnight(date);
-    const endTime = new Date(startTime.getTime() + getMilliseconds({ days: 1 }));
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxAttempts = MAX_RETRY_ATTEMPTS,
+  baseDelay = RETRY_BASE_DELAY_MS,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
-      const tasks = await this.appServer.getScheduleForDates(startTime, endTime);
-      if (!tasks || !tasks.length) throw new Error('empty');
-      const mapped = await Promise.all(tasks.map((t: Task) => this.mapTaskDTO(t, 'SCHEDULED')));
-      return this.setTasks('SCHEDULED', mapped);
+      return await fn();
     } catch (e) {
-      this.logger.log('Error pulling tasks.. ' + (e as any));
-      return this.getLocalTasksForDate(date, 'SCHEDULED');
+      lastError = e;
+      if (attempt < maxAttempts - 1) {
+        await new Promise(r => setTimeout(r, baseDelay * Math.pow(2, attempt)));
+      }
     }
   }
+  throw lastError;
+}
 
-  async getLocalTasksForDate(date: Date, type: AssessmentType): Promise<Task[]> {
-    const schedule = await this.getTasks(type);
-    const startTime = setDateTimeToMidnightEpoch(date);
-    const endTime = startTime + getMilliseconds({ days: 1 });
-    return schedule ? schedule.filter(d => (d.timestamp || 0) + (d.completionWindow || 0) > startTime && (d.timestamp || 0) < endTime) : [];
+/**
+ * Appserver-driven schedule service — fetches the protocol and schedule from
+ * the RADAR appserver and caches locally. The protocol provides the assessment
+ * catalog (questionnaire repo URLs, metadata); `QuestionnaireDataService` then
+ * fetches the actual questionnaire definitions from GitHub. Falls back to the
+ * cached data if the server is unreachable.
+ *
+ * Extends `ScheduleServiceBase` which provides all common state management
+ * (refresh timer, state transitions, storage, UI helpers).
+ */
+export class AppserverScheduleService extends ScheduleServiceBase {
+  private cachedProtocolVersion: string | null = null;
+  private assessmentMap = new Map<string, AssessmentConfig>();
+
+  constructor(
+    storage: StorageService,
+    logger: LoggerService,
+    bus: EventBus,
+    appServer: AppServerService,
+    private readonly questionnaireData: QuestionnaireDataService,
+  ) {
+    super(storage, logger, bus, appServer);
   }
 
-  async generateSchedule(referenceTimestamp?: number, utcOffsetPrev?: number): Promise<Task[]> {
-    this.logger.log('Updating schedule..', referenceTimestamp as any);
-    await Promise.all([this.appServer.init(), this.getCompletedTasks()]);
-    const tasks = await this.appServer.getSchedule();
-    const mapped = await Promise.all(tasks.map((t: Task) => this.mapTaskDTO(t, 'SCHEDULED')));
-    return this.setTasks('SCHEDULED', mapped);
+  async fetchSchedule(): Promise<void> {
+    // 0. Make sure the app server knows this project/subject before asking it for their data.
+    await this.ensureRegistered();
+
+    // 1. Fetch protocol (assessment catalog) — drives questionnaire definitions
+    await this.fetchProtocol();
+
+    // 2. Fetch task schedule from appserver
+    await this.fetchTaskSchedule();
+
+    await this.pruneTrackingSets();
+    await this.persist();
+    await this.refreshStates();
+    this.bus.emit(EVENTS.SCHEDULE_UPDATED, { reason: 'schedule_fetched' });
   }
 
-  async updateTaskToComplete(updatedTask: Task): Promise<any> {
+  // ---------------------------------------------------------------------------
+  // Registration — the app server must know the subject before it will serve data
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Registers the project and subject with the app server (`AppServerService.init`), creating either
+   * if it 404s. Without this the subject is unknown to the app server and every subsequent request
+   * for their data comes back 404 (schedule) or empty (protocol), even with a perfectly valid token.
+   *
+   * Runs on each fetch rather than once: `init` doubles as the "app opened" ping, refreshing the
+   * subject's `lastOpened`, timezone, language and FCM token. Best-effort — a registration failure
+   * still lets the fetches below fall through to cached data.
+   */
+  private async ensureRegistered(): Promise<void> {
     try {
-      await this.appServer.updateTaskState(updatedTask.id, 'COMPLETED');
-      return this.updateTaskToReportedCompletion(updatedTask);
-    } catch {
-      return this.updateTaskToCompleteLocal(updatedTask);
+      await this.appServer.init();
+    } catch (e) {
+      this.logger.log('Failed to register subject with appserver, continuing: ' + e);
     }
   }
 
-  // Storage helpers (minimal)
-  private storageKey(type: AssessmentType) { return `sched:${type}`; }
-  private async setTasks(type: AssessmentType, tasks: Task[]): Promise<Task[]> {
-    await this.store.set(this.storageKey(type), tasks);
-    return tasks;
-  }
-  private async getTasks(type: AssessmentType): Promise<Task[] | null> {
-    return this.store.get<Task[] | null>(this.storageKey(type));
-  }
-  private async getCompletedTasks(): Promise<Task[] | null> {
-    return this.store.get<Task[] | null>('sched:completed');
-  }
-  private async updateTaskToReportedCompletion(task: Task) {
-    const completed = (await this.getCompletedTasks()) || [];
-    completed.push({ ...task, completed: true });
-    await this.store.set('sched:completed', completed);
-    return completed;
-  }
-  private async updateTaskToCompleteLocal(task: Task) {
-    const tasks = (await this.getTasks('SCHEDULED')) || [];
-    const updated = tasks.map(t => t.id === task.id ? { ...t, completed: true } : t);
-    await this.setTasks('SCHEDULED', updated);
-    return updated;
+  // ---------------------------------------------------------------------------
+  // Protocol fetch — loads assessment catalog + questionnaire definitions
+  // ---------------------------------------------------------------------------
+
+  private async fetchProtocol(): Promise<void> {
+    try {
+      const protocol: ProtocolConfig = await retryWithBackoff(() => {
+        const fetchProtocol = this.appServer.getProtocol();
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Protocol fetch timed out')), FETCH_TIMEOUT_MS),
+        );
+        return Promise.race([fetchProtocol, timeout]);
+      });
+
+      // An empty 2xx means the project has no protocol provisioned — a real answer, not a failure.
+      // Say so plainly and keep whatever's cached, rather than dereferencing null below.
+      if (!protocol) {
+        this.logger.log(
+          'Appserver returned no protocol for this project — it likely has no questionnaires ' +
+          'configured. Keeping cached assessments (if any).',
+        );
+        await this.restoreCachedProtocol();
+        return;
+      }
+
+      // Skip questionnaire re-fetch if protocol version hasn't changed
+      if (!this.cachedProtocolVersion) {
+        this.cachedProtocolVersion = await this.storage.get<string>(PROTOCOL_VERSION_KEY);
+      }
+      const versionChanged = protocol.version !== this.cachedProtocolVersion;
+
+      // Build assessment lookup map
+      this.assessmentMap.clear();
+      for (const assessment of protocol.protocols ?? []) {
+        if (assessment.name) this.assessmentMap.set(assessment.name, assessment);
+      }
+
+      if (versionChanged) {
+        await this.questionnaireData.loadDefinitions(protocol);
+        this.cachedProtocolVersion = protocol.version;
+        await this.storage.set(PROTOCOL_VERSION_KEY, protocol.version);
+        await this.storage.set(PROTOCOL_CACHE_KEY, protocol);
+        this.logger.log(`Protocol updated to version ${protocol.version}, loaded ${this.assessmentMap.size} assessments`);
+      } else {
+        this.logger.log(`Protocol version ${protocol.version} unchanged, skipping definition fetch`);
+      }
+
+    } catch (e) {
+      this.logger.log('Failed to fetch protocol after retries, using cache: ' + e);
+      await this.restoreCachedProtocol();
+    }
   }
 
-  async generateSingleAssessmentTask(assessment: Assessment, assessmentType: AssessmentType, referenceDate: number) {
-    return;
+
+  /** Repopulates the assessment map from the last protocol we successfully stored. */
+  private async restoreCachedProtocol(): Promise<void> {
+    const cached = await this.storage.get<ProtocolConfig>(PROTOCOL_CACHE_KEY);
+    if (!cached?.protocols) return;
+    this.assessmentMap.clear();
+    for (const assessment of cached.protocols) {
+      if (assessment.name) this.assessmentMap.set(assessment.name, assessment);
+    }
   }
 
-  private async mapTaskDTO(task: Task, assessmentType: AssessmentType): Promise<Task> {
-    const assessment = await this.questionnaire.getAssessmentForTask(assessmentType, task);
-    const newTask: Task = Object.assign(task, {
-      completed: !!task.completed,
-      nQuestions: assessment ? assessment.questions.length : 1,
-      warning: assessment ? '' : '',
-      requiresInClinicCompletion: assessment ? assessment.requiresInClinicCompletion : false,
-      notifications: [],
-    } as any);
-    return newTask;
+  // ---------------------------------------------------------------------------
+  // Schedule fetch — loads task instances and enriches with assessment metadata
+  // ---------------------------------------------------------------------------
+
+  private async fetchTaskSchedule(): Promise<void> {
+    try {
+      const fetched = await retryWithBackoff(() => {
+        const fetchFromServer = this.appServer.getSchedule()
+          .then((tasks: any[]) => (tasks || []).map((t) => mapServerTask(t, this.assessmentMap)));
+        const timeout = new Promise<Task[]>((_, reject) =>
+          setTimeout(() => reject(new Error('Schedule fetch timed out')), FETCH_TIMEOUT_MS),
+        );
+        return Promise.race([fetchFromServer, timeout]);
+      });
+      // TODO: remove once server-side duplicate issue is fixed
+      const deduped = deduplicateTasks(fetched);
+      this.tasks = mergeWithServer(this.tasks, deduped);
+      console.log(
+        `[AppserverScheduleService] fetchSchedule: ${fetched.length} task(s) fetched`,
+      );
+    } catch (e) {
+      this.logger.log('Failed to fetch schedule from appserver after retries, using cache: ' + e);
+    }
   }
 }
 
+// ---------------------------------------------------------------------------
+// Server task mapping
+// ---------------------------------------------------------------------------
 
+/** Pick the English value from a `MultiLanguageText`, falling back to the first available key. */
+function resolveMLText(mlt?: MultiLanguageText): string | undefined {
+  if (!mlt) return undefined;
+  return mlt.en ?? mlt[Object.keys(mlt)[0]] ?? undefined;
+}
+
+function mapServerTask(task: any, assessments: Map<string, AssessmentConfig>): Task {
+  const timestamp = task.timestamp || 0;
+  const completionWindow = task.completionWindow || 86_400_000;
+  const name = task.name || '';
+  const assessment = assessments.get(name);
+
+  let state: TaskState = 'pending';
+  if (task.completed || task.state === 'COMPLETED') {
+    state = 'completed';
+  }
+
+  return {
+    id: String(task.id ?? `${name}_${timestamp}`),
+    name,
+    title: name,
+    // Instruction copy, most purpose-written first: `startText` is authored for this screen; the
+    // questionnaire's own leading `info` block is the next best thing (it's the preamble participants
+    // would have read anyway); the notification body is phrased as a push but is still a real
+    // sentence; the server task's description is the last resort.
+    // The instructions page is gated on `startText`, so that's what it shows. The questionnaire's own
+    // leading `info` field is deliberately NOT used here — it belongs to the questionnaire and pulling
+    // it forward put the info screen's copy on the instructions page.
+    description:
+      resolveMLText(assessment?.startText) ||
+      resolveMLText(assessment?.protocol?.notification?.text) ||
+      task.description ||
+      '',
+    timestamp,
+    completionWindow,
+    estimatedCompletionTime: assessment?.estimatedCompletionTime ?? task.estimatedCompletionTime,
+    nQuestions: assessment?.nQuestions ?? task.nQuestions,
+    state,
+    completed: state === 'completed',
+    reportedCompletion: state === 'completed',
+    timeCompleted: task.timeCompleted,
+    stateChangedAt: new Date().toISOString(),
+    showInCalendar: assessment?.showInCalendar ?? task.showInCalendar ?? true,
+    isDemo: assessment?.isDemo ?? task.isDemo ?? false,
+    order: assessment?.order ?? task.order ?? 0,
+    warning: task.warning,
+    icon: assessment?.icon ?? task.icon,
+    // The protocol's declared type — without this the cards fall back to guessing from the title, so
+    // every speech/cognitive task reads as a questionnaire.
+    taskType: assessment?.questionnaire?.type ?? task.type,
+    reminderTimestamp: task.reminderTimestamp,
+    requiresInClinicCompletion: task.requiresInClinicCompletion ?? false,
+    notifications: task.notifications || [],
+    startText: resolveMLText(assessment?.startText),
+    endText: resolveMLText(assessment?.endText),
+  };
+}
+
+/**
+ * Merge server-fetched tasks with locally cached tasks.
+ * Server is authoritative, but locally completed/skipped tasks are preserved
+ * if the server hasn't caught up yet (async sync race).
+ */
+/** Workaround: server sometimes returns duplicate entries for the same task. Remove once fixed. */
+function deduplicateTasks(tasks: Task[]): Task[] {
+  const seen = new Set<string>();
+  return tasks.filter(t => {
+    const key = `${t.name}:${t.timestamp}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function mergeWithServer(existing: Task[], fetched: Task[]): Task[] {
+  const existingMap = new Map(existing.map(t => [t.id, t]));
+
+  return fetched.map(serverTask => {
+    const local = existingMap.get(serverTask.id);
+    if (
+      local &&
+      (local.state === 'completed' || local.state === 'skipped') &&
+      serverTask.state === 'pending'
+    ) {
+      return local;
+    }
+    return serverTask;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Factory — default schedule service is appserver-driven
+// ---------------------------------------------------------------------------
+
+export const scheduleServiceFactory = (deps: {
+  storage: StorageService;
+  logger: LoggerService;
+  eventBus: EventBus;
+  appServer: AppServerService;
+  questionnaireData: QuestionnaireDataService;
+}) => new AppserverScheduleService(
+  deps.storage,
+  deps.logger,
+  deps.eventBus,
+  deps.appServer,
+  deps.questionnaireData,
+);

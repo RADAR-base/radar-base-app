@@ -1,0 +1,15 @@
+{
+  "blueprintVersion": "1",
+  "root": {
+    "id": "root_notifications",
+    "type": "ViewNode",
+    "isCanvas": true,
+    "title": "Notifications",
+    "children": [
+      {
+        "id": "notifications_list",
+        "type": "NotificationListNode"
+      }
+    ]
+  }
+}

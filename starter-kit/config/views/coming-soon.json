@@ -4,7 +4,6 @@
     "id": "root_coming_soon",
     "type": "ViewNode",
     "isCanvas": true,
-    "title": "Coming Soon",
     "children": [
       {
         "id": "card_study_info",

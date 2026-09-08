@@ -95,23 +95,43 @@ export interface QuestionnaireResult {
   timestamps: Record<string, QuestionTimestamp>;
   startTime: number;
   endTime: number;
+  /** The scheduled task's timestamp (ms since epoch). Used for the `timeNotification` Kafka field. */
+  taskTimestamp?: number;
 }
 
 export interface TaskListConfig {
-  tasks: Task[];
+  tasks: TaskView[];
 }
 
-export interface Task {
+/** UI display projection of a Task — produced by `ScheduleService.toTaskView()`. */
+export interface TaskView {
   id: string;
+  /** The assessment name — links to the protocol's `AssessmentConfig.name` and
+   *  `QuestionnaireDataService.getQuestions(assessmentName)`. */
+  assessmentName: string;
   title: string;
   description: string;
   dueTime: string;
   estimated_minutes: number;
+  nQuestions?: number;
   status: 'pending' | 'completed' | 'overdue';
-  // Optional fields for scheduled tasks
-  timestamp?: number; // epoch ms start time
-  completionWindow?: number; // ms window length
+  timestamp?: number;
+  completionWindow?: number;
   completed?: boolean;
+  reminderTimestamp?: number;
+  /** True until the user first opens this task — drives the card's "New Task" pill. */
+  isNew?: boolean;
+  /** The assessment's declared type — see `Task.taskType`. */
+  taskType?: string;
+  /** When the task was actually completed (epoch ms), set by `ScheduleService.completeTask`. Drives
+   *  the calendar card's "Done at" time, which is otherwise the *scheduled* time. */
+  timeCompleted?: number;
+  /** Optional study-supplied icon URL. Falls back to default glyph on load error. */
+  iconUrl?: string;
+  /** Pre-task instruction text from the protocol's `startText`. */
+  startText?: string;
+  /** Post-task completion text from the protocol's `endText`. */
+  endText?: string;
 }
 
 export interface DataExportConfig {
@@ -128,7 +148,7 @@ export interface ApiService {
   post<T = any>(path: string, body: unknown, options?: RequestInit): Promise<T>;
 }
 
-// Generic dashboard data shape — drives nodes like `VitalsChartNode`. Each series renders
+// Generic dashboard data shape — drives nodes like `GraphDataNode`. Each series renders
 // one chart; its values can be supplied inline (`values`), pulled from a configurable API
 // endpoint (`responseField` + `dataSource`), or synthesized as a placeholder for previews.
 
@@ -194,11 +214,18 @@ export interface OAuthConfig {
   tokenPath?: string;
 }
 
+/** Client identity needed for token-endpoint requests (refresh / code exchange). */
+export interface OAuthClientCredentials {
+  clientId: string;
+  /** Omit or leave blank for public clients. */
+  clientSecret?: string;
+}
+
 export type AuthStatus = 'unknown' | 'unauthenticated' | 'authenticating' | 'authenticated';
 
 // Scheduling and questionnaire abstractions
 export type AssessmentType = 'SCHEDULED' | 'AD_HOC';
-export type TaskState = 'COMPLETED' | 'PENDING' | 'SKIPPED';
+export type ServerTaskState = 'COMPLETED' | 'PENDING' | 'SKIPPED';
 
 export interface Assessment {
   questions: Array<{ id: string; text?: string }>;
@@ -211,13 +238,17 @@ export interface QuestionnaireService {
 }
 
 // App Server related service abstractions
-export interface TokenPair { access_token: string; refresh_token?: string }
+export interface TokenPair { access_token: string; refresh_token?: string; expires_in?: number }
 export interface TokenService {
   refresh(): Promise<TokenPair>;
-  register(refreshParams: { refresh_token: string; access_token?: string }): Promise<void>;
+  register(refreshParams: { refresh_token: string; access_token?: string; expires_in?: number }): Promise<void>;
+  /**
+   * Provide the OAuth client id/secret used on refresh. Call at app boot (from `OAuthConfig`)
+   * and again after login so refresh works across restarts without coupling TokenService to
+   * the full auth config.
+   */
+  configureOAuthClient(credentials: OAuthClientCredentials): Promise<void>;
   getRefreshParams(refreshToken: string): { refresh_token: string };
-  getURI(): Promise<string>;
-  setURI(uri: string): Promise<string>;
   setTokenEndpoint(endpoint: string): Promise<void>;
   getTokenEndpoint(): Promise<string>;
   getAccessToken(): Promise<string | null>;
@@ -236,6 +267,8 @@ export interface SubjectConfigService {
   getProjectName(): Promise<string>;
   getEnrolmentDate(): Promise<string | Date>;
   getParticipantAttributes(): Promise<Record<string, unknown>>;
+  /** Drop cached identity (call on logout). Optional for simple/no-op implementations. */
+  clear?(): Promise<void>;
 }
 
 export interface LocalizationService {
@@ -253,6 +286,7 @@ export interface ObservableLike<T> {
 export interface StorageService {
   get<T = any>(key: string): Promise<T | null>;
   set<T = any>(key: string, value: T): Promise<void>;
+  remove(key: string): Promise<void>;
   observe<T = any>(key: string): ObservableLike<T>;
 }
 
@@ -265,6 +299,7 @@ export interface AppServerService {
   addSubjectIfMissing(subjectId: string, projectId: string, enrolmentDate: string | Date, attributes: Record<string, unknown>, fcmToken?: string | null): Promise<any>;
   addSubjectToServer(subjectId: string, projectId: string, enrolmentDate: string | Date, fcmToken?: string | null, attributes?: Record<string, unknown>): Promise<any>;
   fetchFromGithub(githubUrl: string): Promise<any>;
+  getProtocol(): Promise<any>;
   getSchedule(): Promise<any>;
   getScheduleForDates(startTime: Date, endTime: Date): Promise<any>;
   generateSchedule(): Promise<any>;
@@ -309,6 +344,8 @@ export interface NotificationService {
   publishCustomNotification(user: Subject, timestamp: number, title: string, text: string): Promise<any>;
   cancelAllNotifications(user: Subject): Promise<any>;
   cancelSingleNotification(user: Subject, notificationId: string | number): Promise<any>;
+  /** Returns the current FCM token, or null if unavailable. */
+  getFCMToken(): Promise<string | null>;
 }
 
 export enum NotificationActionType {
@@ -326,23 +363,22 @@ export interface Subject {
 
 export interface CacheService {
   init(): Promise<void>;
-  getCache(): Promise<Record<string, any>>;
-  getCacheSize(): Promise<number>;
-  storeInCache(type: string, value: any, cacheValue: any): Promise<void>;
-  removeFromCache(key: string): Promise<void>;
-  removeFromCacheMultiple(keys: string[]): Promise<void>;
-  setCache(cache: Record<string, any>): Promise<void>;
-  clearCache(): Promise<void>;
+  store(key: string, data: any): Promise<void>;
+  get(key: string): Promise<any | null>;
+  getAll(): Promise<Record<string, any>>;
+  keys(): string[];
+  size(): number;
+  remove(key: string): Promise<void>;
+  removeMultiple(keys: string[]): Promise<void>;
+  clear(): Promise<void>;
 }
 
 export interface KafkaService {
-  init(): Promise<any>;
-  sendAllFromCache(): Promise<{ successKeys: string[]; failedKeys: string[] }>;
-  prepareKafkaObjectAndStore(type: string, value: any): Promise<void>;
-  resetProgress(): void;
-  isCacheCurrentlySending(): boolean;
-  eventCallback$: ObservableLike<number>;
+  init(): Promise<void>;
+  send(topic: string, record: any): Promise<any>;
   getTopics(): Promise<string[]>;
+  /** Fetch schema from the schema registry for a given topic (key or value). */
+  getSchema(topic: string, schemaType?: 'key' | 'value'): Promise<{ id: number; version: number; schema: string }>;
 }
 
 export interface SchemaService {
@@ -355,8 +391,10 @@ export interface ConfigService {
   init(): Promise<any>;
   getAll(): Promise<Record<string, any>>;
   get(key: string): Promise<any>;
+  /** Platform base URL (set during authentication, consumed by Kafka, schema registry, etc.). */
+  getBaseUrl(): Promise<string>;
+  setBaseUrl(uri: string): Promise<string>;
   sendCachedData(): Promise<{ successKeys: string[]; failedKeys: string[] }>;
-  getKafkaService(): KafkaService;
   sendConfigChangeEvent(type: string, previous?: any, current?: any, error?: any, data?: any): void;
 }
 
@@ -415,8 +453,14 @@ export interface QuestionnaireMetadata {
 /** A single assessment entry in the top-level `protocols` array. */
 export interface AssessmentConfig {
   name: string;
+  /** Optional study-supplied task icon URL (raster). Studies set this to brand their tasks with
+   *  their own icon; when omitted the app shows the default type badge. Flows to `TaskInstance.icon`
+   *  → `Task.iconUrl` → the card's `TaskIcon`. */
+  icon?: string;
   questionnaire?: QuestionnaireMetadata;
   estimatedCompletionTime?: number;
+  /** Question count when known from protocol metadata (enriches TaskView). */
+  nQuestions?: number;
   protocol: AssessmentProtocol;
   startText?: MultiLanguageText;
   endText?: MultiLanguageText;
@@ -437,43 +481,61 @@ export interface ProtocolConfig {
   protocols: AssessmentConfig[];
 }
 
-export type TaskInstanceState = 'pending' | 'completed' | 'skipped' | 'overdue' | 'expired';
+export type TaskState = 'pending' | 'completed' | 'skipped' | 'overdue' | 'expired';
 
-export interface TaskInstance {
-  /** Unique: `${name}_${timestamp}` */
-  instanceId: string;
-  /** Assessment name from protocol */
+/** Core task model — aligned with RADAR-Questionnaire `Task`. */
+export interface Task {
+  id: string;
   name: string;
-  /** Display title */
   title: string;
-  /** Display description (from assessment startText or warn) */
   description: string;
-  /** Epoch ms of the scheduled start time */
   timestamp: number;
-  /** Completion window in ms */
   completionWindow: number;
   estimatedCompletionTime?: number;
-  state: TaskInstanceState;
-  /** ISO timestamp of last state change */
-  stateChangedAt: string;
+  nQuestions?: number;
+  state: TaskState;
+  completed: boolean;
+  reportedCompletion: boolean;
+  timeCompleted?: number;
+  stateChangedAt?: string;
   showInCalendar: boolean;
   isDemo: boolean;
   order: number;
   warning?: string;
-  syncedToServer: boolean;
+  icon?: string;
+  reminderTimestamp?: number;
+  requiresInClinicCompletion?: boolean;
+  /** The assessment's declared type (`AssessmentConfig.questionnaire.type`), e.g. `audio` for a
+   *  speech task. Drives the card's icon/color via `normalizeTaskType`; when absent the card falls
+   *  back to guessing from the title. */
+  taskType?: string;
+  notifications: any[];
+  /** Pre-task instruction text from the protocol's `startText`. */
+  startText?: string;
+  /** Post-task completion text from the protocol's `endText`. */
+  endText?: string;
 }
 
 export interface ScheduleService {
   init(): Promise<void>;
-  loadProtocol(protocol: ProtocolConfig, referenceTimestamp?: number): Promise<void>;
-  getTasksForDate(date: Date): Promise<TaskInstance[]>;
-  getTasksForRange(startDate: Date, endDate: Date): Promise<TaskInstance[]>;
-  getUpcomingTasks(limit?: number): Promise<TaskInstance[]>;
+  /** Fetch the schedule from the appserver and cache locally. Falls back to cache on failure. */
+  fetchSchedule(): Promise<void>;
+  getTasksForDate(date: Date): Promise<Task[]>;
+  getTasksForRange(startDate: Date, endDate: Date): Promise<Task[]>;
+  getUpcomingTasks(limit?: number): Promise<Task[]>;
   getPendingCount(): Promise<number>;
-  completeTask(instanceId: string): Promise<TaskInstance>;
-  skipTask(instanceId: string): Promise<TaskInstance>;
+  /** True when the task's timestamp has passed and its completion window is still open. */
+  isTaskStartable(task: Task): boolean;
+  /** True when the task's completion window has elapsed or the task is already completed. */
+  isTaskExpired(task: Task): boolean;
+  completeTask(taskId: string): Promise<Task>;
+  skipTask(taskId: string): Promise<Task>;
   refreshStates(): Promise<void>;
-  toSDUITask(instance: TaskInstance): Task;
+  toTaskView(task: Task): TaskView;
+  /** Mark a task as opened by the user, persistently — clears its "New Task" pill. */
+  markTaskOpened(taskId: string): Promise<void>;
+  /** Distinct calendar days the user has completed ≥1 task — drives the "Active days" metric. */
+  getActiveDaysCount(): number;
   destroy(): void;
 }
 
@@ -486,4 +548,24 @@ export interface QuestionnaireDataService {
   getQuestions(assessmentName: string): Promise<Question[]>;
   /** Submit completed questionnaire result. */
   submitResult(result: QuestionnaireResult): Promise<void>;
+}
+
+export interface DataPipelineService {
+  /** Convert and cache a single payload for later upload. */
+  submit(type: string, payload: any): Promise<void>;
+  /** Convert and cache multiple payloads of the same type. */
+  submitMultiple(type: string, payloads: any[]): Promise<void>;
+  /** Submit a payload and immediately flush all cached data. */
+  submitAndFlush(
+    type: string,
+    payload: any,
+  ): Promise<{ successKeys: string[]; failedKeys: string[] }>;
+  /** Flush all cached data to Kafka. */
+  flush(): Promise<{ successKeys: string[]; failedKeys: string[] }>;
+  /** True while a flush is in progress. */
+  isFlushing(): boolean;
+  /** Reset progress to 0. */
+  resetProgress(): void;
+  /** Observable emitting flush progress (0–1). */
+  progress$: ObservableLike<number>;
 }

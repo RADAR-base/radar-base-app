@@ -4,7 +4,12 @@ const { getDefaultConfig } = require('expo/metro-config');
 const config = getDefaultConfig(__dirname);
 
 // Allow Firebase + other libraries that ship `.mjs` / `.cjs` to resolve under Metro.
-config.resolver.sourceExts = ['js', 'json', 'ts', 'tsx', 'jsx', 'mjs', 'cjs'];
+// `svg` is added (and removed from `assetExts` below) per react-native-svg-transformer's
+// setup so `import Icon from './icon.svg'` yields a component, not an asset URI —
+// required for @radarbase/app-kit's header icons.
+config.transformer.babelTransformerPath = require.resolve('react-native-svg-transformer');
+config.resolver.assetExts = config.resolver.assetExts.filter((ext) => ext !== 'svg');
+config.resolver.sourceExts = ['js', 'json', 'ts', 'tsx', 'jsx', 'mjs', 'cjs', 'svg'];
 
 // Prefer the `react-native` package export, then `browser`, then `main`.
 // Required by some Firebase ESM bundles.
@@ -51,17 +56,20 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
 // After this kit is extracted into its own repo and consumes the published
 // @radarbase/app-kit from npm, you can delete this block entirely.
 // ---------------------------------------------------------------------------
-// const path = require('path');
-// const projectRoot = __dirname;
-// const workspaceRoot = path.resolve(projectRoot, '..');
-// config.watchFolders = [workspaceRoot];
-// config.resolver.nodeModulesPaths = [path.resolve(projectRoot, 'node_modules')];
-// config.resolver.disableHierarchicalLookup = true;
-// config.resolver.extraNodeModules = {
-//   react: path.resolve(projectRoot, 'node_modules/react'),
-//   'react-dom': path.resolve(projectRoot, 'node_modules/react-dom'),
-//   'react-native': path.resolve(projectRoot, 'node_modules/react-native'),
-//   'react-native-web': path.resolve(projectRoot, 'node_modules/react-native-web'),
-// };
+const path = require('path');
+const projectRoot = __dirname;
+const workspaceRoot = path.resolve(projectRoot, '..');
+config.watchFolders = [workspaceRoot];
+config.resolver.nodeModulesPaths = [
+  path.resolve(projectRoot, 'node_modules'),
+  path.resolve(workspaceRoot, 'node_modules'),
+];
+config.resolver.disableHierarchicalLookup = true;
+config.resolver.extraNodeModules = {
+  react: path.resolve(projectRoot, 'node_modules/react'),
+  'react-dom': path.resolve(projectRoot, 'node_modules/react-dom'),
+  'react-native': path.resolve(projectRoot, 'node_modules/react-native'),
+  'react-native-web': path.resolve(projectRoot, 'node_modules/react-native-web'),
+};
 
 module.exports = config;

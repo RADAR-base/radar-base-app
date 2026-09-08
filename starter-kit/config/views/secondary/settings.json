@@ -1,0 +1,215 @@
+{
+  "blueprintVersion": "1",
+  "root": {
+    "id": "root_settings",
+    "type": "ViewNode",
+    "isCanvas": true,
+    "title": "Settings",
+    "children": [
+      {
+        "id": "section_info",
+        "type": "SectionNode",
+        "title": "Info",
+        "children": [
+          {
+            "id": "card_participant",
+            "type": "CardNode",
+            "isCanvas": true,
+            "children": [
+              {
+                "id": "row_participant_id",
+                "type": "SettingsRowNode",
+                "label": "Participant ID",
+                "value": "{{user.login}}",
+                "variant": "value"
+              }
+            ]
+          },
+          {
+            "id": "card_versions",
+            "type": "CardNode",
+            "isCanvas": true,
+            "children": [
+              {
+                "id": "row_app_version",
+                "type": "SettingsRowNode",
+                "label": "App Version",
+                "value": "{{app.version}}",
+                "variant": "value",
+                "showDivider": true
+              },
+              {
+                "id": "row_schedule_version",
+                "type": "SettingsRowNode",
+                "label": "Schedule Version",
+                "value": "1.0.0",
+                "variant": "value"
+              }
+            ]
+          }
+        ]
+      },
+
+      {
+        "id": "section_health",
+        "type": "SectionNode",
+        "title": "Connect Apple Health",
+        "children": [
+          {
+            "id": "card_health",
+            "type": "CardNode",
+            "isCanvas": true,
+            "children": [
+              {
+                "id": "row_health_status",
+                "type": "SettingsRowNode",
+                "label": "Status",
+                "value": "Connected",
+                "variant": "value"
+              }
+            ]
+          }
+        ]
+      },
+
+      {
+        "id": "section_notifications",
+        "type": "SectionNode",
+        "title": "Notifications",
+        "children": [
+          {
+            "id": "card_notif_settings",
+            "type": "CardNode",
+            "isCanvas": true,
+            "children": [
+              {
+                "id": "row_notifications_toggle",
+                "type": "SettingsRowNode",
+                "label": "Notifications",
+                "variant": "toggle",
+                "icon": "bell",
+                "defaultOn": true,
+                "eventName": "settings.notifications_toggle",
+                "showDivider": true
+              },
+              {
+                "id": "row_snooze",
+                "type": "SettingsRowNode",
+                "label": "Snooze",
+                "value": "None",
+                "variant": "toggle",
+                "icon": "clock",
+                "eventName": "settings.snooze_toggle"
+              }
+            ]
+          }
+        ]
+      },
+
+      {
+        "id": "section_network",
+        "type": "SectionNode",
+        "title": "Network Settings",
+        "children": [
+          {
+            "id": "card_network",
+            "type": "CardNode",
+            "isCanvas": true,
+            "children": [
+              {
+                "id": "row_data_plan",
+                "type": "SettingsRowNode",
+                "label": "Use data plan for sending records",
+                "variant": "toggle",
+                "eventName": "settings.data_plan_toggle",
+                "showDivider": true
+              },
+              {
+                "id": "row_priority_data",
+                "type": "SettingsRowNode",
+                "label": "Use data plan for high priority data only",
+                "variant": "toggle",
+                "eventName": "settings.priority_data_toggle"
+              }
+            ]
+          }
+        ]
+      },
+
+      {
+        "id": "section_links",
+        "type": "SectionNode",
+        "title": "Links",
+        "children": [
+          {
+            "id": "card_links",
+            "type": "CardNode",
+            "isCanvas": true,
+            "children": [
+              {
+                "id": "row_about",
+                "type": "SettingsRowNode",
+                "label": "About RADAR-base",
+                "variant": "link",
+                "icon": "info",
+                "url": "https://radar-base.org",
+                "showDivider": true
+              },
+              {
+                "id": "row_faq",
+                "type": "SettingsRowNode",
+                "label": "F.A.Q",
+                "variant": "link",
+                "icon": "help-circle",
+                "url": "https://radar-base.org/faq",
+                "showDivider": true
+              },
+              {
+                "id": "row_privacy",
+                "type": "SettingsRowNode",
+                "label": "Privacy Policies",
+                "variant": "link",
+                "icon": "shield",
+                "url": "https://radar-base.org/privacy"
+              }
+            ]
+          }
+        ]
+      },
+
+      {
+        "id": "card_reset",
+        "type": "CardNode",
+        "isCanvas": true,
+        "children": [
+          {
+            "id": "row_reset",
+            "type": "SettingsRowNode",
+            "label": "Reset",
+            "variant": "action",
+            "icon": "refresh",
+            "action": "TriggerEvent",
+            "eventName": "settings.reset"
+          }
+        ]
+      },
+
+      {
+        "id": "card_logout",
+        "type": "CardNode",
+        "isCanvas": true,
+        "children": [
+          {
+            "id": "row_logout",
+            "type": "SettingsRowNode",
+            "label": "Logout",
+            "variant": "action",
+            "icon": "log-out",
+            "action": "TriggerEvent",
+            "eventName": "auth.sign_out"
+          }
+        ]
+      }
+    ]
+  }
+}

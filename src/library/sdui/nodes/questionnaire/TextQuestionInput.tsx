@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { fontFamily } from '../../../../theme/theme';
 
 interface TextQuestionInputProps {
   validationType?: string;
@@ -84,6 +85,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     fontSize: 15,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
     backgroundColor: '#fff',
   },
   multilineInput: {
@@ -93,12 +96,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 15,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
     backgroundColor: '#fff',
     textAlignVertical: 'top',
   },
   warning: {
     color: '#dc3545',
     fontSize: 12,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
     marginTop: 4,
   },
 });

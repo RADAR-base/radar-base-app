@@ -2,8 +2,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useCoreServices } from '../../../core/CoreServicesContext';
 import { EVENTS } from '../../../core/EventBus';
-import type { Task } from '../../../types';
+import type { TaskView as Task } from '../../../types';
 import type { NodeProps } from '../types';
+import { fontFamily, cardShadow } from '../../../theme/theme';
 
 interface FilterShape {
   status?: 'incomplete' | 'complete' | 'all';
@@ -13,8 +14,8 @@ interface FilterShape {
 const TASK_ICONS: Record<string, { symbol: string; bg: string }> = {
   default: { symbol: '\u{1F4CB}', bg: '#D6E4F0' },
   mood: { symbol: '\u{1F60A}', bg: '#D6E4F0' },
-  blood: { symbol: '\u2764', bg: '#F0D6D6' },
-  pressure: { symbol: '\u2764', bg: '#F0D6D6' },
+  blood: { symbol: '❤', bg: '#F0D6D6' },
+  pressure: { symbol: '❤', bg: '#F0D6D6' },
   medication: { symbol: '\u{1F48A}', bg: '#D6F0D6' },
   voice: { symbol: '\u{1F3A4}', bg: '#E0D6F0' },
   phq: { symbol: '\u{1F4DD}', bg: '#E0D6F0' },
@@ -43,7 +44,7 @@ export function SurveyTaskListNode({ node, context }: NodeProps) {
   const loadTasks = useCallback(async () => {
     try {
       const instances = await schedule.getTasksForDate(new Date());
-      const sduiTasks = instances.map(i => schedule.toSDUITask(i));
+      const sduiTasks = instances.map(i => schedule.toTaskView(i));
       setTasks(filterTasks(sduiTasks, filter, variant));
     } catch {
       setTasks([]);
@@ -271,14 +272,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 const styles = StyleSheet.create({
-  description: { fontSize: 13, marginBottom: 10 },
+  description: { fontSize: 13, marginBottom: 10, fontFamily: fontFamily.regular, includeFontPadding: false },
   listContainer: {
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
+    ...cardShadow,
   },
   taskItem: {
     flexDirection: 'row',
@@ -300,12 +297,16 @@ const styles = StyleSheet.create({
   },
   iconText: {
     fontSize: 18,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
   },
   taskContent: {
     flex: 1,
   },
   taskTitle: {
     fontSize: 15,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
     fontWeight: '600',
     marginBottom: 6,
   },
@@ -325,6 +326,8 @@ const styles = StyleSheet.create({
   },
   pillText: {
     fontSize: 9,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
     fontWeight: '600',
   },
   timeBadge: {
@@ -350,18 +353,18 @@ const styles = StyleSheet.create({
   },
   timeBadgeText: {
     fontSize: 10,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     fontWeight: '700',
   },
   emptyState: {
     padding: 24,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    ...cardShadow,
   },
   emptyText: {
     fontSize: 13,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
   },
 });

@@ -1,3 +1,10 @@
+// Install app-wide Text defaults on import of the library (before any Text renders): the OS
+// font-scale cap (so accessibility sizes enlarge text without breaking the fixed-geometry card
+// layouts) and Android's includeFontPadding:false (line-height parity with iOS). See
+// theme/fontScaling.ts. Idempotent — a second call is a no-op.
+import { installTextDefaults } from './theme/fontScaling';
+installTextDefaults();
+
 // Core services
 export {
   CoreServicesProvider,
@@ -14,22 +21,32 @@ export {
   useAuthService,
   useNotificationService,
   useScheduleService,
+  useScheduleInit,
+  useSubjectConfigService,
   useQuestionnaireDataService,
 } from './core/CoreServicesContext';
 export { useAuth } from './core/useAuth';
 export type { UseAuthResult } from './core/useAuth';
 export type { CoreServiceOverrides } from './core/CoreServicesContext';
 export { dataService } from './core/DataService';
+export { createAsyncStorageService } from './core/AsyncStorageService';
 export { apiService } from './core/ApiService';
 export { eventBus } from './core/EventBus';
 export { appServerServiceFactory } from './core/AppServerService';
-export { AppserverScheduleService } from './core/AppserverScheduleService';
-export { scheduleServiceFactory } from './core/ScheduleService';
+export { analyticsServiceFactory, DefaultAnalyticsService, FirebaseAnalyticsService } from './core/AnalyticsService';
+export { remoteConfigServiceFactory, DefaultRemoteConfigService, FirebaseRemoteConfigService } from './core/RemoteConfigService';
+export { notificationServiceFactory, DefaultNotificationService, FirebaseNotificationService } from './core/NotificationService';
+export { scheduleServiceFactory } from './core/AppserverScheduleService';
 export { questionnaireDataServiceFactory } from './core/QuestionnaireDataService';
+export {
+  subjectConfigServiceFactory,
+  ManagementPortalSubjectConfigService,
+} from './core/SubjectConfigService';
 
 // SDUI engine — the primary public surface
 export {
   SDUIShell,
+  AppShell,
   NodeRegistry,
   NodeRenderer,
   NodeErrorBoundary,
@@ -38,6 +55,7 @@ export {
   parseManifest,
   parseBlueprint,
   createBundledBlueprintSource,
+  createRemoteBlueprintSource,
   createActionDispatcher,
   interpolate,
   interpolateDeep,
@@ -49,27 +67,59 @@ export {
   AlertBannerNode,
   CalendarNode,
   CardNode,
+  StatCardNode,
+  TaskCardNode,
+  ToDoStatusNode,
+  DataWheelCardNode,
+  CardSectionNode,
+  TaskListSectionNode,
   ConnectDevicesMenuNode,
+  HeaderNode,
   InboxItemListCoordinatorNode,
   InboxItemListNode,
+  NavbarNode,
   QuestionnaireNode,
+  QuestionnaireScreenNode,
   RelativeActivityTodayNode,
   SectionNode,
   SurveyTaskListNode,
   TextNode,
   ViewNode,
-  VitalsChartNode,
+  GraphDataNode,
   RadioInput,
   CheckboxInput,
   RangeInput,
   SliderInput,
   TextQuestionInput,
+  TextInputField,
+  HintCard,
+  PageHeader,
+  StepSlider,
+  PillButton,
+  useStepFlow,
+  useSlideOverlay,
+  useTopInset,
+  useBottomInset,
+  NotificationsScreen,
+  ConnectHealthScreen,
+  TaskInstructionsScreen,
+  TaskCompletionScreen,
+  LoadingDots,
+  LoadingScreen,
   InfoScreen,
   QuestionRenderer,
   evaluateBranchingLogic,
+  LoginScreen,
+  PostEnrolmentFlow,
+  GradientMeshBackground,
+  WelcomeCard,
+  StudyNameModal,
+  RegistrationFlow,
+  CameraScanScreen,
 } from './library/sdui';
 export type {
   SDUIShellProps,
+  AppShellProps,
   NodeComponent,
   NodeProps,
   SDUIContext,
@@ -80,6 +130,30 @@ export type {
   ChartProps,
   ResolvedSeries,
   DashboardDataState,
+  StatCardType,
+  StatCardSize,
+  TaskCardType,
+  DataWheelSize,
+  TextInputFieldProps,
+  HintCardProps,
+  PageHeaderProps,
+  StepSliderProps,
+  PillButtonProps,
+  StepFlow,
+  StepDirection,
+  NotificationsScreenProps,
+  ConnectHealthScreenProps,
+  TaskInstructionsScreenProps,
+  TaskCompletionScreenProps,
+  LoadingDotsProps,
+  LoadingScreenProps,
+  LoginScreenProps,
+  PostEnrolmentFlowProps,
+  GradientMeshBackgroundProps,
+  WelcomeCardProps,
+  StudyNameModalProps,
+  RegistrationFlowProps,
+  CameraScanScreenProps,
 } from './library/sdui';
 
 // SDUI contracts
@@ -90,7 +164,6 @@ export type {
   HeaderManifest,
   TabManifest,
   WidgetRegistryEntry,
-  AlertRule,
   ScreenBlueprint,
   Node,
 } from './library/contracts';
@@ -128,6 +201,7 @@ export type {
   AuthService,
   AuthStatus,
   OAuthConfig,
+  OAuthClientCredentials,
   AnalyticsService,
   CacheService,
   KafkaService,
@@ -142,9 +216,37 @@ export type {
   RepeatQuestionnaire,
   MultiLanguageText,
   QuestionnaireMetadata,
-  TaskInstance,
-  TaskInstanceState,
+  TaskState,
+  TaskView,
 } from './types';
+
+// Design tokens — colors + layout primitives transcribed from the Figma design system.
+export {
+  darkTheme,
+  lightTheme,
+  getColorTokens,
+  toThemeManifest,
+  resolveBackground,
+  readableTextColor,
+  mix,
+  withAlpha,
+  layout,
+  fontFamily,
+  tracking,
+  headerLayout,
+  navbarLayout,
+} from './theme/theme';
+export type { ColorTokens, ThemeMode, ThemeColorOverrides } from './theme/theme';
+export { MAX_FONT_SCALE, installTextDefaults, installFontScaleCap } from './theme/fontScaling';
+
+// Design-system icons — React components (resolved via react-native-svg-transformer in the host app).
+export { default as QrCodeIcon } from './theme/icons/qrcode.svg';
+export { default as ScanQRCode } from './theme/icons/scanqrcode.svg';
+export { default as LoginIcon } from './theme/icons/login.svg';
+export { default as RegistrationCompleteIllustration } from './theme/icons/registrationcomplete.svg';
+export { default as EnableNotificationsIllustration } from './theme/icons/enablenotifications.svg';
+export { default as AppleHealthIcon } from './theme/icons/applehealth.svg';
+export { default as HealthConnectIcon } from './theme/icons/healthconnect.svg';
 
 // Architecture-aligned namespace entry points
 export * as LibrarySDUI from './library/sdui';

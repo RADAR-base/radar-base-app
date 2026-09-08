@@ -5,6 +5,7 @@ import type { Answer, Question, QuestionnaireResult, QuestionTimestamp } from '.
 import type { NodeProps } from '../types';
 import { QuestionRenderer } from './questionnaire/QuestionRenderer';
 import { evaluateBranchingLogic } from './questionnaire/branchingLogic';
+import { fontFamily, cardShadow, getColorTokens, withAlpha, layout as layoutTokens } from '../../../theme/theme';
 
 const ON_PRIMARY = '#FFFFFF';
 
@@ -17,25 +18,24 @@ const ON_PRIMARY = '#FFFFFF';
  *   3. Falls back to a placeholder if neither is available
  *
  * Features:
- *   - Introduction screen (configurable via `node.startText`)
  *   - Branching logic (REDCap-style conditional question display)
  *   - Progress tracking with visual bar
- *   - Completion screen (configurable via `node.endText`)
  *   - Answer timestamps per question
  *   - Submits QuestionnaireResult via QuestionnaireDataService
+ *
+ * Introduction and completion screens are handled by the parent
+ * (TaskInstructionsScreen / TaskCompletionScreen in SDUIShell).
  */
 export function QuestionnaireNode({ node, context }: NodeProps) {
   const { questionnaireData, eventBus } = useCoreServices();
 
   const assessmentName = typeof node.assessmentName === 'string' ? node.assessmentName : undefined;
   const title = typeof node.title === 'string' ? node.title : (assessmentName ?? 'Questionnaire');
-  const startText = typeof node.startText === 'string' ? node.startText : undefined;
-  const endText = typeof node.endText === 'string' ? node.endText : 'Thank you for completing this questionnaire.';
-  const showIntro = node.showIntroduction !== false && !!startText;
+  const taskTimestamp = typeof node.taskTimestamp === 'number' ? node.taskTimestamp : undefined;
 
   const [allQuestions, setAllQuestions] = useState<Question[]>([]);
-  const [phase, setPhase] = useState<'intro' | 'questions' | 'done'>(showIntro ? 'intro' : 'questions');
   const [currentIndex, setCurrentIndex] = useState(0);
+  const submittedRef = useRef(false);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [timestamps, setTimestamps] = useState<Record<string, QuestionTimestamp>>({});
   const questionStartTime = useRef(Date.now());
@@ -106,9 +106,8 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
     if (currentIndex < total - 1) {
       setCurrentIndex(currentIndex + 1);
       questionStartTime.current = Date.now();
-    } else {
-      // Finish
-      setPhase('done');
+    } else if (!submittedRef.current) {
+      submittedRef.current = true;
       submitResult();
     }
   }, [currentIndex, total, currentQuestion, timestamps]);
@@ -128,6 +127,7 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
       timestamps,
       startTime: startTimeRef.current,
       endTime: Date.now(),
+      taskTimestamp,
     };
     try {
       await questionnaireData.submitResult(result);
@@ -137,51 +137,29 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
     }
   }, [questionnaireData, assessmentName, title, answers, timestamps, eventBus]);
 
-  const theme = context.theme;
-  const primary = theme.primaryColor;
-  const surface = theme.surfaceColor ?? '#FFFFFF';
-  const text = theme.textColor ?? '#000';
-  const textSecondary = theme.textSecondaryColor ?? '#6D6D80';
-  const radius = theme.button?.borderRadius ?? 8;
+  const fullScreen = node.fullScreen === true;
 
-  // --- Introduction Screen ---
-  if (phase === 'intro') {
-    return (
-      <View style={[styles.container, { backgroundColor: surface, borderRadius: radius }]}>
-        <Text style={[styles.title, { color: text }]}>{title}</Text>
-        {startText && <Text style={[styles.introText, { color: textSecondary }]}>{startText}</Text>}
-        <TouchableOpacity
-          accessibilityRole="button"
-          onPress={() => {
-            setPhase('questions');
-            startTimeRef.current = Date.now();
-            questionStartTime.current = Date.now();
-          }}
-          style={[styles.primaryButton, { backgroundColor: primary, borderRadius: radius }]}
-        >
-          <Text style={styles.primaryButtonText}>Start</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  // Theme off the shared design tokens (which honor the manifest `brandColors`), the same as the rest
+  // of the app — not the legacy flat `theme.primaryColor`/`surfaceColor` fields. This makes the
+  // questionnaire brand-colored and dark-mode correct.
+  const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
+  const primary = tokens.button.background; // brand navy (repainted by brandColors.brand)
+  const onPrimary = tokens.button.text; //     label color on the primary button
+  const surface = tokens.card.background; //    branded card surface, matching the app's other cards
+  const text = tokens.text.primary;
+  const textSecondary = withAlpha(tokens.text.primary, 0.55); // muted copy (intro, progress, notes)
+  const disabled = tokens.button.disabled; //   disabled button fill / muted "Previous"
+  const hairline = withAlpha(tokens.text.primary, 0.12); // progress track + nav divider
+  const radius = layoutTokens.radiusCard;
 
-  // --- Completion Screen ---
-  if (phase === 'done') {
-    return (
-      <View style={[styles.container, { backgroundColor: surface, borderRadius: radius }]}>
-        <Text style={[styles.title, { color: text }]}>{title}</Text>
-        <Text style={[styles.doneText, { color: textSecondary }]}>{endText}</Text>
-        <Text style={[styles.doneSubtext, { color: textSecondary }]}>
-          {answeredCount} of {total} questions answered
-        </Text>
-      </View>
-    );
-  }
+  const containerStyle = fullScreen
+    ? [styles.fullContainer, { backgroundColor: surface }]
+    : [styles.container, { backgroundColor: surface, borderRadius: radius }];
 
   // --- Questions Screen ---
   if (allQuestions.length === 0) {
     return (
-      <View style={[styles.container, { backgroundColor: surface, borderRadius: radius }]}>
+      <View style={containerStyle}>
         <Text style={[styles.title, { color: text }]}>{title}</Text>
         <Text style={[styles.emptyText, { color: textSecondary }]}>No questions available</Text>
       </View>
@@ -194,13 +172,13 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
   const canProceed = !isRequired || hasAnswer || isInfoType;
 
   return (
-    <View style={[styles.container, { backgroundColor: surface, borderRadius: radius }]}>
+    <View style={containerStyle}>
       {/* Progress bar */}
       <View style={styles.progressRow}>
         <Text style={[styles.progressText, { color: textSecondary }]}>
           {currentIndex + 1} / {total}
         </Text>
-        <View style={styles.progressBar}>
+        <View style={[styles.progressBar, { backgroundColor: hairline }]}>
           <View style={[styles.progressFill, { width: `${progress}%`, backgroundColor: primary }]} />
         </View>
       </View>
@@ -208,7 +186,7 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
       <Text style={[styles.title, { color: text }]}>{title}</Text>
 
       {/* Current question */}
-      <ScrollView style={styles.questionArea} contentContainerStyle={styles.questionContent}>
+      <ScrollView style={fullScreen ? styles.questionAreaFull : styles.questionArea} contentContainerStyle={styles.questionContent}>
         {currentQuestion && (
           <QuestionRenderer
             question={currentQuestion}
@@ -222,7 +200,7 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
       </ScrollView>
 
       {/* Navigation */}
-      <View style={styles.navRow}>
+      <View style={[styles.navRow, { borderTopColor: hairline }]}>
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="Previous question"
@@ -230,7 +208,7 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
           onPress={goPrevious}
           style={[styles.navButton, currentIndex === 0 && styles.navButtonDisabled]}
         >
-          <Text style={[styles.navButtonText, { color: currentIndex === 0 ? '#ccc' : primary }]}>
+          <Text style={[styles.navButtonText, { color: currentIndex === 0 ? disabled : primary }]}>
             Previous
           </Text>
         </TouchableOpacity>
@@ -242,10 +220,10 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
           onPress={goNext}
           style={[
             styles.primaryButton,
-            { backgroundColor: canProceed ? primary : '#ccc', borderRadius: radius },
+            { backgroundColor: canProceed ? primary : disabled, borderRadius: radius },
           ]}
         >
-          <Text style={styles.primaryButtonText}>
+          <Text style={[styles.primaryButtonText, { color: onPrimary }]}>
             {currentIndex === total - 1 ? 'Finish' : 'Next'}
           </Text>
         </TouchableOpacity>
@@ -258,18 +236,18 @@ const styles = StyleSheet.create({
   container: {
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    ...cardShadow,
+  },
+  fullContainer: {
+    flex: 1,
+    padding: 16,
   },
   progressRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
   },
-  progressText: { fontSize: 12, fontWeight: '600', marginRight: 10 },
+  progressText: { fontSize: 12, fontWeight: '600', marginRight: 10, fontFamily: fontFamily.semiBold, includeFontPadding: false },
   progressBar: {
     flex: 1,
     height: 6,
@@ -278,12 +256,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: { height: '100%', borderRadius: 3 },
-  title: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
-  introText: { fontSize: 14, lineHeight: 20, marginBottom: 20 },
-  doneText: { fontSize: 14, lineHeight: 20, marginBottom: 8 },
-  doneSubtext: { fontSize: 12, fontStyle: 'italic' },
-  emptyText: { fontSize: 13, fontStyle: 'italic', marginTop: 8 },
+  title: { fontSize: 18, fontWeight: '700', marginBottom: 8, fontFamily: fontFamily.bold, includeFontPadding: false },
+  emptyText: { fontSize: 13, fontStyle: 'italic', marginTop: 8, fontFamily: fontFamily.regular, includeFontPadding: false },
   questionArea: { maxHeight: 400 },
+  questionAreaFull: { flex: 1 },
   questionContent: { paddingBottom: 8 },
   navRow: {
     flexDirection: 'row',
@@ -296,7 +272,7 @@ const styles = StyleSheet.create({
   },
   navButton: { paddingVertical: 10, paddingHorizontal: 16 },
   navButtonDisabled: { opacity: 0.4 },
-  navButtonText: { fontSize: 14, fontWeight: '600' },
+  navButtonText: { fontSize: 14, fontWeight: '600', fontFamily: fontFamily.semiBold, includeFontPadding: false },
   primaryButton: {
     paddingVertical: 12,
     paddingHorizontal: 24,
@@ -304,6 +280,8 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: ON_PRIMARY,
     fontSize: 15,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
     fontWeight: '600',
     textAlign: 'center',
   },
