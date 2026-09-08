@@ -1,13 +1,10 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import {
-  ConnectHealthScreen,
-  NotificationsScreen,
-  StepSlider,
-  useStepFlow,
-  type ThemeColorOverrides,
-} from '@radarbase/app-kit';
-
+import type { ThemeColorOverrides } from '../../theme/theme';
+import { ConnectHealthScreen } from './ConnectHealthScreen';
+import { NotificationsScreen } from './NotificationsScreen';
+import { StepSlider } from './StepSlider';
+import { useStepFlow } from './useStepFlow';
 import { RegistrationCompleteScreen } from './RegistrationCompleteScreen';
 
 /**

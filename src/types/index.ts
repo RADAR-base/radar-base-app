@@ -95,6 +95,8 @@ export interface QuestionnaireResult {
   timestamps: Record<string, QuestionTimestamp>;
   startTime: number;
   endTime: number;
+  /** The scheduled task's timestamp (ms since epoch). Used for the `timeNotification` Kafka field. */
+  taskTimestamp?: number;
 }
 
 export interface TaskListConfig {
@@ -247,8 +249,6 @@ export interface TokenService {
    */
   configureOAuthClient(credentials: OAuthClientCredentials): Promise<void>;
   getRefreshParams(refreshToken: string): { refresh_token: string };
-  getURI(): Promise<string>;
-  setURI(uri: string): Promise<string>;
   setTokenEndpoint(endpoint: string): Promise<void>;
   getTokenEndpoint(): Promise<string>;
   getAccessToken(): Promise<string | null>;
@@ -286,6 +286,7 @@ export interface ObservableLike<T> {
 export interface StorageService {
   get<T = any>(key: string): Promise<T | null>;
   set<T = any>(key: string, value: T): Promise<void>;
+  remove(key: string): Promise<void>;
   observe<T = any>(key: string): ObservableLike<T>;
 }
 
@@ -343,6 +344,8 @@ export interface NotificationService {
   publishCustomNotification(user: Subject, timestamp: number, title: string, text: string): Promise<any>;
   cancelAllNotifications(user: Subject): Promise<any>;
   cancelSingleNotification(user: Subject, notificationId: string | number): Promise<any>;
+  /** Returns the current FCM token, or null if unavailable. */
+  getFCMToken(): Promise<string | null>;
 }
 
 export enum NotificationActionType {
@@ -360,23 +363,22 @@ export interface Subject {
 
 export interface CacheService {
   init(): Promise<void>;
-  getCache(): Promise<Record<string, any>>;
-  getCacheSize(): Promise<number>;
-  storeInCache(type: string, value: any, cacheValue: any): Promise<void>;
-  removeFromCache(key: string): Promise<void>;
-  removeFromCacheMultiple(keys: string[]): Promise<void>;
-  setCache(cache: Record<string, any>): Promise<void>;
-  clearCache(): Promise<void>;
+  store(key: string, data: any): Promise<void>;
+  get(key: string): Promise<any | null>;
+  getAll(): Promise<Record<string, any>>;
+  keys(): string[];
+  size(): number;
+  remove(key: string): Promise<void>;
+  removeMultiple(keys: string[]): Promise<void>;
+  clear(): Promise<void>;
 }
 
 export interface KafkaService {
-  init(): Promise<any>;
-  sendAllFromCache(): Promise<{ successKeys: string[]; failedKeys: string[] }>;
-  prepareKafkaObjectAndStore(type: string, value: any): Promise<void>;
-  resetProgress(): void;
-  isCacheCurrentlySending(): boolean;
-  eventCallback$: ObservableLike<number>;
+  init(): Promise<void>;
+  send(topic: string, record: any): Promise<any>;
   getTopics(): Promise<string[]>;
+  /** Fetch schema from the schema registry for a given topic (key or value). */
+  getSchema(topic: string, schemaType?: 'key' | 'value'): Promise<{ id: number; version: number; schema: string }>;
 }
 
 export interface SchemaService {
@@ -389,8 +391,10 @@ export interface ConfigService {
   init(): Promise<any>;
   getAll(): Promise<Record<string, any>>;
   get(key: string): Promise<any>;
+  /** Platform base URL (set during authentication, consumed by Kafka, schema registry, etc.). */
+  getBaseUrl(): Promise<string>;
+  setBaseUrl(uri: string): Promise<string>;
   sendCachedData(): Promise<{ successKeys: string[]; failedKeys: string[] }>;
-  getKafkaService(): KafkaService;
   sendConfigChangeEvent(type: string, previous?: any, current?: any, error?: any, data?: any): void;
 }
 
@@ -544,4 +548,24 @@ export interface QuestionnaireDataService {
   getQuestions(assessmentName: string): Promise<Question[]>;
   /** Submit completed questionnaire result. */
   submitResult(result: QuestionnaireResult): Promise<void>;
+}
+
+export interface DataPipelineService {
+  /** Convert and cache a single payload for later upload. */
+  submit(type: string, payload: any): Promise<void>;
+  /** Convert and cache multiple payloads of the same type. */
+  submitMultiple(type: string, payloads: any[]): Promise<void>;
+  /** Submit a payload and immediately flush all cached data. */
+  submitAndFlush(
+    type: string,
+    payload: any,
+  ): Promise<{ successKeys: string[]; failedKeys: string[] }>;
+  /** Flush all cached data to Kafka. */
+  flush(): Promise<{ successKeys: string[]; failedKeys: string[] }>;
+  /** True while a flush is in progress. */
+  isFlushing(): boolean;
+  /** Reset progress to 0. */
+  resetProgress(): void;
+  /** Observable emitting flush progress (0–1). */
+  progress$: ObservableLike<number>;
 }

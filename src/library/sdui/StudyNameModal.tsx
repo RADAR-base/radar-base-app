@@ -16,10 +16,10 @@ import {
   fontFamily,
   getColorTokens,
   layout,
-  TextInputField,
   type ThemeColorOverrides,
   type ThemeMode,
-} from '@radarbase/app-kit';
+} from '../../theme/theme';
+import { TextInputField } from './TextInputField';
 
 /**
  * "Enter Study Name" modal — Figma node 3120:1253. A close (X) button, a title + description,

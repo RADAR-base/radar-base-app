@@ -41,6 +41,7 @@ export const HeaderSchema = z
     textColor: z.string().optional(),
     showBackButton: z.boolean().optional(),
     showSettings: z.boolean().optional(),
+    showNotifications: z.boolean().optional(),
     /** Leading header icon: `true` (default) shows the profile picture, `false` the RadarBase wordmark. */
     profileIcon: z.boolean().optional(),
     /** Home-tab greeting "Edit" affordance. Defaults to shown; set `false` to hide it. (Only the home
@@ -48,6 +49,10 @@ export const HeaderSchema = z
     showEditButton: z.boolean().optional(),
     /** When true, appends the signed-in user's name (from `SDUIContext.template.user`) after `title`. */
     showName: z.boolean().optional(),
+    /** View path for the settings secondary view. */
+    settingsViewPath: z.string().optional(),
+    /** View path for the notifications secondary view. */
+    notificationsViewPath: z.string().optional(),
   })
   .passthrough();
 
@@ -65,36 +70,15 @@ export const WidgetRegistryEntrySchema = z.object({
   module: z.string(),
 });
 
-export const AlertActionSchema = z
-  .object({
-    type: z.string(),
-  })
-  .passthrough();
-
-export const AlertRuleSchema = z
-  .object({
-    id: z.string(),
-    metric: z.string(),
-    condition: z.string(),
-    threshold: z.number(),
-    windowDays: z.number().optional(),
-    actions: z.array(AlertActionSchema).optional(),
-    severity: z.string().optional(),
-    message: z.string().optional(),
-  })
-  .passthrough();
-
-export const AlertsSchema = z.object({
-  enabled: z.boolean(),
-  rules: z.array(AlertRuleSchema).optional(),
-});
-
 export const ManifestSchema = z
   .object({
     appName: z.string(),
+    description: z.string().optional(),
     version: z.string(),
     configSchemaVersion: z.string(),
     clinicalTemplate: z.string().nullable().optional(),
+    /** Base URL for fetching blueprint JSONs remotely. View paths are resolved relative to this. */
+    blueprintBaseUrl: z.string().optional(),
     theme: ThemeSchema,
     // Optional: the dashboard header can instead live in each tab's blueprint as a leading
     // `HeaderNode` (rendered inline by `ViewNode`, so it scrolls with the page). When a manifest
@@ -103,7 +87,6 @@ export const ManifestSchema = z
     tabs: z.array(TabConfigSchema).min(1, 'At least one tab is required'),
     secondaryViews: z.record(z.string()).optional(),
     widgetsRegistry: z.array(WidgetRegistryEntrySchema).optional(),
-    alerts: AlertsSchema.optional(),
     roles: z.record(z.string()).optional(),
     cms: z
       .object({
@@ -112,6 +95,24 @@ export const ManifestSchema = z
       })
       .passthrough()
       .optional(),
+    login: z
+      .object({
+        /** Show the "Sign Up" button on the welcome card. Defaults to `true`. */
+        showSignUp: z.boolean().optional(),
+      })
+      .optional(),
+    auth: z
+      .object({
+        clientId: z.string(),
+        clientSecret: z.string().optional(),
+        endpoint: z.string(),
+        scopes: z.string(),
+        audience: z.string(),
+        redirectUri: z.string(),
+        authPath: z.string().optional(),
+        tokenPath: z.string().optional(),
+      })
+      .optional(),
   })
   .passthrough();
 
@@ -119,5 +120,4 @@ export type ThemeManifest = z.infer<typeof ThemeSchema>;
 export type HeaderManifest = z.infer<typeof HeaderSchema>;
 export type TabManifest = z.infer<typeof TabConfigSchema>;
 export type WidgetRegistryEntry = z.infer<typeof WidgetRegistryEntrySchema>;
-export type AlertRule = z.infer<typeof AlertRuleSchema>;
 export type AppManifest = z.infer<typeof ManifestSchema>;

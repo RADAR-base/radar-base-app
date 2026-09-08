@@ -21,15 +21,21 @@ export {
   useAuthService,
   useNotificationService,
   useScheduleService,
+  useScheduleInit,
+  useSubjectConfigService,
   useQuestionnaireDataService,
 } from './core/CoreServicesContext';
 export { useAuth } from './core/useAuth';
 export type { UseAuthResult } from './core/useAuth';
 export type { CoreServiceOverrides } from './core/CoreServicesContext';
 export { dataService } from './core/DataService';
+export { createAsyncStorageService } from './core/AsyncStorageService';
 export { apiService } from './core/ApiService';
 export { eventBus } from './core/EventBus';
 export { appServerServiceFactory } from './core/AppServerService';
+export { analyticsServiceFactory, DefaultAnalyticsService, FirebaseAnalyticsService } from './core/AnalyticsService';
+export { remoteConfigServiceFactory, DefaultRemoteConfigService, FirebaseRemoteConfigService } from './core/RemoteConfigService';
+export { notificationServiceFactory, DefaultNotificationService, FirebaseNotificationService } from './core/NotificationService';
 export { scheduleServiceFactory } from './core/AppserverScheduleService';
 export { questionnaireDataServiceFactory } from './core/QuestionnaireDataService';
 export {
@@ -40,6 +46,7 @@ export {
 // SDUI engine — the primary public surface
 export {
   SDUIShell,
+  AppShell,
   NodeRegistry,
   NodeRenderer,
   NodeErrorBoundary,
@@ -48,6 +55,7 @@ export {
   parseManifest,
   parseBlueprint,
   createBundledBlueprintSource,
+  createRemoteBlueprintSource,
   createActionDispatcher,
   interpolate,
   interpolateDeep,
@@ -95,14 +103,23 @@ export {
   NotificationsScreen,
   ConnectHealthScreen,
   TaskInstructionsScreen,
+  TaskCompletionScreen,
   LoadingDots,
   LoadingScreen,
   InfoScreen,
   QuestionRenderer,
   evaluateBranchingLogic,
+  LoginScreen,
+  PostEnrolmentFlow,
+  GradientMeshBackground,
+  WelcomeCard,
+  StudyNameModal,
+  RegistrationFlow,
+  CameraScanScreen,
 } from './library/sdui';
 export type {
   SDUIShellProps,
+  AppShellProps,
   NodeComponent,
   NodeProps,
   SDUIContext,
@@ -127,8 +144,16 @@ export type {
   NotificationsScreenProps,
   ConnectHealthScreenProps,
   TaskInstructionsScreenProps,
+  TaskCompletionScreenProps,
   LoadingDotsProps,
   LoadingScreenProps,
+  LoginScreenProps,
+  PostEnrolmentFlowProps,
+  GradientMeshBackgroundProps,
+  WelcomeCardProps,
+  StudyNameModalProps,
+  RegistrationFlowProps,
+  CameraScanScreenProps,
 } from './library/sdui';
 
 // SDUI contracts
@@ -139,7 +164,6 @@ export type {
   HeaderManifest,
   TabManifest,
   WidgetRegistryEntry,
-  AlertRule,
   ScreenBlueprint,
   Node,
 } from './library/contracts';

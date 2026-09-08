@@ -6,11 +6,11 @@ import {
   fontFamily,
   getColorTokens,
   layout,
-  PillButton,
-  RegistrationCompleteIllustration,
   type ThemeColorOverrides,
   type ThemeMode,
-} from '@radarbase/app-kit';
+} from '../../theme/theme';
+import { PillButton } from './PillButton';
+import RegistrationCompleteIllustration from '../../theme/icons/registrationcomplete.svg';
 
 /**
  * "Enrolment Complete" step — Figma node 3068:4287. Final step of the registration flow (progress
@@ -57,7 +57,7 @@ export function EnrolmentCompleteView({
         <RegistrationCompleteIllustration width={illoWidth} height={illoHeight} color={heading} />
         <Text style={[styles.heading, { color: heading }]}>Enrolment Complete</Text>
         <Text style={[styles.description, { color: bodyText }]}>
-          You’re all set!{'\n'}Press Start to begin your study tasks.
+          You're all set!{'\n'}Press Start to begin your study tasks.
           {'\n\n'}By enrolling in the study, you agree to the collection and use of information in
           relation to our Privacy Policy.
         </Text>

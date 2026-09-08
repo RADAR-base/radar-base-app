@@ -36,6 +36,7 @@ import { TabActiveContext } from './TabActiveContext';
 import { PageHeader } from './PageHeader';
 import { NotificationsProvider } from './useNotifications';
 import { TaskInstructionsScreen } from './TaskInstructionsScreen';
+import { TaskCompletionScreen } from './TaskCompletionScreen';
 import type { TaskCardType } from './nodes/card/TaskCardNode';
 import { fontFamily, navbarLayout, layout as layoutTokens, resolveBackground } from '../../theme/theme';
 import type { SDUIContext, TemplateContext } from './types';
@@ -107,25 +108,33 @@ export function SDUIShell(props: SDUIShellProps) {
     // whatever mode was active on first load.
   }, [props.manifestSource, props.manifestFallback, colorScheme]);
 
-  // Pre-warm the blueprint cache for every tab in the background once the manifest loads, so the
-  // first switch to each tab is instant (no loader flash) — TabView then reads them synchronously.
+  // Pre-warm the blueprint cache for tabs and secondary views once the manifest loads, so the
+  // first switch/open is instant (no loader flash).
   useEffect(() => {
     if (!manifest) return;
     for (const tab of manifest.tabs) {
       void blueprintLoader.load(tab.viewPath).catch(() => {});
+    }
+    if (manifest.secondaryViews) {
+      for (const viewPath of Object.values(manifest.secondaryViews)) {
+        void blueprintLoader.load(viewPath).catch(() => {});
+      }
     }
   }, [manifest, blueprintLoader]);
 
   const openSecondaryView = useCallback(
     async (viewUrl: string) => {
       try {
-        const blueprint = await blueprintLoader.load(viewUrl);
+        // Resolve logical names (e.g. "daily_questionnaire") to file paths via
+        // the manifest's secondaryViews map; fall back to the raw viewUrl for direct paths.
+        const resolvedPath = manifest?.secondaryViews?.[viewUrl] ?? viewUrl;
+        const blueprint = await blueprintLoader.load(resolvedPath);
         setSecondaryStack((stack) => [...stack, { viewUrl, blueprint }]);
       } catch (err) {
         console.error(`[SDUI] Failed to open secondary view "${viewUrl}":`, err);
       }
     },
-    [blueprintLoader],
+    [blueprintLoader, manifest],
   );
 
   const popSecondaryView = useCallback(() => {
@@ -174,7 +183,7 @@ export function SDUIShell(props: SDUIShellProps) {
 
   return (
     <CoreServicesProvider overrides={props.serviceOverrides}>
-      <NotificationsProvider alerts={manifest.alerts}>
+      <NotificationsProvider>
       <View
         style={[
           styles.container,
@@ -289,14 +298,15 @@ export interface TaskInstructionsPayload {
   taskName: string;
   description?: string;
   taskType: TaskCardType;
-  /** The assessment's `startText`, if the study authored one. Absent means no instructions page —
-   *  the task opens straight into its questionnaire. */
-  startText?: string;
-  /** The assessment's `endText`, if the study authored one — shown on the "Well done" screen. */
-  endText?: string;
   duration?: string;
   expirationTime?: string;
   questionNumber?: string;
+  /** The scheduled task's timestamp (ms since epoch). */
+  taskTimestamp?: number;
+  /** Pre-task instruction text from the protocol's `startText`. Shown on the instructions screen. */
+  startText?: string;
+  /** Post-task completion text from the protocol's `endText`. Shown on the completion screen. */
+  endText?: string;
 }
 
 /**
@@ -307,9 +317,9 @@ export interface TaskInstructionsPayload {
  * Flow: instructions → "Lets Start" → questionnaire → auto-complete task on finish.
  */
 function TaskInstructionsHost({ context }: { context: SDUIContext }) {
-  const { schedule, eventBus, questionnaireData } = useCoreServices();
+  const { schedule, eventBus } = useCoreServices();
   const [payload, setPayload] = useState<TaskInstructionsPayload | null>(null);
-  const [phase, setPhase] = useState<'instructions' | 'questionnaire'>('instructions');
+  const [phase, setPhase] = useState<'instructions' | 'questionnaire' | 'completed'>('instructions');
   // The instructions outlive the phase change by the length of the push — see `start`.
   const [showInstructions, setShowInstructions] = useState(true);
   const { width } = useWindowDimensions();
@@ -343,21 +353,9 @@ function TaskInstructionsHost({ context }: { context: SDUIContext }) {
     return () => eventBus.off(EVENTS.OPEN_TASK_INSTRUCTIONS, handler);
   }, [eventBus, overlay, push]);
 
-  // When the questionnaire is submitted, mark the task complete — but leave the overlay up, because the
-  // questionnaire then shows its own "Well done" screen. Dismissal happens on QUESTIONNAIRE_EXIT below,
-  // when the participant picks Home or Calendar there.
-  useEffect(() => {
-    if (phase !== 'questionnaire' || !payload) return;
-    const onCompleted = () => {
-      void schedule.completeTask(payload.taskId).catch(() => {});
-    };
-    eventBus.on(EVENTS.QUESTIONNAIRE_COMPLETED, onCompleted);
-    return () => eventBus.off(EVENTS.QUESTIONNAIRE_COMPLETED, onCompleted);
-  }, [eventBus, phase, payload, schedule]);
-
   // The questionnaire asked to be dismissed — either abandoned via "Exit" on the first question (the
-  // task stays incomplete), or finished and closed from its "Well done" screen (already marked complete
-  // above). Either way: slide the page away.
+  // task stays incomplete), or finished and closed from the completion screen (already marked complete
+  // below). Either way: slide the page away.
   useEffect(() => {
     if (phase !== 'questionnaire') return;
     const onExit = () => overlay.close();
@@ -389,6 +387,27 @@ function TaskInstructionsHost({ context }: { context: SDUIContext }) {
     });
   };
 
+  // Listen for questionnaire completion → mark task complete, show completion screen
+  useEffect(() => {
+    if (phase !== 'questionnaire' || !payload) return;
+    const handler = () => {
+      void schedule.completeTask(payload.taskId).catch(() => {});
+      setPhase('completed');
+    };
+    eventBus.on(EVENTS.QUESTIONNAIRE_COMPLETED, handler);
+    return () => eventBus.off(EVENTS.QUESTIONNAIRE_COMPLETED, handler);
+  }, [phase, payload, schedule, eventBus]);
+
+  const handleHome = useCallback(() => {
+    overlay.close();
+    context.dispatch({ type: 'Navigate', tabId: 'home' });
+  }, [overlay, context]);
+
+  const handleCalendar = useCallback(() => {
+    overlay.close();
+    context.dispatch({ type: 'Navigate', tabId: 'calendar' });
+  }, [overlay, context]);
+
   if (!payload && !overlay.visible) return null;
 
   return (
@@ -396,22 +415,21 @@ function TaskInstructionsHost({ context }: { context: SDUIContext }) {
       {...overlay.panHandlers}
       style={[StyleSheet.absoluteFill, styles.instructionsOverlay, overlay.overlayStyle]}
     >
-      {/* Kept mounted through the push (see `start`) so it can slide out rather than vanish. */}
-      {payload && showInstructions && (
-        <Animated.View style={[StyleSheet.absoluteFill, instructionsPushStyle]}>
-          <TaskInstructionsScreen
-            taskName={payload.taskName}
-            description={payload.description}
-            taskType={payload.taskType}
-            duration={payload.duration}
-            expirationTime={payload.expirationTime}
-            questionNumber={payload.questionNumber}
-            onBack={overlay.close}
-            onRemindLater={overlay.close}
-            onStart={start}
-            mode={context.colorScheme ?? 'light'}
-            brandColors={context.theme.brandColors}
-          />
+      {payload && showInstructions && phase === 'instructions' && (
+    <Animated.View style={[StyleSheet.absoluteFill, instructionsPushStyle]}>
+        <TaskInstructionsScreen
+          taskName={payload.taskName}
+          description={payload.startText ?? payload.description}
+          taskType={payload.taskType}
+          duration={payload.duration}
+          expirationTime={payload.expirationTime}
+          questionNumber={payload.questionNumber}
+          onBack={overlay.close}
+          onRemindLater={overlay.close}
+          onStart={start}
+          mode={context.colorScheme ?? 'light'}
+          brandColors={context.theme.brandColors}
+        />
         </Animated.View>
       )}
       {payload && phase === 'questionnaire' && (
@@ -431,11 +449,23 @@ function TaskInstructionsHost({ context }: { context: SDUIContext }) {
               id: `questionnaire-${payload.taskId}`,
               assessmentName: payload.assessmentName,
               title: payload.taskName,
+              taskTimestamp: payload.taskTimestamp,
+              fullScreen: true,
               endText: payload.endText,
             }}
             context={context}
           />
         </Animated.View>
+      )}
+      {payload && phase === 'completed' && (
+        <TaskCompletionScreen
+          taskName={payload.taskName}
+          message={payload.endText}
+          onHome={handleHome}
+          onCalendar={handleCalendar}
+          mode={context.colorScheme ?? 'light'}
+          brandColors={context.theme.brandColors}
+        />
       )}
     </Animated.View>
   );

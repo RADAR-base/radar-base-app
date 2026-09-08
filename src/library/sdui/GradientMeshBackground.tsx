@@ -1,8 +1,8 @@
+import React, { useMemo } from "react";
 import { BackdropBlur, Canvas, Fill, Shader, Skia, useClock } from "@shopify/react-native-skia";
 import { useDerivedValue, useSharedValue } from "react-native-reanimated";
 import { StyleSheet, View, useWindowDimensions } from "react-native";
-import { useMemo } from "react";
-import { getColorTokens, type ThemeMode } from "@radarbase/app-kit";
+import { getColorTokens, type ThemeMode } from "../../theme/theme";
 
 const source = Skia.RuntimeEffect.Make(`
 uniform float u_time;

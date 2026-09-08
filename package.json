@@ -37,8 +37,9 @@
     "@react-native-firebase/app": ">=18.0.0",
     "@react-native-firebase/messaging": ">=18.0.0",
     "@react-native-firebase/remote-config": ">=18.0.0",
-    "react": ">=16.8.0",
-    "react-native": ">=0.60.0",
+    "@shopify/react-native-skia": ">=1.0.0",
+    "react": ">=18.0.0",
+    "react-native": ">=0.80.0",
     "react-native-keychain": ">=8.0.0",
     "react-native-reanimated": ">=3.0.0",
     "react-native-safe-area-context": ">=4.0.0",
@@ -68,6 +69,9 @@
     },
     "react-native-svg": {
       "optional": true
+    },
+    "@shopify/react-native-skia": {
+      "optional": true
     }
   },
   "dependencies": {
@@ -94,6 +98,7 @@
     "prettier": "3.4.2",
     "react": "19.2.0",
     "react-native": "0.80.3",
+    "@shopify/react-native-skia": "2.0.0-next.4",
     "react-native-reanimated": "^3.17.4",
     "react-native-safe-area-context": "^5.8.0",
     "react-native-svg": "^15.15.5",

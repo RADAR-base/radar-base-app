@@ -4,14 +4,14 @@ import Animated from 'react-native-reanimated';
 import {
   getColorTokens,
   layout,
-  PageHeader,
   resolveBackground,
-  StepSlider,
-  useSlideOverlay,
-  useStepFlow,
   type ThemeColorOverrides,
   type ThemeMode,
-} from '@radarbase/app-kit';
+} from '../../theme/theme';
+import { PageHeader } from './PageHeader';
+import { StepSlider } from './StepSlider';
+import { useSlideOverlay } from './useSlideOverlay';
+import { useStepFlow } from './useStepFlow';
 
 import { ChooseMethodView } from './ChooseMethodView';
 import { QrInstructionsView } from './QrInstructionsView';

@@ -7,10 +7,10 @@ import {
   getColorTokens,
   layout,
   readableTextColor,
-  ScanQRCode,
   type ThemeColorOverrides,
   type ThemeMode,
-} from '@radarbase/app-kit';
+} from '../../theme/theme';
+import ScanQRCode from '../../theme/icons/scanqrcode.svg';
 
 /**
  * "Scan QR Code" instructions step — Figma node 3062:3406. Second step of the registration flow: an

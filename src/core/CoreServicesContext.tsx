@@ -1,4 +1,4 @@
-import React, { createContext, useContext, ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { dataService } from './DataService';
 import { eventBus } from './EventBus';
 import { apiService } from './ApiService';
@@ -14,19 +14,9 @@ import {
   scheduleServiceFactory,
   questionnaireDataServiceFactory,
   subjectConfigServiceFactory,
+  dataPipelineFactory,
+  remoteConfigServiceFactory,
 } from './index';
-
-let remoteConfigModule: any;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  remoteConfigModule = require('@react-native-firebase/remote-config');
-} catch {
-  remoteConfigModule = null;
-}
-const remoteConfig: any = remoteConfigModule?.default || remoteConfigModule || (() => ({
-  fetchAndActivate: async () => {},
-  getValue: (_k: string) => ({ asString: () => '' })
-}));
 import type {
   DataService,
   EventBus,
@@ -46,12 +36,13 @@ import type {
   NotificationService,
   ScheduleService,
   QuestionnaireDataService,
+  DataPipelineService,
   OAuthConfig,
 } from '../types';
 
 // Enhanced no-op implementations to satisfy dependencies; apps can override via a higher-level provider if needed
-const noopLogger: LoggerService = { 
-  log: (message: string, meta?: unknown) => console.log(message, meta), 
+const noopLogger: LoggerService = {
+  log: (message: string, meta?: unknown) => console.log(message, meta),
   error: (message: string, meta?: unknown) => {
     console.error(message, meta);
     // Do not throw in noop logger to avoid crashing UI in web/demo
@@ -60,31 +51,6 @@ const noopLogger: LoggerService = {
 };
 
 const noopLocalization: LocalizationService = { getLanguage: () => ({ value: 'en' }) };
-
-// Real RemoteConfigService backed by RN Firebase remote-config
-const firebaseRemoteConfigService: RemoteConfigService = {
-  forceFetch: async () => {
-    try {
-      if (typeof (remoteConfig as any) === 'function') {
-        await (remoteConfig as any)().fetchAndActivate();
-      }
-    } catch {}
-    return {
-      getOrDefault: (k: string, d: string) => {
-        try {
-          if (typeof (remoteConfig as any) === 'function') {
-            const val = (remoteConfig as any)().getValue(k);
-            const str = val.asString();
-            return str !== '' ? (str as unknown as string) : d;
-          }
-          return d;
-        } catch {
-          return d;
-        }
-      }
-    } as any;
-  }
-} as any;
 
 const noopSubjectConfig: SubjectConfigService = {
   getParticipantLogin: async () => 'anonymous',
@@ -97,20 +63,8 @@ const noopSubjectConfig: SubjectConfigService = {
 const noopStorage: StorageService = {
   get: async () => null,
   set: async () => {},
+  remove: async () => {},
   observe: () => ({ subscribe: () => ({ unsubscribe: () => {} }) }) as any,
-};
-
-const noopToken: TokenService = {
-  refresh: async () => ({ access_token: 'mock_token' }),
-  register: async () => {},
-  configureOAuthClient: async () => {},
-  getRefreshParams: (token: string) => ({ refresh_token: token }),
-  getURI: async () => 'http://localhost',
-  setURI: async (uri: string) => uri,
-  setTokenEndpoint: async () => {},
-  getTokenEndpoint: async () => 'http://localhost/oauth/token',
-  getAccessToken: async () => 'mock_token',
-  clearTokens: async () => {},
 };
 
 interface CoreServices {
@@ -130,6 +84,10 @@ interface CoreServices {
   notifications: NotificationService;
   schedule: ScheduleService;
   questionnaireData: QuestionnaireDataService;
+  dataPipeline: DataPipelineService;
+  subjectConfig: SubjectConfigService;
+  /** True once the schedule service has initialized (or been skipped for unauthenticated users). */
+  scheduleReady: boolean;
 }
 
 const CoreServicesContext = createContext<CoreServices | null>(null);
@@ -164,154 +122,148 @@ export function CoreServicesProvider({
     return <>{children}</>;
   }
 
-  // Use provided overrides or fall back to no-op implementations
-  const logger = overrides.logger || noopLogger;
-  const localization = overrides.localization || noopLocalization;
-  const remoteConfig = overrides.remoteConfig || firebaseRemoteConfigService;
-  const storage = overrides.storage || noopStorage;
+  return <CoreServicesProviderInner overrides={overrides}>{children}</CoreServicesProviderInner>;
+}
 
-  // Create token service — pass OAuth client so cold-start refresh has client_id
-  // before any appserver call (RN fetch also needs a string body; see TokenService).
-  const token = tokenServiceFactory({
-    storage,
-    logger,
-    bus: eventBus,
-    oauthClient: overrides.authConfig?.clientId
-      ? {
-          clientId: overrides.authConfig.clientId,
-          clientSecret: overrides.authConfig.clientSecret,
-        }
-      : undefined,
-  });
+function CoreServicesProviderInner({
+  children,
+  overrides = {},
+}: CoreServicesProviderProps) {
+  const [scheduleReady, setScheduleReady] = useState(false);
 
-  // Subject identity: prefer an explicit override; otherwise resolve from Management Portal
-  // using the OAuth base URL (`GET …/managementportal/api/subjects/{login}`).
-  const subjectConfig =
-    overrides.subjectConfig ??
-    (overrides.authConfig?.endpoint
-      ? subjectConfigServiceFactory({
-          token,
-          storage,
-          logger,
-          baseUrl: overrides.authConfig.endpoint,
-        })
-      : noopSubjectConfig);
+  // Create all services exactly once via useRef so they survive re-renders
+  // (e.g. when scheduleReady flips from false → true).
+  const stableRef = useRef<Omit<CoreServices, 'scheduleReady'> | null>(null);
+  if (!stableRef.current) {
+    const logger = overrides.logger || noopLogger;
+    const localization = overrides.localization || noopLocalization;
+    const rc = overrides.remoteConfig || remoteConfigServiceFactory({ logger });
+    const storage = overrides.storage || noopStorage;
 
-  // Create analytics service
-  const analytics = analyticsServiceFactory({
-    logger,
-    remoteConfig,
-  });
+    const token = tokenServiceFactory({
+      storage,
+      logger,
+      bus: eventBus,
+      oauthClient: overrides.authConfig?.clientId
+        ? {
+            clientId: overrides.authConfig.clientId,
+            clientSecret: overrides.authConfig.clientSecret,
+          }
+        : undefined,
+    });
 
-  // Create cache service
-  const cache = cacheServiceFactory({
-    storage,
-    logger,
-  });
+    const subjectConfig =
+      overrides.subjectConfig ??
+      (overrides.authConfig?.endpoint
+        ? subjectConfigServiceFactory({
+            token,
+            storage,
+            logger,
+            baseUrl: overrides.authConfig.endpoint,
+          })
+        : noopSubjectConfig);
 
-  // Create kafka service
-  const kafka = kafkaServiceFactory({
-    cache,
-    api: apiService,
-    token,
-    logger,
-    remoteConfig,
-    storage,
-  });
+    const analytics = analyticsServiceFactory({ logger, remoteConfig: rc });
+    const cache = cacheServiceFactory({ storage, logger });
+    const kafka = kafkaServiceFactory({ api: apiService, token, logger, remoteConfig: rc, storage });
+    const dataPipeline = dataPipelineFactory({ cache, kafka, logger, storage, subjectConfig });
+    const config = configServiceFactory({
+      kafka, analytics, cache, pipeline: dataPipeline,
+      remoteConfig: rc, storage, logger, dataService,
+    });
+    const auth = authServiceFactory({
+      token, analytics, logger, config, subjectConfig,
+      eventBus, storage, oauthConfig: overrides.authConfig,
+    });
+    const notifications = notificationServiceFactory({
+      storage, logger, remoteConfig: rc, analytics, subjectConfig, eventBus,
+    });
+    const appServer = appServerServiceFactory({
+      api: apiService, storage, subjectConfig, logger, remoteConfig: rc, localization, token,
+    });
+    const questionnaireData = questionnaireDataServiceFactory({
+      storage, logger, eventBus, dataPipeline, appServer, remoteConfig: rc,
+    });
+    const schedule = scheduleServiceFactory({
+      storage, logger, eventBus, appServer, questionnaireData,
+    });
 
-  // Create config service (orchestrates other services)
-  const config = configServiceFactory({
-    kafka,
-    analytics,
-    cache,
-    token,
-    remoteConfig,
-    storage,
-    logger,
-    dataService,
-  });
+    apiService.setAuthTokenProvider(async () => {
+      try {
+        const t = await token.getAccessToken();
+        return t;
+      } catch {
+        return null;
+      }
+    });
 
-  // Create auth service
-  const auth = authServiceFactory({
-    token,
-    analytics,
-    logger,
-    config,
-    subjectConfig,
-    eventBus: eventBus,
-    storage,
-    oauthConfig: overrides.authConfig,
-  });
+    stableRef.current = {
+      data: dataService, eventBus, api: apiService, appServer,
+      token, analytics, cache, kafka, config, auth, notifications,
+      schedule, questionnaireData, dataPipeline, subjectConfig,
+    };
+  }
 
-  // Create notification service
-  const notifications = notificationServiceFactory({
-    storage,
-    logger,
-    remoteConfig,
-    analytics,
-  });
+  const services: CoreServices = { ...stableRef.current, scheduleReady };
 
-  // Create app server service
-  const appServer = appServerServiceFactory({
-    api: apiService,
-    storage,
-    subjectConfig,
-    logger,
-    remoteConfig,
-    localization,
-    token,
-  });
-
-  // Create questionnaire data service
-  const questionnaireData = questionnaireDataServiceFactory({
-    storage,
-    logger,
-    eventBus: eventBus,
-  });
-
-  // Create schedule service (depends on questionnaireData for protocol-driven definition loading)
-  const schedule = scheduleServiceFactory({
-    storage,
-    logger,
-    eventBus: eventBus,
-    appServer,
-    questionnaireData,
-  });
-
-  // Inject auth token provider into ApiService
-  apiService.setAuthTokenProvider(async () => {
-    try {
-      const t = await token.getAccessToken();
-      return t;
-    } catch {
-      return null;
-    }
-  });
-
-  const services: CoreServices = {
-    // Original services
-    data: dataService,
-    eventBus: eventBus,
-    api: apiService,
-    appServer,
-    
-    // New services
-    token,
-    analytics,
-    cache,
-    kafka,
-    config,
-    auth,
-    notifications,
-    schedule,
-    questionnaireData,
-  };
+  // Fire-and-forget config init on mount (Kafka init + cache flush for returning users)
+  const initRef = useRef(false);
+  useEffect(() => {
+    if (initRef.current) return;
+    initRef.current = true;
+    stableRef.current!.config.init().catch(() => {});
+  }, []);
 
   return (
     <CoreServicesContext.Provider value={services}>
+      <ScheduleInitManager services={services} onReady={() => setScheduleReady(true)} />
       {children}
     </CoreServicesContext.Provider>
   );
+}
+
+/** Internal component that initializes the schedule service when the user is authenticated
+ *  and tears it down on sign-out. Keeps schedule lifecycle out of the host app. */
+function ScheduleInitManager({ services, onReady }: { services: CoreServices; onReady: () => void }) {
+  const { auth, schedule } = services;
+  const bus = services.eventBus;
+  const initedRef = useRef(false);
+
+  const initSchedule = useCallback(async () => {
+    if (initedRef.current) return;
+    const isAuth = await auth.isAuthenticated();
+    if (!isAuth) {
+      onReady();
+      return;
+    }
+    initedRef.current = true;
+    await schedule.init();
+    await schedule.fetchSchedule();
+    onReady();
+  }, [auth, schedule, onReady]);
+
+  useEffect(() => {
+    initSchedule().catch(() => {
+      onReady();
+    });
+
+    const handler = (data: { status: string }) => {
+      if (data.status === 'authenticated' && !initedRef.current) {
+        initSchedule().catch(() => {});
+      } else if (data.status === 'unauthenticated' && initedRef.current) {
+        initedRef.current = false;
+        schedule.destroy();
+        onReady();
+      }
+    };
+    bus.on('auth.state_changed', handler);
+    return () => {
+      bus.off('auth.state_changed', handler);
+      schedule.destroy();
+    };
+  }, [initSchedule, schedule, bus, onReady]);
+
+  return null;
 }
 
 export const useCoreServices = (): CoreServices => {
@@ -336,3 +288,11 @@ export const useAuthService = () => useCoreServices().auth;
 export const useNotificationService = () => useCoreServices().notifications;
 export const useScheduleService = () => useCoreServices().schedule;
 export const useQuestionnaireDataService = () => useCoreServices().questionnaireData;
+export const useDataPipeline = () => useCoreServices().dataPipeline;
+export const useSubjectConfigService = () => useCoreServices().subjectConfig;
+
+/** Returns true once the schedule service has initialized (or been skipped for unauthenticated users).
+ *  Schedule lifecycle is managed internally by CoreServicesProvider. */
+export function useScheduleInit(): boolean {
+  return useCoreServices().scheduleReady;
+}

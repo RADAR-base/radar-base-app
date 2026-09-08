@@ -2,12 +2,11 @@ import React from 'react';
 import { StyleSheet, useColorScheme, View } from 'react-native';
 import {
   getColorTokens,
-  PageHeader,
   resolveBackground,
   type ThemeColorOverrides,
   type ThemeMode,
-} from '@radarbase/app-kit';
-
+} from '../../theme/theme';
+import { PageHeader } from './PageHeader';
 import { EnrolmentCompleteView } from './EnrolmentCompleteView';
 
 /**

@@ -112,6 +112,7 @@ export function TaskDayList({ context, date, variant, filter = NO_FILTER, idPref
       duration: current.estimated_minutes > 0 ? `${current.estimated_minutes} min` : undefined,
       expirationTime: formatExpiration(current),
       questionNumber: current.nQuestions ? `x${current.nQuestions}` : undefined,
+      taskTimestamp: current.timestamp,
     });
   };
 

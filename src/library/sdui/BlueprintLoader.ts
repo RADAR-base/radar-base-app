@@ -107,3 +107,33 @@ export function createBundledBlueprintSource(
     return blueprint;
   };
 }
+
+/**
+ * Blueprint source that fetches view JSONs from a remote server. View paths from the
+ * manifest are resolved relative to `baseUrl`:
+ *   `{baseUrl}/{viewPath}`  e.g.  `https://api.example.com/config/views/home.json`
+ *
+ * An optional `fallback` source (typically bundled blueprints) is tried when the
+ * network request fails, enabling offline-first behaviour.
+ */
+export function createRemoteBlueprintSource(
+  baseUrl: string,
+  fallback?: BlueprintSource,
+): BlueprintSource {
+  const base = baseUrl.replace(/\/$/, '');
+  return async (viewPath) => {
+    try {
+      const url = `${base}/${viewPath}`;
+      const response = await fetch(url, {
+        headers: { Accept: 'application/json' },
+      });
+      if (!response.ok) {
+        throw new Error(`Blueprint fetch failed: ${response.status} ${response.statusText} (${url})`);
+      }
+      return await response.json();
+    } catch (err) {
+      if (fallback) return fallback(viewPath);
+      throw err;
+    }
+  };
+}

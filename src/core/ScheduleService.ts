@@ -131,18 +131,23 @@ export abstract class ScheduleServiceBase implements ScheduleService {
   async getUpcomingTasks(limit = 10): Promise<Task[]> {
     const now = Date.now();
     return this.tasks
-      .filter(t => t.timestamp >= now && (t.state === 'pending' || t.state === 'overdue'))
+      .filter(t => {
+        if (t.state !== 'pending' && t.state !== 'overdue') return false;
+        const expiresAt = t.timestamp + t.completionWindow;
+        // Include future tasks and currently-active tasks (not yet expired)
+        return expiresAt > now;
+      })
       .sort((a, b) => a.timestamp - b.timestamp)
       .slice(0, limit);
   }
 
   async getPendingCount(): Promise<number> {
-    const todayStart = startOfDay(new Date()).getTime();
-    const todayEnd = endOfDay(new Date()).getTime();
-    return this.tasks.filter(
-      t => t.timestamp >= todayStart && t.timestamp <= todayEnd
-        && (t.state === 'pending' || t.state === 'overdue'),
-    ).length;
+    const now = Date.now();
+    return this.tasks.filter(t => {
+      const expiresAt = t.timestamp + t.completionWindow;
+      return t.timestamp <= now && expiresAt > now
+        && (t.state === 'pending' || t.state === 'overdue');
+    }).length;
   }
 
   getActiveDaysCount(): number {
@@ -237,13 +242,14 @@ export abstract class ScheduleServiceBase implements ScheduleService {
         });
       }
 
-      if (task.state !== 'pending') continue;
+      // Skip terminal states — only pending/overdue can transition
+      if (task.state === 'completed' || task.state === 'skipped' || task.state === 'expired') continue;
 
       if (now > expiresAt) {
         task.state = 'expired';
         task.stateChangedAt = new Date().toISOString();
         changed = true;
-      } else if (now > task.timestamp) {
+      } else if (task.state === 'pending' && now > task.timestamp) {
         task.state = 'overdue';
         task.stateChangedAt = new Date().toISOString();
         changed = true;
