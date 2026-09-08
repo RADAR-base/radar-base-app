@@ -2,7 +2,14 @@ import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import ArrowRightIcon from '../../../theme/icons/arrowright.svg';
-import { fontFamily, tracking, getColorTokens } from '../../../theme/theme';
+import {
+  calendarChrome,
+  fontFamily,
+  tracking,
+  getColorTokens,
+  mix,
+  readableTextColor,
+} from '../../../theme/theme';
 import { TabActiveContext } from '../TabActiveContext';
 import { CalendarTaskView } from './section/CalendarTaskView';
 import type { NodeProps } from '../types';
@@ -14,22 +21,24 @@ import type { NodeProps } from '../types';
  * **today** (the current day). The task list itself is the shared `TaskDayList`, the same body
  * `TaskListSectionNode` renders for today.
  *
- * The selector is a fixed navy component in both light and dark (matching the Figma), so its colors
- * are local constants rather than theme tokens — only the date-header text keys off the theme.
+ * The selector's navy ramp is derived from the manifest `brandColors` (see `selector colors` below):
+ * `brand` is the pill fill, lightened toward white for the arrow buttons; `accent` (pre-blended over
+ * the brand) is the selected-day highlight and today's dot. Studies that set no `brandColors` fall
+ * back to the design-system navy defaults. The date-header text keys off the theme as before.
  */
 
-/** navy/800 — the pill container fill. */
+/** Default pill fill (navy/800) when the manifest sets no `brandColors.brand`. */
 const SELECTOR_BG = '#1D3557';
-/** navy/600 — the circular arrow buttons. */
+/** Default arrow-button fill (navy/600) when no brand is set. */
 const ARROW_BG = '#2C4F6B';
-/** cyan/300 — today's dot. */
+/** Default today's-dot / selected-highlight seed (cyan/300) when no `brandColors.accent` is set. */
 const CYAN = '#7EC8E8';
 const DAY_TEXT = '#FFFFFF';
 /**
- * Selected-day highlight: cyan/300 at 50% pre-blended over the navy selector background, as an
+ * Default selected-day highlight: cyan/300 at 50% pre-blended over the navy selector background, as an
  * *opaque* color. It's visually identical to `rgba(126,200,232,0.5)` on the navy, but avoids an
  * Android bug where a semi-transparent background + borderRadius paints as a square, not a circle.
- * (The selector background is always this fixed navy, so the pre-blend stays correct.)
+ * The brand-derived path below reproduces this by pre-blending `accent` over the brand fill.
  */
 const SELECTED_BG = '#4E7FA0';
 
@@ -80,6 +89,23 @@ function formatDateHeader(d: Date): string {
 
 export function CalendarNode({ context }: NodeProps) {
   const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
+
+  // Selector navy ramp, derived from the manifest brand color so the calendar carries the study's
+  // brand. `brand` is the pill fill; the arrow buttons are the brand lightened toward white; the
+  // selected-day highlight is `accent` pre-blended 50% over the brand (opaque, to dodge the Android
+  // semi-transparent-circle bug). On a dark page the whole ramp lifts toward white so the pill still
+  // reads as raised above the near-black background. No brandColors → the design-system navy defaults.
+  // Shared with the timeline rail in `CalendarTaskView`, and with the page header and navbar — the
+  // calendar's chrome is the app's chrome, in both modes. See `calendarChrome`.
+  const selectorBg = calendarChrome(tokens.header.headerBackground);
+  const accent = context.theme.brandColors?.accent ?? CYAN;
+  // Lifted *relative to the pill*, not to the page, so the arrows and the selected day read against
+  // the selector whatever navy it lands on.
+  const arrowBg = mix(selectorBg, '#FFFFFF', 0.14);
+  const selectedBg = mix(selectorBg, accent, 0.5);
+  // White day letters unless the brand fill is too light for them to read (then near-black).
+  const dayText = readableTextColor(selectorBg, { preferred: DAY_TEXT });
+  const dotColor = accent;
 
   const [selectedDate, setSelectedDate] = useState<Date>(() => startOfDay(new Date()));
   const [today, setToday] = useState<Date>(() => startOfDay(new Date()));
@@ -173,12 +199,21 @@ export function CalendarNode({ context }: NodeProps) {
           {formatDateHeader(selectedDate)}
         </Text>
 
-        <View style={styles.selectorRow}>
-          <ArrowButton direction="prev" onPress={() => shiftWeek(-1)} disabled={!canPrev} />
+        <View style={[styles.selectorRow, { backgroundColor: selectorBg }]}>
+          <ArrowButton
+            direction="prev"
+            onPress={() => shiftWeek(-1)}
+            disabled={!canPrev}
+            bg={arrowBg}
+            iconColor={dayText}
+          />
 
           <Animated.View style={[styles.daysRow, stripStyle]}>
             {/* Single highlight circle behind the letters; slides between days (see indicatorStyle). */}
-            <Animated.View style={[styles.selectedIndicator, indicatorStyle]} pointerEvents="none" />
+            <Animated.View
+              style={[styles.selectedIndicator, { backgroundColor: selectedBg }, indicatorStyle]}
+              pointerEvents="none"
+            />
             {weekDays.map((day, i) => {
               const selected = sameDay(day, selectedDate);
               const isToday = sameDay(day, today);
@@ -196,19 +231,27 @@ export function CalendarNode({ context }: NodeProps) {
                   onPress={() => setSelectedDate(startOfDay(day))}
                 >
                   <View style={styles.dayCircle}>
-                    <Text style={[styles.dayLetter, !inRange && styles.dayLetterDisabled]}>
+                    <Text
+                      style={[styles.dayLetter, { color: dayText }, !inRange && styles.dayLetterDisabled]}
+                    >
                       {DAY_LETTERS[i]}
                     </Text>
-                    {/* Teal dot marks today — absolutely positioned just under the centered letter, so
+                    {/* Accent dot marks today — absolutely positioned just under the centered letter, so
                         it doesn't add height (keeps the circle level with the arrows). */}
-                    {isToday && <View style={styles.dot} />}
+                    {isToday && <View style={[styles.dot, { backgroundColor: dotColor }]} />}
                   </View>
                 </Pressable>
               );
             })}
           </Animated.View>
 
-          <ArrowButton direction="next" onPress={() => shiftWeek(1)} disabled={!canNext} />
+          <ArrowButton
+            direction="next"
+            onPress={() => shiftWeek(1)}
+            disabled={!canNext}
+            bg={arrowBg}
+            iconColor={dayText}
+          />
         </View>
       </View>
 
@@ -222,10 +265,14 @@ function ArrowButton({
   direction,
   onPress,
   disabled,
+  bg,
+  iconColor,
 }: {
   direction: 'prev' | 'next';
   onPress: () => void;
   disabled?: boolean;
+  bg: string;
+  iconColor: string;
 }) {
   const isPrev = direction === 'prev';
   return (
@@ -238,6 +285,7 @@ function ArrowButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.arrowBtn,
+        { backgroundColor: bg },
         disabled && styles.arrowBtnDisabled,
         pressed && styles.arrowBtnPressed,
       ]}
@@ -247,7 +295,7 @@ function ArrowButton({
           nudge re-centers each direction; the inner view does the flip so the two don't compound. */}
       <View style={isPrev ? styles.arrowNudgePrev : styles.arrowNudgeNext}>
         <View style={isPrev ? styles.flip : undefined}>
-          <ArrowRightIcon width={15} height={14} color={DAY_TEXT} />
+          <ArrowRightIcon width={15} height={14} color={iconColor} />
         </View>
       </View>
     </Pressable>

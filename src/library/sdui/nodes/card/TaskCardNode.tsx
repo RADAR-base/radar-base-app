@@ -4,7 +4,7 @@ import type { ComponentType } from 'react';
 import type { SvgProps } from 'react-native-svg';
 import DurationIcon from '../../../../theme/icons/duration.svg';
 import MedicineQuantityIcon from '../../../../theme/icons/medicinequantitiy.svg';
-import { tracking, fontFamily, getColorTokens, layout as layoutTokens, cardShadow, withAlpha } from '../../../../theme/theme';
+import { tracking, fontFamily, getColorTokens, layout as layoutTokens, cardShadow, withAlpha, taskStatusColors } from '../../../../theme/theme';
 import type { NodeProps } from '../../types';
 import { TaskIcon } from './TaskIcon';
 import { TYPE_COLORS, TASK_TINT, type TaskCardType } from './taskTypes';
@@ -14,7 +14,8 @@ import { TYPE_COLORS, TASK_TINT, type TaskCardType } from './taskTypes';
 export { TYPE_COLORS, TASK_TINT } from './taskTypes';
 export type { TaskCardType } from './taskTypes';
 
-const NEW_TASK_GREEN = '#9CB167';
+// "New Task!" pill green — shared with the calendar card via the theme.
+const NEW_TASK_GREEN = taskStatusColors.newBadge;
 /** Grey scrim laid over a not-yet-available task to read it as disabled/greyed-out. */
 const UNAVAILABLE_SCRIM = 'rgba(202, 203, 212, 0.5)';
 

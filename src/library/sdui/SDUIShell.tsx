@@ -1,7 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { InteractionManager, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import {
+  InteractionManager,
+  StyleSheet,
+  Text,
+  useColorScheme,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import {
   CoreServicesProvider,
   useCoreServices,
@@ -30,6 +42,9 @@ import { fontFamily, navbarLayout, layout as layoutTokens, resolveBackground } f
 import type { SDUIContext, TemplateContext } from './types';
 
 const noopRender = () => null;
+
+/** Instructions → first question push. Matches the questionnaire's own page slide. */
+const PUSH_DURATION = 260;
 
 export interface SDUIShellProps {
   manifestSource: ManifestSource;
@@ -305,30 +320,71 @@ function TaskInstructionsHost({ context }: { context: SDUIContext }) {
   const { schedule, eventBus } = useCoreServices();
   const [payload, setPayload] = useState<TaskInstructionsPayload | null>(null);
   const [phase, setPhase] = useState<'instructions' | 'questionnaire' | 'completed'>('instructions');
+  // The instructions outlive the phase change by the length of the push — see `start`.
+  const [showInstructions, setShowInstructions] = useState(true);
+  const { width } = useWindowDimensions();
+  /** 0 = instructions in place, 1 = questionnaire in place. */
+  const push = useSharedValue(0);
+  const instructionsPushStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: -push.value * width }],
+  }));
+  const questionnairePushStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: (1 - push.value) * width }],
+  }));
+  // One overlay for both phases — `phase` swaps the instructions page for the questionnaire in place.
   const overlay = useSlideOverlay();
 
   useEffect(() => {
     const handler = (data: TaskInstructionsPayload) => {
       setPayload(data);
-      setPhase('instructions');
+      // The instructions page only earns its place when the study authored `startText` for this
+      // assessment. Without one there's nothing to brief the participant with, so skip straight to
+      // the questionnaire rather than showing a near-empty interstitial.
+      const hasInstructions = !!data.startText;
+      setPhase(hasInstructions ? 'instructions' : 'questionnaire');
+      // Set the push state here too, not just in `start`. Skipping straight to the questionnaire never
+      // runs `start`, so leaving these at their defaults kept the instructions mounted at rest and
+      // drew them over the questionnaire.
+      setShowInstructions(hasInstructions);
+      push.value = hasInstructions ? 0 : 1;
       overlay.open();
     };
     eventBus.on(EVENTS.OPEN_TASK_INSTRUCTIONS, handler);
     return () => eventBus.off(EVENTS.OPEN_TASK_INSTRUCTIONS, handler);
-  }, [eventBus, overlay]);
+  }, [eventBus, overlay, push]);
+
+  // The questionnaire asked to be dismissed — either abandoned via "Exit" on the first question (the
+  // task stays incomplete), or finished and closed from the completion screen (already marked complete
+  // below). Either way: slide the page away.
+  useEffect(() => {
+    if (phase !== 'questionnaire') return;
+    const onExit = () => overlay.close();
+    eventBus.on(EVENTS.QUESTIONNAIRE_EXIT, onExit);
+    return () => eventBus.off(EVENTS.QUESTIONNAIRE_EXIT, onExit);
+  }, [eventBus, phase, overlay]);
 
   // Fully unmount the page once the slide-out finishes (overlay.visible flips false in its callback).
   useEffect(() => {
     if (!overlay.visible) {
       setPayload(null);
       setPhase('instructions');
+      setShowInstructions(true);
+      push.value = 0;
     }
-  }, [overlay.visible]);
+  }, [overlay.visible, push]);
 
+  // "Lets Start" → push the questionnaire in from the right while the instructions leave to the left,
+  // rather than swapping the two in place. The questions were fetched and cached at startup
+  // (`QuestionnaireDataService.loadDefinitions`); `QuestionnaireScreenNode` looks them up by the
+  // assessment name, which is the task's title.
   const start = () => {
     if (!payload) return;
-    // Transition to questionnaire phase — the QuestionnaireNode handles the rest
     setPhase('questionnaire');
+    // The instructions stay mounted until the slide finishes — dropping them on the phase change
+    // would leave the questionnaire arriving over an empty page.
+    push.value = withTiming(1, { duration: PUSH_DURATION }, (finished) => {
+      if (finished) runOnJS(setShowInstructions)(false);
+    });
   };
 
   // Listen for questionnaire completion → mark task complete, show completion screen
@@ -359,7 +415,8 @@ function TaskInstructionsHost({ context }: { context: SDUIContext }) {
       {...overlay.panHandlers}
       style={[StyleSheet.absoluteFill, styles.instructionsOverlay, overlay.overlayStyle]}
     >
-      {payload && phase === 'instructions' && (
+      {payload && showInstructions && phase === 'instructions' && (
+    <Animated.View style={[StyleSheet.absoluteFill, instructionsPushStyle]}>
         <TaskInstructionsScreen
           taskName={payload.taskName}
           description={payload.startText ?? payload.description}
@@ -373,27 +430,32 @@ function TaskInstructionsHost({ context }: { context: SDUIContext }) {
           mode={context.colorScheme ?? 'light'}
           brandColors={context.theme.brandColors}
         />
+        </Animated.View>
       )}
       {payload && phase === 'questionnaire' && (
-        <View style={{ flex: 1, backgroundColor: resolveBackground(context.theme, context.colorScheme ?? 'light') }}>
-          <PageHeader
-            onBack={overlay.close}
-            title={payload.taskName}
-            mode={context.colorScheme ?? 'light'}
-            brandColors={context.theme.brandColors}
-          />
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: resolveBackground(context.theme, context.colorScheme ?? 'light') },
+            questionnairePushStyle,
+          ]}
+        >
+          {/* No PageHeader — QuestionnaireScreenNode draws its own header (task name + item count +
+              progress) and footer (Exit/Back + Next/Finish), filling the whole overlay. Its Exit and
+              "Well done" buttons dismiss via QUESTIONNAIRE_EXIT, handled above. */}
           <NodeRenderer
             node={{
-              type: 'QuestionnaireNode',
+              type: 'QuestionnaireScreenNode',
               id: `questionnaire-${payload.taskId}`,
               assessmentName: payload.assessmentName,
               title: payload.taskName,
               taskTimestamp: payload.taskTimestamp,
               fullScreen: true,
+              endText: payload.endText,
             }}
             context={context}
           />
-        </View>
+        </Animated.View>
       )}
       {payload && phase === 'completed' && (
         <TaskCompletionScreen
@@ -442,8 +504,10 @@ function deriveHeaderNode(manifest: AppManifest, tabId: string, context: SDUICon
     name: isHomeTab ? username : undefined,
     showName: isHomeTab && header.showName === true,
     description: isHomeTab ? subtitle ?? 'Track your data and complete your daily tasks' : '',
-    // Home shows the Edit affordance + the last-synced button; other tabs hide both.
-    showEditButton: isHomeTab ? undefined : false,
+    // Home shows the Edit affordance (unless the manifest sets `header.showEditButton: false`) + the
+    // last-synced button; other tabs hide both. `undefined` on home defers to HeaderTextNode's
+    // shown-by-default.
+    showEditButton: isHomeTab ? headerRecord.showEditButton : false,
     lastSyncedButton: isHomeTab ? undefined : false,
     // Shared action config, defined once in the manifest header and applied to every tab.
     showSettings: headerRecord.showSettings,

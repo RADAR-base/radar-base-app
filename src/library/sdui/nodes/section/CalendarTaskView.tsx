@@ -6,12 +6,22 @@ import type { SvgProps } from 'react-native-svg';
 import { useCoreServices } from '../../../../core/CoreServicesContext';
 import { EVENTS } from '../../../../core/EventBus';
 import type { TaskView as Task } from '../../../../types';
-import { fontFamily, tracking, getColorTokens, resolveBackground } from '../../../../theme/theme';
+import {
+  fontFamily,
+  tracking,
+  getColorTokens,
+  resolveBackground,
+  taskStatusColors,
+  readableTextColor,
+  calendarRailColor,
+  CALENDAR_DEFAULT_ACCENT,
+  calendarRail,
+} from '../../../../theme/theme';
 import TimeMorning from '../../../../theme/icons/timemorning.svg';
 import TimeAfternoon from '../../../../theme/icons/timeafternoon.svg';
 import TimeEvening from '../../../../theme/icons/timeevening.svg';
-import CheckIcon from '../../../../theme/icons/check.svg';
-import MissedIcon from '../../../../theme/icons/missed.svg';
+import StateDoneIcon from '../../../../theme/icons/statedone.svg';
+import StateMissedIcon from '../../../../theme/icons/statemissed.svg';
 import { CalendarTaskCard, type CalendarTaskState } from '../card/CalendarTaskCard';
 import { inferTaskType, isExpired } from './TaskDayList';
 import type { SDUIContext } from '../../types';
@@ -24,11 +34,11 @@ const SLOT_ICON: Record<Slot, ComponentType<SvgProps>> = {
   Evening: TimeEvening,
 };
 
-/** Rail circle fill for the two "terminal" states; `available`/`notReady` circles are open rings
- *  filled with the page background so the connecting line doesn't show through them. */
-const DONE_CIRCLE = '#9CB167'; // green/200 — medium enough for a white check
-const MISSED_CIRCLE = '#B5DFF2'; // sky/100 — matches the missed card
-const GREY = '#A8A9B2'; // neutral/600 — the not-ready rail color
+// Rail dots reuse each state's badge circle from the shared task-status palette; the not-ready
+// line/ring is the shared rail grey. (Both live in the theme so the card and rail stay in sync.)
+const DONE_CIRCLE = taskStatusColors.done.circle;
+const MISSED_CIRCLE = taskStatusColors.missed.circle;
+const GREY = calendarRail.grey;
 
 export interface CalendarTaskViewProps {
   context: SDUIContext;
@@ -83,8 +93,16 @@ export function CalendarTaskView({ context, date }: CalendarTaskViewProps) {
   }, []);
 
   const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
-  const navy = tokens.background.secondary;
+  // The rail's "reached" color — the same accent-over-chrome mix as the selected day in the picker
+  // above, so the two read as one control. A step lighter than the chrome itself, which a 6px line and
+  // small rings need to be visible on a dark page.
+  const accent = context.theme.brandColors?.accent ?? CALENDAR_DEFAULT_ACCENT;
+  const navy = calendarRailColor(tokens.header.headerBackground, accent);
   const pageBg = resolveBackground(context.theme, context.colorScheme ?? 'light');
+  // "Morning" / "Afternoon" / "Evening". These took the rail color, which works on a light page but
+  // put near-black chrome on a near-black page in dark mode — the labels were invisible. Keep the rail
+  // color where it reads, and fall back to whatever does otherwise.
+  const slotLabel = readableTextColor(pageBg, { preferred: navy });
 
   const handlePress = (task: Task) => {
     if (task.status === 'completed') return;
@@ -94,7 +112,9 @@ export function CalendarTaskView({ context, date }: CalendarTaskViewProps) {
       assessmentName: task.assessmentName,
       taskName: task.title,
       description: task.description,
-      taskType: inferTaskType(task.title),
+      taskType: inferTaskType(task.title, task.taskType),
+      startText: task.startText,
+      endText: task.endText,
       duration: task.estimated_minutes > 0 ? `${task.estimated_minutes} min` : undefined,
       expirationTime: formatExpiration(task),
       questionNumber: task.nQuestions ? `x${task.nQuestions}` : undefined,
@@ -166,7 +186,7 @@ export function CalendarTaskView({ context, date }: CalendarTaskViewProps) {
 
             {entry.kind === 'header' ? (
               <View style={styles.headerContent}>
-                <Text style={[styles.headerLabel, { color: navy }]}>{entry.slot}</Text>
+                <Text style={[styles.headerLabel, { color: slotLabel }]}>{entry.slot}</Text>
               </View>
             ) : (
               <View style={styles.cardContent}>
@@ -179,9 +199,9 @@ export function CalendarTaskView({ context, date }: CalendarTaskViewProps) {
                   <CalendarTaskCard
                     context={context}
                     state={entry.state}
-                    taskType={inferTaskType(entry.task.title)}
+                    taskType={inferTaskType(entry.task.title, entry.task.taskType)}
                     taskName={entry.task.title}
-                    time={formatClock(entry.task)}
+                    time={formatClock(entry.task, entry.state === 'done')}
                     duration={
                       entry.task.estimated_minutes > 0
                         ? `${entry.task.estimated_minutes} min`
@@ -220,14 +240,14 @@ function StateCircle({
   if (state === 'done') {
     return (
       <View style={[styles.circle, { backgroundColor: DONE_CIRCLE }]}>
-        <CheckIcon width={30} height={30} color="#FFFFFF" />
+        <StateDoneIcon width={18} height={18} color={taskStatusColors.done.icon} />
       </View>
     );
   }
   if (state === 'missed') {
     return (
       <View style={[styles.circle, { backgroundColor: MISSED_CIRCLE }]}>
-        <MissedIcon width={16} height={16} color={navy} />
+        <StateMissedIcon width={18} height={18} color={taskStatusColors.missed.icon} />
       </View>
     );
   }
@@ -262,8 +282,19 @@ function slotFor(task: Task): Slot {
   return 'Evening';
 }
 
-function formatClock(task: Task): string {
-  const total = dayMinutes(task);
+/**
+ * The clock time shown on a card. Normally the task's scheduled time ("Starts at 09:00"), but a
+ * completed card reads "Done at …", which should be when the participant actually finished — that's
+ * `timeCompleted`, stamped by `ScheduleService.completeTask` when the questionnaire reports done.
+ * Falls back to the scheduled time for tasks completed before this was recorded.
+ */
+function formatClock(task: Task, useCompletionTime = false): string {
+  const completed = useCompletionTime && task.timeCompleted != null
+    ? new Date(task.timeCompleted)
+    : null;
+  const total = completed
+    ? completed.getHours() * 60 + completed.getMinutes()
+    : dayMinutes(task);
   const hour = Math.floor(total / 60);
   const min = total % 60;
   return `${hour}:${String(min).padStart(2, '0')}`;
@@ -303,8 +334,9 @@ function formatExpiration(task: Task): string | undefined {
   return `${hours}H ${String(mins).padStart(2, '0')}M`;
 }
 
-const NODE = 30;
-const LINE_WIDTH = 6;
+// Rail geometry (dot diameter + connecting-line thickness) — shared via the theme.
+const NODE = calendarRail.nodeSize;
+const LINE_WIDTH = calendarRail.lineWidth;
 
 const styles = StyleSheet.create({
   container: {

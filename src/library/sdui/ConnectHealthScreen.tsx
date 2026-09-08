@@ -2,7 +2,7 @@ import React from 'react';
 import { Platform, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { tracking, fontFamily, getColorTokens, layout, type ThemeColorOverrides, type ThemeMode } from '../../theme/theme';
+import { tracking, fontFamily, getColorTokens, layout, resolveBackground, type ThemeColorOverrides, type ThemeMode } from '../../theme/theme';
 import AppleHealthIcon from '../../theme/icons/applehealth.svg';
 import HealthConnectIcon from '../../theme/icons/healthconnect.svg';
 import { PillButton } from './PillButton';
@@ -54,7 +54,9 @@ export function ConnectHealthScreen({
   const isApple = resolvedPlatform === 'apple';
   const content = isApple ? CONTENT.apple : CONTENT.android;
 
-  const heading = tokens.button.background; // navy title, tracks brand override
+  // Brand-colored title/icons. Uses the raw brand so it tracks the override in *both* themes — in dark
+  // mode the theme's `button.background` is a fixed navy that doesn't follow the brand.
+  const heading = brandColors?.brand ?? tokens.button.background;
   const bodyText = tokens.card.hint.text; // description (matches the sibling onboarding screens)
 
   return (
@@ -62,7 +64,7 @@ export function ConnectHealthScreen({
       style={[
         styles.root,
         {
-          backgroundColor: tokens.background.primary,
+          backgroundColor: resolveBackground({ brandColors }, resolvedMode),
           paddingTop: insets.top + 16,
           paddingBottom: insets.bottom + 16,
         },

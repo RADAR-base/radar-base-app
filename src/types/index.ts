@@ -121,6 +121,11 @@ export interface TaskView {
   reminderTimestamp?: number;
   /** True until the user first opens this task — drives the card's "New Task" pill. */
   isNew?: boolean;
+  /** The assessment's declared type — see `Task.taskType`. */
+  taskType?: string;
+  /** When the task was actually completed (epoch ms), set by `ScheduleService.completeTask`. Drives
+   *  the calendar card's "Done at" time, which is otherwise the *scheduled* time. */
+  timeCompleted?: number;
   /** Optional study-supplied icon URL. Falls back to default glyph on load error. */
   iconUrl?: string;
   /** Pre-task instruction text from the protocol's `startText`. */
@@ -500,6 +505,10 @@ export interface Task {
   icon?: string;
   reminderTimestamp?: number;
   requiresInClinicCompletion?: boolean;
+  /** The assessment's declared type (`AssessmentConfig.questionnaire.type`), e.g. `audio` for a
+   *  speech task. Drives the card's icon/color via `normalizeTaskType`; when absent the card falls
+   *  back to guessing from the title. */
+  taskType?: string;
   notifications: any[];
   /** Pre-task instruction text from the protocol's `startText`. */
   startText?: string;

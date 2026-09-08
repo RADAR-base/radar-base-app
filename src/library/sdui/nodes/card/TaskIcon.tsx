@@ -7,6 +7,7 @@ import QuestionnaireIcon from '../../../../theme/icons/questionnaire.svg';
 import SpeechIcon from '../../../../theme/icons/speech.svg';
 import PhysicalIcon from '../../../../theme/icons/physical.svg';
 import MedicationIcon from '../../../../theme/icons/medicine.svg';
+import CognitiveIcon from '../../../../theme/icons/brain.svg';
 import { TYPE_COLORS, type TaskCardType } from './taskTypes';
 
 /** Default per-type glyph — the same icons the home task list uses, so both cards read consistently. */
@@ -15,6 +16,7 @@ const GLYPH: Record<TaskCardType, ComponentType<SvgProps>> = {
   speech: SpeechIcon,
   physical: PhysicalIcon,
   medication: MedicationIcon,
+  cognitive: CognitiveIcon,
 };
 
 export interface TaskIconProps {

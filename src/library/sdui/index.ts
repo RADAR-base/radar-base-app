@@ -91,6 +91,7 @@ export {
   InboxItemListNode,
   NavbarNode,
   QuestionnaireNode,
+  QuestionnaireScreenNode,
   RelativeActivityTodayNode,
   SectionNode,
   SurveyTaskListNode,
@@ -100,6 +101,7 @@ export {
 } from './nodes';
 
 // Questionnaire sub-components (for custom questionnaire UIs)
+export type { SpeechRecording } from './nodes/questionnaire';
 export {
   RadioInput,
   CheckboxInput,
@@ -107,6 +109,7 @@ export {
   SliderInput,
   TextQuestionInput,
   InfoScreen,
+  SpeechInput,
   QuestionRenderer,
   evaluateBranchingLogic,
 } from './nodes/questionnaire';

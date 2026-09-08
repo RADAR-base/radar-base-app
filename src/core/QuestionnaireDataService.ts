@@ -56,7 +56,7 @@ export class DefaultQuestionnaireDataService implements QuestionnaireDataService
     private readonly pipeline: DataPipelineService,
     private readonly appServer: AppServerService,
     private readonly remoteConfig: RemoteConfigService,
-  ) {}
+  ) { }
 
   async loadDefinitions(protocol: ProtocolConfig, language = 'en'): Promise<void> {
     // Resolve fetch strategy from remote config
@@ -217,6 +217,29 @@ function parseGithubContent(data: any): Question[] {
  * Output:
  *   https://api.github.com/repos/ORG/REPO/contents/PATH/NAME/NAME_armt_LANG.json?ref=BRANCH
  */
+/**
+ * Decodes base64 content from the GitHub contents API as UTF-8.
+ *
+ * `atob` alone is not enough: it returns a *binary string* — one character per byte — so a multi-byte
+ * UTF-8 character is split into separate characters. A curly apostrophe (`’`, bytes E2 80 99) comes
+ * out as `â` followed by two control characters, which is why questionnaire text showed up as
+ * "Aesopâs fables" and "Press âStartâ".
+ *
+ * So: take `atob`'s bytes back out and decode them properly.
+ */
+function decodeBase64Utf8(base64: string): string {
+  const binary = atob(base64.replace(/\s/g, ''));
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  if (typeof TextDecoder !== 'undefined') {
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+  // Fallback for runtimes without TextDecoder: percent-encode each byte, which decodeURIComponent
+  // then reads as UTF-8.
+  return decodeURIComponent(
+    Array.from(bytes, (byte) => `%${byte.toString(16).padStart(2, '0')}`).join(''),
+  );
+}
+
 function formatQuestionnaireUri(repository: string, name: string, language: string): string {
   try {
     const url = new URL(repository);
