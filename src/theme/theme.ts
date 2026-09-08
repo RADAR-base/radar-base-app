@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
 import type { ThemeManifest } from '../library/contracts/ManifestSchema';
-import { mix, readableTextColor, relativeLuminance } from './contrast';
+import { mix, readableTextColor, relativeLuminance, withAlpha } from './contrast';
 
 export {
   readableTextColor,
@@ -475,13 +475,43 @@ export interface ThemeColorOverrides {
   tertiary?: string;
 }
 
-/** The palette entries a brand override repaints, per mode. `brand` (primary) covers *both* navies —
- *  the deep `navy900` chrome (header, navbar) and the `navy750` navy (buttons, accents) — so a single
- *  brand color drives the whole 30% navy presence, not just the buttons. */
+/**
+ * The palette entries a brand override repaints, per mode. `brand` (primary) covers *both* navies —
+ * the deep `navy900` chrome (header, navbar) and the `navy750` navy (buttons, accents) — so a single
+ * brand color drives the whole 30% navy presence, not just the buttons.
+ *
+ * Dark mode also repaints `navy700`, which is that mode's `button.background`. Without it a brand
+ * override moved the header (`navy900`) but left every primary button on a fixed mid navy, so the two
+ * visibly disagreed — the questionnaire's brand read lighter than the header above it.
+ */
 type BrandSlot = 'primary' | 'secondary' | 'tertiary';
 const BRAND_SLOTS: Record<ThemeMode, Record<BrandSlot, (keyof typeof palette)[]>> = {
   light: { primary: ['navy750', 'navy900'], secondary: ['blue600'], tertiary: ['teal650'] },
-  dark: { primary: ['navy900'], secondary: ['navy750'], tertiary: ['teal650'] },
+  dark: { primary: ['navy900', 'navy700'], secondary: ['navy750'], tertiary: ['teal650'] },
+};
+
+/**
+ * Translucent palette entries derived from a brand slot — disabled/loading button fills, the navbar
+ * shadow, the progress-bar track.
+ *
+ * They can't go in `BRAND_SLOTS`: that swaps a palette value for the override *verbatim*, which would
+ * turn `rgba(44, 79, 107, 0.3)` into an opaque brand fill and make disabled buttons look enabled.
+ * Listing the alpha here instead re-applies it to the new color.
+ */
+const BRAND_ALPHA_SLOTS: Record<
+  ThemeMode,
+  { entry: keyof typeof palette; slot: BrandSlot; alpha: number }[]
+> = {
+  light: [
+    { entry: 'navy750a30', slot: 'primary', alpha: 0.3 },
+    { entry: 'navy750a80', slot: 'primary', alpha: 0.8 },
+    { entry: 'teal650a25', slot: 'tertiary', alpha: 0.25 },
+  ],
+  dark: [
+    { entry: 'navy700a30', slot: 'primary', alpha: 0.3 },
+    { entry: 'navy700a80', slot: 'primary', alpha: 0.8 },
+    { entry: 'teal650a25', slot: 'tertiary', alpha: 0.25 },
+  ],
 };
 
 /** Deep-clone `value`, replacing any leaf string found in `swaps` with its mapped color. */
@@ -582,6 +612,11 @@ export function getColorTokens(mode: ThemeMode, overrides?: ThemeColorOverrides)
     const next = resolved[slot];
     if (next) for (const entry of slots[slot]) swaps[palette[entry]] = next;
   }
+  // Translucent variants of the same slots, re-applied at their own alpha — see `BRAND_ALPHA_SLOTS`.
+  for (const { entry, slot, alpha } of BRAND_ALPHA_SLOTS[mode]) {
+    const next = resolved[slot];
+    if (next) swaps[palette[entry]] = withAlpha(next, alpha);
+  }
   const themed = Object.keys(swaps).length ? deepReplace(base, swaps) : base;
   const readable = withReadableText(themed);
   // Give card surfaces a faint wash of the brand accent (10% color = the manifest's "pop"), so cards
@@ -674,14 +709,43 @@ export const taskStatusColors = {
 /**
  * Geometry + fixed colors for the calendar day-timeline rail (`CalendarTaskView`). `grey` is the
  * not-ready line/ring (reads in both themes); the "reached" color is the theme navy in light mode and
- * `reachedDark` (a light blue) in dark mode so the line/rings don't vanish on the dark page.
+ * `calendarChrome` below in dark mode, so the rail matches the day selector above it.
  */
 export const calendarRail = {
   nodeSize: 30,
   lineWidth: 6,
   grey: '#A8A9B2', // neutral/600
-  reachedDark: '#A8C4E0', // light blue — the "reached" rail color in dark mode
 } as const;
+
+/**
+ * The navy shared by the calendar's day selector and its timeline rail.
+ *
+ * This is simply `header.headerBackground` — the same token the page header and navbar use — so the
+ * calendar's chrome is the app's chrome rather than a colour of its own. It follows a manifest brand
+ * (carrying the dark-mode guard that darkens a too-light brand) and, with no brand, resolves to
+ * `navy750` in light and `navy900` in dark.
+ *
+ * It deliberately isn't lightened for dark mode. Lifting it made the selector read as a different,
+ * bluer navy than the header above it; the navbar sits at this same value on the same page and reads
+ * fine, so matching matters more here than standing out.
+ */
+export function calendarChrome(headerBackground: string): string {
+  return headerBackground;
+}
+
+/** Accent the calendar falls back to when the manifest sets none (cyan/300). */
+export const CALENDAR_DEFAULT_ACCENT = '#7EC8E8';
+
+/**
+ * The timeline rail's "reached" colour — the accent blended half-and-half over the calendar chrome.
+ *
+ * This is the same mix as the selected day in the date picker, deliberately: the rail then reads as
+ * part of that control rather than a separate line, and it lands a step lighter than the chrome, which
+ * a 6px line and small rings need in order to be visible at all on a dark page.
+ */
+export function calendarRailColor(headerBackground: string, accent: string): string {
+  return mix(calendarChrome(headerBackground), accent, 0.5);
+}
 
 /**
  * Adapts the Figma color tokens to the SDUI engine's `ThemeManifest` shape

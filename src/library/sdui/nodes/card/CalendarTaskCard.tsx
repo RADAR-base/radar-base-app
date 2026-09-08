@@ -11,7 +11,15 @@ import StateMissedIcon from '../../../../theme/icons/statemissed.svg';
 import StateNotReadyIcon from '../../../../theme/icons/statenotready.svg';
 import DurationIcon from '../../../../theme/icons/duration.svg';
 
-import { fontFamily, tracking, getColorTokens, layout as layoutTokens, cardShadow, withAlpha } from '../../../../theme/theme';
+import {
+  fontFamily,
+  tracking,
+  getColorTokens,
+  layout as layoutTokens,
+  cardShadow,
+  withAlpha,
+  taskStatusColors,
+} from '../../../../theme/theme';
 import type { SDUIContext } from '../../types';
 import { TYPE_COLORS, TASK_TINT, type TaskCardType } from './TaskCardNode';
 import { TaskIcon } from './TaskIcon';
@@ -20,57 +28,18 @@ import { TaskIcon } from './TaskIcon';
  *  home task list, the calendar keeps *all* cards for the day — completed and expired included. */
 export type CalendarTaskState = 'available' | 'done' | 'missed' | 'notReady';
 
-const NEW_TASK_GREEN = '#9CB167'; // color/green/200
-
 /**
- * Per-state "task progress" card (Figma 3753:5144 / 5158 / 5172): a pastel card in the state hue, a
- * light-tint badge circle holding a semantic icon, a mid-shade label, a dark-shade name, and a white
- * pill with mid-shade text. Fixed colors (like `toDoStatus`/`dataWheel`) — they don't vary by
- * light/dark, so the text is a fixed dark shade that reads on the fixed pastel (all clear WCAG AA).
+ * Per-state content for the "task progress" cards (Figma 3753:5144 / 5158 / 5172): just the badge icon
+ * and the copy. All colors come from the shared `taskStatusColors` in the theme (also used by the
+ * calendar rail dots), so the palette lives in one place.
  */
-const STATE_BADGE: Record<
+const STATE_META: Record<
   Exclude<CalendarTaskState, 'available'>,
-  {
-    Icon: ComponentType<SvgProps>;
-    cardBg: string;
-    circle: string;
-    label: string;
-    labelColor: string;
-    nameColor: string;
-    pillTextColor: string;
-    pillPrefix: string;
-  }
+  { Icon: ComponentType<SvgProps>; label: string; pillPrefix: string }
 > = {
-  done: {
-    Icon: StateDoneIcon,
-    cardBg: '#C0DD97', // green/100
-    circle: '#E3FAE4', // light green
-    label: 'Completed',
-    labelColor: '#639922', // green/400
-    nameColor: '#27500A', // green/800
-    pillTextColor: '#639922', // green/400
-    pillPrefix: 'Done at',
-  },
-  missed: {
-    Icon: StateMissedIcon,
-    cardBg: '#7EC8E8', // sky/200
-    circle: '#E3F4FA', // sky/50
-    label: 'We missed you',
-    labelColor: '#1778A0', // sky/600
-    nameColor: '#0E5474', // sky/800
-    pillTextColor: '#2196C4', // sky/500
-    pillPrefix: 'Task Expired at',
-  },
-  notReady: {
-    Icon: StateNotReadyIcon,
-    cardBg: '#CACBD4', // neutral/500
-    circle: '#F6F5F8', // neutral/400
-    label: 'Not ready yet',
-    labelColor: '#79787F', // neutral/800
-    nameColor: '#28313B', // slate surface-mild
-    pillTextColor: '#79787F', // neutral/800
-    pillPrefix: 'Starts in',
-  },
+  done: { Icon: StateDoneIcon, label: 'Completed', pillPrefix: 'Done at' },
+  missed: { Icon: StateMissedIcon, label: 'We missed you', pillPrefix: 'Task Expired at' },
+  notReady: { Icon: StateNotReadyIcon, label: 'Not ready yet', pillPrefix: 'Starts at' },
 };
 
 export interface CalendarTaskCardProps {
@@ -94,11 +63,13 @@ export interface CalendarTaskCardProps {
  *
  * `available` uses the study-configurable `TaskIcon` (type-colored badge) with time + name + "New
  * Task!" + two type-colored info pills. `done`/`missed`/`notReady` are pastel "task progress" cards
- * (see {@link STATE_BADGE}) — a light badge + semantic icon, a state label, the name, and a white pill.
+ * (see {@link STATE_META} + `taskStatusColors`) — a light badge + semantic icon, a state label, the
+ * name, and a white pill.
  */
 export function CalendarTaskCard(props: CalendarTaskCardProps) {
   const { context, state, taskType, taskName, time, duration, expirationTime, newTask, iconUrl } = props;
   const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
+  const isDark = (context.colorScheme ?? 'light') === 'dark';
 
   if (state === 'available') {
     // Info pills take the task-type color (15% tint fill, full-color text/icon) — same as TaskCardNode.
@@ -111,13 +82,17 @@ export function CalendarTaskCard(props: CalendarTaskCardProps) {
           <View style={styles.content}>
             <View style={styles.topRow}>
               <View style={styles.nameCol}>
-                <Text style={styles.time}>{time}</Text>
+                <Text
+                  style={[styles.time, { color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }]}
+                >
+                  {time}
+                </Text>
                 <Text style={[styles.name, { color: tokens.text.primary }]} numberOfLines={1}>
                   {taskName}
                 </Text>
               </View>
               {newTask && (
-                <View style={[styles.newBadge, { backgroundColor: NEW_TASK_GREEN }]}>
+                <View style={[styles.newBadge, { backgroundColor: taskStatusColors.newBadge }]}>
                   <Text style={styles.newBadgeText}>New Task!</Text>
                 </View>
               )}
@@ -141,25 +116,40 @@ export function CalendarTaskCard(props: CalendarTaskCardProps) {
     );
   }
 
-  const badge = STATE_BADGE[state];
-  const Icon = badge.Icon;
+  const meta = STATE_META[state];
+  const c = taskStatusColors[state];
+  const Icon = meta.Icon;
+  const m = isDark ? c.dark : c.light;
+  // Dark mode inverts the badge — the solid icon color becomes the circle fill and the pale chip
+  // color becomes the glyph, so it reads clearly against the dark card. Light mode keeps chip + solid.
+  const circleBg = isDark ? c.icon : c.circle;
+  const iconColor = isDark ? c.circle : c.icon;
+  // Headline color: the state's `label` tone, except not-ready — its grey label is too faint on its
+  // grey card, so that one takes the darker `name` tone (matching Figma 3734:4958).
+  const statusColor = state === 'notReady' ? m.name : m.label;
   return (
-    <View style={[styles.card, { backgroundColor: badge.cardBg }]}>
+    <View style={[styles.card, { backgroundColor: m.card }]}>
       <View style={styles.row}>
-        <View style={[styles.stateBadge, { backgroundColor: badge.circle }]}>
-          <Icon width={36} height={36} />
+        <View style={[styles.stateBadge, { backgroundColor: circleBg }]}>
+          <Icon width={36} height={36} color={iconColor} />
         </View>
-        <View style={styles.content}>
-          <View style={styles.nameCol}>
-            <Text style={[styles.stateLabel, { color: badge.labelColor }]}>{badge.label}</Text>
-            <Text style={[styles.name, { color: badge.nameColor }]} numberOfLines={1}>
-              {taskName}
-            </Text>
-          </View>
-          <View style={styles.pillRow}>
+        <View style={styles.stateContent}>
+          <Text style={[styles.stateLabel, { color: statusColor }]} numberOfLines={1}>
+            {meta.label}
+          </Text>
+          {/* Task name and timing both drop to white pills beneath the status headline, so the state is
+              what reads first (Figma 3734:4925 / 4943 / 4958). Stacked rather than side by side, which
+              gives a long name (e.g. "Record Blood Pressure") the full content width before it has to
+              truncate. */}
+          <View style={styles.statePillStack}>
             <View style={styles.statePill}>
-              <Text style={[styles.statePillText, { color: badge.pillTextColor }]}>
-                {`${badge.pillPrefix} ${time}`}
+              <Text style={[styles.statePillText, { color: c.pillText }]} numberOfLines={1}>
+                {taskName}
+              </Text>
+            </View>
+            <View style={styles.statePill}>
+              <Text style={[styles.statePillText, { color: c.pillText }]} numberOfLines={1}>
+                {`${meta.pillPrefix} ${time}`}
               </Text>
             </View>
           </View>
@@ -182,6 +172,9 @@ const styles = StyleSheet.create({
     gap: 16,
     width: '100%',
   },
+  // Fixed rather than stretched to the card height: a stretching square grows with the (now taller)
+  // stacked text block, which both bulks up the card and steals width from the headline — pushing it to
+  // wrap and grow the card again. A fixed size breaks that loop.
   stateBadge: {
     width: 64,
     height: 64,
@@ -227,9 +220,11 @@ const styles = StyleSheet.create({
     letterSpacing: tracking.bold,
     includeFontPadding: false,
   },
+  // The state is the card's headline — everything else drops to a pill beneath it.
   stateLabel: {
-    fontSize: 12,
-    lineHeight: 14,
+    fontSize: 24,
+    // Taller than the font size so tall glyphs/descenders aren't clipped on Android ("y" in "yet").
+    lineHeight: 28,
     fontFamily: fontFamily.bold,
     fontWeight: '700',
     letterSpacing: tracking.bold,
@@ -271,7 +266,24 @@ const styles = StyleSheet.create({
     letterSpacing: tracking.regular,
     includeFontPadding: false,
   },
+  // Like `content`, but with a tighter headline→pills gap: the status card stacks two pills, so the
+  // shared 9px gap made it noticeably taller than the available card.
+  stateContent: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4,
+    justifyContent: 'center',
+  },
+  // Stacked pills, each hugging its own text. The 4px gap matches the available card's `pillRow`, so
+  // both card variants share the same pill rhythm.
+  statePillStack: {
+    alignItems: 'flex-start',
+    gap: 4,
+    maxWidth: '100%',
+  },
+  // Box matches the available card's `pill`: same padding tokens, min height and pill radius.
   statePill: {
+    maxWidth: '100%',
     minHeight: 20,
     alignItems: 'center',
     justifyContent: 'center',
@@ -280,9 +292,10 @@ const styles = StyleSheet.create({
     borderRadius: layoutTokens.radiusPill,
     backgroundColor: '#FFFFFF',
   },
+  // Matches the available card's `pillText` so both card variants read at the same size.
   statePillText: {
-    fontSize: 10,
-    lineHeight: 12,
+    fontSize: 12,
+    lineHeight: 14,
     fontFamily: fontFamily.regular,
     letterSpacing: tracking.regular,
     includeFontPadding: false,
