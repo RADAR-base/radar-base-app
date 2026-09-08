@@ -9,7 +9,6 @@ import type {
   EventBus,
   AppServerService,
   QuestionnaireDataService,
-  MultiLanguageText,
 } from '../types';
 import { EVENTS } from './EventBus';
 import { ScheduleServiceBase } from './ScheduleService';

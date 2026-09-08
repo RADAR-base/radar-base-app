@@ -119,8 +119,6 @@ export function CalendarTaskView({ context, date }: CalendarTaskViewProps) {
       expirationTime: formatExpiration(task),
       questionNumber: task.nQuestions ? `x${task.nQuestions}` : undefined,
       taskTimestamp: task.timestamp,
-      startText: task.startText,
-      endText: task.endText,
     });
   };
 

@@ -113,8 +113,6 @@ export function TaskDayList({ context, date, variant, filter = NO_FILTER, idPref
       expirationTime: formatExpiration(current),
       questionNumber: current.nQuestions ? `x${current.nQuestions}` : undefined,
       taskTimestamp: current.timestamp,
-      startText: current.startText,
-      endText: current.endText,
     });
   };
 
