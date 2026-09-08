@@ -5,7 +5,7 @@ import type { Answer, Question, QuestionnaireResult, QuestionTimestamp } from '.
 import type { NodeProps } from '../types';
 import { QuestionRenderer } from './questionnaire/QuestionRenderer';
 import { evaluateBranchingLogic } from './questionnaire/branchingLogic';
-import { fontFamily, cardShadow } from '../../../theme/theme';
+import { fontFamily, cardShadow, getColorTokens, withAlpha, layout as layoutTokens } from '../../../theme/theme';
 
 const ON_PRIMARY = '#FFFFFF';
 
@@ -140,12 +140,18 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
 
   const fullScreen = node.fullScreen === true;
 
-  const theme = context.theme;
-  const primary = theme.primaryColor;
-  const surface = theme.surfaceColor ?? '#FFFFFF';
-  const text = theme.textColor ?? '#000';
-  const textSecondary = theme.textSecondaryColor ?? '#6D6D80';
-  const radius = theme.button?.borderRadius ?? 8;
+  // Theme off the shared design tokens (which honor the manifest `brandColors`), the same as the rest
+  // of the app — not the legacy flat `theme.primaryColor`/`surfaceColor` fields. This makes the
+  // questionnaire brand-colored and dark-mode correct.
+  const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
+  const primary = tokens.button.background; // brand navy (repainted by brandColors.brand)
+  const onPrimary = tokens.button.text; //     label color on the primary button
+  const surface = tokens.card.background; //    branded card surface, matching the app's other cards
+  const text = tokens.text.primary;
+  const textSecondary = withAlpha(tokens.text.primary, 0.55); // muted copy (intro, progress, notes)
+  const disabled = tokens.button.disabled; //   disabled button fill / muted "Previous"
+  const hairline = withAlpha(tokens.text.primary, 0.12); // progress track + nav divider
+  const radius = layoutTokens.radiusCard;
 
   const containerStyle = fullScreen
     ? [styles.fullContainer, { backgroundColor: surface }]
@@ -207,7 +213,7 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
         <Text style={[styles.progressText, { color: textSecondary }]}>
           {currentIndex + 1} / {total}
         </Text>
-        <View style={styles.progressBar}>
+        <View style={[styles.progressBar, { backgroundColor: hairline }]}>
           <View style={[styles.progressFill, { width: `${progress}%`, backgroundColor: primary }]} />
         </View>
       </View>
@@ -229,7 +235,7 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
       </ScrollView>
 
       {/* Navigation */}
-      <View style={styles.navRow}>
+      <View style={[styles.navRow, { borderTopColor: hairline }]}>
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="Previous question"
@@ -237,7 +243,7 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
           onPress={goPrevious}
           style={[styles.navButton, currentIndex === 0 && styles.navButtonDisabled]}
         >
-          <Text style={[styles.navButtonText, { color: currentIndex === 0 ? '#ccc' : primary }]}>
+          <Text style={[styles.navButtonText, { color: currentIndex === 0 ? disabled : primary }]}>
             Previous
           </Text>
         </TouchableOpacity>
@@ -249,10 +255,10 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
           onPress={goNext}
           style={[
             styles.primaryButton,
-            { backgroundColor: canProceed ? primary : '#ccc', borderRadius: radius },
+            { backgroundColor: canProceed ? primary : disabled, borderRadius: radius },
           ]}
         >
-          <Text style={styles.primaryButtonText}>
+          <Text style={[styles.primaryButtonText, { color: onPrimary }]}>
             {currentIndex === total - 1 ? 'Finish' : 'Next'}
           </Text>
         </TouchableOpacity>

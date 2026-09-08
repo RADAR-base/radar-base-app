@@ -8,6 +8,7 @@ import type {
   EventBus,
   AppServerService,
   QuestionnaireDataService,
+  MultiLanguageText,
 } from '../types';
 import { EVENTS } from './EventBus';
 import { ScheduleServiceBase } from './ScheduleService';
@@ -62,6 +63,9 @@ export class AppserverScheduleService extends ScheduleServiceBase {
   }
 
   async fetchSchedule(): Promise<void> {
+    // 0. Make sure the app server knows this project/subject before asking it for their data.
+    await this.ensureRegistered();
+
     // 1. Fetch protocol (assessment catalog) — drives questionnaire definitions
     await this.fetchProtocol();
 
@@ -72,6 +76,27 @@ export class AppserverScheduleService extends ScheduleServiceBase {
     await this.persist();
     await this.refreshStates();
     this.bus.emit(EVENTS.SCHEDULE_UPDATED, { reason: 'schedule_fetched' });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Registration — the app server must know the subject before it will serve data
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Registers the project and subject with the app server (`AppServerService.init`), creating either
+   * if it 404s. Without this the subject is unknown to the app server and every subsequent request
+   * for their data comes back 404 (schedule) or empty (protocol), even with a perfectly valid token.
+   *
+   * Runs on each fetch rather than once: `init` doubles as the "app opened" ping, refreshing the
+   * subject's `lastOpened`, timezone, language and FCM token. Best-effort — a registration failure
+   * still lets the fetches below fall through to cached data.
+   */
+  private async ensureRegistered(): Promise<void> {
+    try {
+      await this.appServer.init();
+    } catch (e) {
+      this.logger.log('Failed to register subject with appserver, continuing: ' + e);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -87,6 +112,17 @@ export class AppserverScheduleService extends ScheduleServiceBase {
         );
         return Promise.race([fetchProtocol, timeout]);
       });
+
+      // An empty 2xx means the project has no protocol provisioned — a real answer, not a failure.
+      // Say so plainly and keep whatever's cached, rather than dereferencing null below.
+      if (!protocol) {
+        this.logger.log(
+          'Appserver returned no protocol for this project — it likely has no questionnaires ' +
+          'configured. Keeping cached assessments (if any).',
+        );
+        await this.restoreCachedProtocol();
+        return;
+      }
 
       // Skip questionnaire re-fetch if protocol version hasn't changed
       if (!this.cachedProtocolVersion) {
@@ -109,16 +145,21 @@ export class AppserverScheduleService extends ScheduleServiceBase {
       } else {
         this.logger.log(`Protocol version ${protocol.version} unchanged, skipping definition fetch`);
       }
+
     } catch (e) {
       this.logger.log('Failed to fetch protocol after retries, using cache: ' + e);
-      // Restore assessment map from cached protocol
-      const cached = await this.storage.get<ProtocolConfig>(PROTOCOL_CACHE_KEY);
-      if (cached?.protocols) {
-        this.assessmentMap.clear();
-        for (const assessment of cached.protocols) {
-          if (assessment.name) this.assessmentMap.set(assessment.name, assessment);
-        }
-      }
+      await this.restoreCachedProtocol();
+    }
+  }
+
+
+  /** Repopulates the assessment map from the last protocol we successfully stored. */
+  private async restoreCachedProtocol(): Promise<void> {
+    const cached = await this.storage.get<ProtocolConfig>(PROTOCOL_CACHE_KEY);
+    if (!cached?.protocols) return;
+    this.assessmentMap.clear();
+    for (const assessment of cached.protocols) {
+      if (assessment.name) this.assessmentMap.set(assessment.name, assessment);
     }
   }
 
@@ -150,6 +191,12 @@ export class AppserverScheduleService extends ScheduleServiceBase {
 // Server task mapping
 // ---------------------------------------------------------------------------
 
+/** Pick the English value from a `MultiLanguageText`, falling back to the first available key. */
+function resolveMLText(mlt?: MultiLanguageText): string | undefined {
+  if (!mlt) return undefined;
+  return mlt.en ?? mlt[Object.keys(mlt)[0]] ?? undefined;
+}
+
 function mapServerTask(task: any, assessments: Map<string, AssessmentConfig>): Task {
   const timestamp = task.timestamp || 0;
   const completionWindow = task.completionWindow || 86_400_000;
@@ -165,7 +212,18 @@ function mapServerTask(task: any, assessments: Map<string, AssessmentConfig>): T
     id: String(task.id ?? `${name}_${timestamp}`),
     name,
     title: name,
-    description: task.description || '',
+    // Instruction copy, most purpose-written first: `startText` is authored for this screen; the
+    // questionnaire's own leading `info` block is the next best thing (it's the preamble participants
+    // would have read anyway); the notification body is phrased as a push but is still a real
+    // sentence; the server task's description is the last resort.
+    // The instructions page is gated on `startText`, so that's what it shows. The questionnaire's own
+    // leading `info` field is deliberately NOT used here — it belongs to the questionnaire and pulling
+    // it forward put the info screen's copy on the instructions page.
+    description:
+      resolveMLText(assessment?.startText) ||
+      resolveMLText(assessment?.protocol?.notification?.text) ||
+      task.description ||
+      '',
     timestamp,
     completionWindow,
     estimatedCompletionTime: assessment?.estimatedCompletionTime ?? task.estimatedCompletionTime,
@@ -180,9 +238,14 @@ function mapServerTask(task: any, assessments: Map<string, AssessmentConfig>): T
     order: assessment?.order ?? task.order ?? 0,
     warning: task.warning,
     icon: assessment?.icon ?? task.icon,
+    // The protocol's declared type — without this the cards fall back to guessing from the title, so
+    // every speech/cognitive task reads as a questionnaire.
+    taskType: assessment?.questionnaire?.type ?? task.type,
     reminderTimestamp: task.reminderTimestamp,
     requiresInClinicCompletion: task.requiresInClinicCompletion ?? false,
     notifications: task.notifications || [],
+    startText: resolveMLText(assessment?.startText),
+    endText: resolveMLText(assessment?.endText),
   };
 }
 

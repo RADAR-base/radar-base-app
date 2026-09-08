@@ -114,7 +114,12 @@ export class DefaultQuestionnaireDataService implements QuestionnaireDataService
 
   private async fetchQuestionnaire(assessment: AssessmentConfig, language: string): Promise<Question[]> {
     const metadata = assessment.questionnaire!;
-    const uri = formatQuestionnaireUri(metadata.repository!, metadata.name, language);
+    // A `repository` that already points at a definition file (e.g. a raw.githubusercontent.com
+    // URL ending in `…_armt.json`) is fetched directly. Otherwise it's treated as a directory and
+    // the RADAR-Questionnaire-style GitHub API path is built from it (name + language suffix).
+    const uri = metadata.repository!.endsWith('.json')
+      ? metadata.repository!
+      : formatQuestionnaireUri(metadata.repository!, metadata.name, language);
 
     this.logger.log(`Fetching questionnaire for ${assessment.name} from ${uri}`);
     const response = await fetch(uri);
@@ -123,8 +128,7 @@ export class DefaultQuestionnaireDataService implements QuestionnaireDataService
     const data = await response.json();
     // GitHub API returns { content: base64 } for contents endpoint
     if (data.content && data.encoding === 'base64') {
-      const decoded = atob(data.content.replace(/\n/g, ''));
-      return JSON.parse(decoded) as Question[];
+      return JSON.parse(decodeBase64Utf8(data.content)) as Question[];
     }
     // Direct raw content
     if (Array.isArray(data)) return data as Question[];
@@ -154,6 +158,29 @@ export class DefaultQuestionnaireDataService implements QuestionnaireDataService
  * Output:
  *   https://api.github.com/repos/ORG/REPO/contents/PATH/NAME/NAME_armt_LANG.json?ref=BRANCH
  */
+/**
+ * Decodes base64 content from the GitHub contents API as UTF-8.
+ *
+ * `atob` alone is not enough: it returns a *binary string* — one character per byte — so a multi-byte
+ * UTF-8 character is split into separate characters. A curly apostrophe (`’`, bytes E2 80 99) comes
+ * out as `â` followed by two control characters, which is why questionnaire text showed up as
+ * "Aesopâs fables" and "Press âStartâ".
+ *
+ * So: take `atob`'s bytes back out and decode them properly.
+ */
+function decodeBase64Utf8(base64: string): string {
+  const binary = atob(base64.replace(/\s/g, ''));
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  if (typeof TextDecoder !== 'undefined') {
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+  // Fallback for runtimes without TextDecoder: percent-encode each byte, which decodeURIComponent
+  // then reads as UTF-8.
+  return decodeURIComponent(
+    Array.from(bytes, (byte) => `%${byte.toString(16).padStart(2, '0')}`).join(''),
+  );
+}
+
 function formatQuestionnaireUri(repository: string, name: string, language: string): string {
   try {
     const url = new URL(repository);

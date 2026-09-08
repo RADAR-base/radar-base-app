@@ -108,6 +108,7 @@ export function TaskDayList({ context, date, variant, filter = NO_FILTER, idPref
       description: current.description,
       taskType: inferTaskType(current.title, current.taskType),
       startText: current.startText,
+      endText: current.endText,
       duration: current.estimated_minutes > 0 ? `${current.estimated_minutes} min` : undefined,
       expirationTime: formatExpiration(current),
       questionNumber: current.nQuestions ? `x${current.nQuestions}` : undefined,

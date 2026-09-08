@@ -96,6 +96,7 @@ export {
 } from './nodes';
 
 // Questionnaire sub-components (for custom questionnaire UIs)
+export type { SpeechRecording } from './nodes/questionnaire';
 export {
   RadioInput,
   CheckboxInput,
@@ -107,4 +108,3 @@ export {
   QuestionRenderer,
   evaluateBranchingLogic,
 } from './nodes/questionnaire';
-export type { SpeechRecording } from './nodes/questionnaire';

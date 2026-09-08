@@ -114,6 +114,7 @@ export function CalendarTaskView({ context, date }: CalendarTaskViewProps) {
       description: task.description,
       taskType: inferTaskType(task.title, task.taskType),
       startText: task.startText,
+      endText: task.endText,
       duration: task.estimated_minutes > 0 ? `${task.estimated_minutes} min` : undefined,
       expirationTime: formatExpiration(task),
       questionNumber: task.nQuestions ? `x${task.nQuestions}` : undefined,

@@ -41,11 +41,11 @@ export const HeaderSchema = z
     textColor: z.string().optional(),
     showBackButton: z.boolean().optional(),
     showSettings: z.boolean().optional(),
+    /** Leading header icon: `true` (default) shows the profile picture, `false` the RadarBase wordmark. */
+    profileIcon: z.boolean().optional(),
     /** Home-tab greeting "Edit" affordance. Defaults to shown; set `false` to hide it. (Only the home
      *  tab renders the greeting — other tabs never show it regardless.) */
     showEditButton: z.boolean().optional(),
-    /** Leading header icon: `true` (default) shows the profile picture, `false` the RadarBase wordmark. */
-    profileIcon: z.boolean().optional(),
     /** When true, appends the signed-in user's name (from `SDUIContext.template.user`) after `title`. */
     showName: z.boolean().optional(),
   })
