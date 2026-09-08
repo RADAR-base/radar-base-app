@@ -45,19 +45,25 @@ export function buildHeaderParts(node: Node, context: SDUIContext): HeaderParts 
       : transparent
         ? readableTextColor(pageBg, { preferred: panelColor })
         : readableTextColor(panelColor, { preferred: pageBg });
-  // Swap the button's fill/icon when transparent: navy chip + white icon → white chip + navy icon.
+  // Header action buttons are brand-colored, and which half takes the brand depends on the variant
+  // (same in light and dark): the home page (colored panel) gets a white chip with a brand-colored
+  // icon; every other page (flat/transparent header) gets a brand-colored chip with a white icon.
+  // The brand color as the theme actually applies it (the header/panel surface) — not the raw
+  // `brandColors.brand`. So the buttons track the same value as the chrome, including the dark-mode
+  // guard that swaps a too-light brand for the theme's near-black (see `getColorTokens`).
+  const brand = tokens.header.headerBackground;
   const buttonBackgroundColor =
     typeof node.buttonBackgroundColor === 'string'
       ? node.buttonBackgroundColor
       : transparent
-        ? tokens.header.buttonIcon
-        : tokens.header.buttonBackground;
+        ? brand
+        : '#FFFFFF';
   const buttonIconColor =
     typeof node.buttonIconColor === 'string'
       ? node.buttonIconColor
       : transparent
-        ? tokens.header.buttonBackground
-        : tokens.header.buttonIcon;
+        ? '#FFFFFF'
+        : brand;
   const showProfileIcon = node.profileIcon !== false;
 
   // Fixed navy backdrop for the (non-theming white) profile glyph. Filled disc when transparent so
