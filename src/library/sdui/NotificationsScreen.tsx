@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, useColorScheme, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { tracking, fontFamily, getColorTokens, layout, type ThemeColorOverrides, type ThemeMode } from '../../theme/theme';
+import { tracking, fontFamily, getColorTokens, layout, resolveBackground, type ThemeColorOverrides, type ThemeMode } from '../../theme/theme';
 import EnableNotificationsIllustration from '../../theme/icons/enablenotifications.svg';
 import { PillButton } from './PillButton';
 
@@ -50,7 +50,9 @@ export function NotificationsScreen({
   const resolvedMode: ThemeMode = mode ?? (deviceScheme === 'dark' ? 'dark' : 'light');
   const tokens = getColorTokens(resolvedMode, brandColors);
 
-  const heading = tokens.button.background; // navy — title + the illustration's brand-tracking navy
+  // Brand-colored title + illustration. Raw brand so it tracks the override in *both* themes — in dark
+  // mode the theme's `button.background` is a fixed navy that doesn't follow the brand.
+  const heading = brandColors?.brand ?? tokens.button.background;
   const bodyText = tokens.card.hint.text;
 
   const illoWidth = Math.min(width - 64, ILLO_W);
@@ -61,7 +63,7 @@ export function NotificationsScreen({
       style={[
         styles.root,
         {
-          backgroundColor: tokens.background.primary,
+          backgroundColor: resolveBackground({ brandColors }, resolvedMode),
           paddingTop: insets.top + 16,
           paddingBottom: insets.bottom + 16,
         },
