@@ -15,6 +15,7 @@ import QuestionnaireIcon from '../../theme/icons/questionnaire.svg';
 import SpeechIcon from '../../theme/icons/speech.svg';
 import PhysicalIcon from '../../theme/icons/physical.svg';
 import MedicationIcon from '../../theme/icons/medicine.svg';
+import CognitiveIcon from '../../theme/icons/brain.svg';
 import ExpiryIcon from '../../theme/icons/expiry.svg';
 import DurationIcon from '../../theme/icons/duration.svg';
 import QuantityIcon from '../../theme/icons/quantity.svg';
@@ -22,6 +23,8 @@ import {
   fontFamily,
   getColorTokens,
   layout as layoutTokens,
+  readableTextColor,
+  resolveBackground,
   tracking,
   withAlpha,
   type ThemeColorOverrides,
@@ -37,6 +40,7 @@ const TASK_ICON: Record<TaskCardType, ComponentType<SvgProps>> = {
   speech: SpeechIcon,
   physical: PhysicalIcon,
   medication: MedicationIcon,
+  cognitive: CognitiveIcon,
 };
 
 export interface TaskInstructionsScreenProps {
@@ -94,8 +98,16 @@ export function TaskInstructionsScreen({
 
   // Same per-type palette as the home task card (`TYPE_COLORS`): solid `badge`, light `pillBg`, `accent`.
   const c = TYPE_COLORS[taskType];
-  const brand = tokens.button.background; // navy — title, primary button, outline
-  const onBrand = tokens.navbar.text.primary; // white — primary button label
+  // Title / primary button / outline. Raw brand so it tracks the override in *both* themes — in dark
+  // mode the theme's `button.background` is a fixed navy that never follows the brand, which left this
+  // page out of step with the questionnaire it opens into.
+  const brand = brandColors?.brand ?? tokens.button.background;
+  // Primary button label: white in light mode; in dark mode whatever reads on the brand fill, so a
+  // pale brand still gets a legible label (matches `PillButton`).
+  const onBrand =
+    resolvedMode === 'dark'
+      ? readableTextColor(brand, { preferred: tokens.navbar.text.primary })
+      : tokens.navbar.text.primary;
   const Icon = TASK_ICON[taskType];
 
   // Idle "instruction" animation: a gentle bob + slight sway, looping — a stand-in for real animated
@@ -131,7 +143,7 @@ export function TaskInstructionsScreen({
       style={[
         styles.root,
         {
-          backgroundColor: tokens.background.primary,
+          backgroundColor: resolveBackground({ brandColors }, resolvedMode),
           paddingTop: topInset,
           paddingBottom: bottomInset,
         },

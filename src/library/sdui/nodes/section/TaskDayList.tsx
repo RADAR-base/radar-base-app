@@ -5,6 +5,7 @@ import { EVENTS } from '../../../../core/EventBus';
 import type { TaskView as Task } from '../../../../types';
 import { layout as layoutTokens } from '../../../../theme/theme';
 import { TaskCardNode, type TaskCardType } from '../card/TaskCardNode';
+import { normalizeTaskType } from '../card/taskTypes';
 import { ToDoStatusNode } from '../card/ToDoStatusNode';
 import type { Node } from '../../../contracts/NodeSchema';
 import type { SDUIContext } from '../../types';
@@ -36,8 +37,8 @@ export interface TaskDayListProps {
  * (a selected day, under the date selector). Pulls the given day's tasks from `ScheduleService`,
  * renders them as `TaskCardNode`s, and falls back to `ToDoStatusNode` when nothing is open.
  *
- * `protocol.json`'s assessments have no explicit task-type field, so `TaskCardNode`'s `taskType`
- * (questionnaire/speech/physical/medication) is inferred by keyword-matching the task's title.
+ * `TaskCardNode`'s `taskType` comes from the assessment's declared `questionnaire.type`, falling back
+ * to keyword-matching the title when the protocol doesn't declare one — see `inferTaskType`.
  */
 export function TaskDayList({ context, date, variant, filter = NO_FILTER, idPrefix }: TaskDayListProps) {
   const { schedule, eventBus } = useCoreServices();
@@ -105,7 +106,8 @@ export function TaskDayList({ context, date, variant, filter = NO_FILTER, idPref
       assessmentName: current.assessmentName,
       taskName: current.title,
       description: current.description,
-      taskType: inferTaskType(current.title),
+      taskType: inferTaskType(current.title, current.taskType),
+      startText: current.startText,
       duration: current.estimated_minutes > 0 ? `${current.estimated_minutes} min` : undefined,
       expirationTime: formatExpiration(current),
       questionNumber: current.nQuestions ? `x${current.nQuestions}` : undefined,
@@ -149,7 +151,7 @@ export function TaskDayList({ context, date, variant, filter = NO_FILTER, idPref
         const taskNode: Node = {
           id: `tasklist-${task.id}`,
           type: 'TaskCardNode',
-          taskType: inferTaskType(task.title),
+          taskType: inferTaskType(task.title, task.taskType),
           taskName: task.title,
           // Only *available* tasks that haven't been opened yet get the "New Task!" pill — a
           // not-yet-due (greyed-out) task can't be opened, so flagging it "new" would be misleading.
@@ -190,13 +192,21 @@ export function isExpired(task: Task): boolean {
 }
 
 /**
- * Keyword-matches the task title (ultimately the assessment's `name` from `protocol.json`) to a
- * `TaskCardNode` badge category, since `protocol.json` has no explicit task-type field.
+ * Resolves a task's `TaskCardNode` badge category.
+ *
+ * Prefers the type the protocol declares (`TaskView.taskType`, from the assessment's
+ * `questionnaire.type`). Only when that's absent or unrecognised does it fall back to keyword-matching
+ * the title — which can only ever guess, and defaults everything it doesn't recognise to
+ * `questionnaire`.
  */
-export function inferTaskType(title: string): TaskCardType {
+export function inferTaskType(title: string, declaredType?: string | null): TaskCardType {
+  const declared = normalizeTaskType(declaredType);
+  if (declared) return declared;
+
   const lower = title.toLowerCase();
   if (/medication|medicine|pill|drug|dose/.test(lower)) return 'medication';
   if (/speech|voice|record/.test(lower)) return 'speech';
+  if (/cognitive|memory|reaction|brain/.test(lower)) return 'cognitive';
   if (/physical|walk|exercise|activity|steps|fitness/.test(lower)) return 'physical';
   return 'questionnaire';
 }
