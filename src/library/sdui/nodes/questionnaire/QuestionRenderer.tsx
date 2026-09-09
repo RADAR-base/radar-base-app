@@ -30,6 +30,8 @@ interface QuestionRendererProps {
   onContinue?: () => void;
   /** Reports the speech question's phase, so the host can adapt its chrome (e.g. hide its footer). */
   onPhaseChange?: (phase: SpeechPhase, meta?: { transition?: boolean }) => void;
+  /** Speech questions: may the participant play their recording back? Defaults to true. */
+  allowReplay?: boolean;
 }
 
 const DEFAULT_YESNO_CHOICES = [
@@ -50,6 +52,7 @@ export function QuestionRenderer({
   mode,
   onContinue,
   onPhaseChange,
+  allowReplay,
 }: QuestionRendererProps) {
   const isRequired = question.required_field === 'y';
   // Hosts that don't theme their inputs still get something coherent: the brand as the selected fill
@@ -173,6 +176,8 @@ export function QuestionRenderer({
             mode={mode}
             onContinue={onContinue}
             onPhaseChange={onPhaseChange}
+            allowReplay={allowReplay}
+            accentColor={accentColor}
           />
         );
 
