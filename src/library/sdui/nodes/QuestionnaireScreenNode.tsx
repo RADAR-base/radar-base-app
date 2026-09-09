@@ -38,18 +38,82 @@ import { StepSlider } from '../StepSlider';
 const SLIDE_DURATION = 260;
 
 /**
- * Floor for a speech question's passage window — roughly four lines of the 24/30 title type.
+ * Ceiling for a speech question's passage window — around thirteen lines of the 24/30 title type.
  *
- * The passage otherwise takes only what the recording controls leave over, which on a short screen
- * can shrink it to a line or two. Note this trades against the "everything fits" rule: where the
- * controls genuinely need more room than the screen has, this floor wins and the overflow is clipped,
- * because page scrolling is off for speech questions.
+ * Only an upper bound: `titleScroll` is `flexShrink: 1`, so the passage already takes just what the
+ * recording controls leave over and shrinks below this on a short screen. Raising it therefore only
+ * affects screens with room to spare, and can't push the stop button off the page.
  */
-const PASSAGE_MAX_HEIGHT = 300;
+const PASSAGE_MAX_HEIGHT = 400;
 
 
 /** Height of the fade at the edge of the scrollable passage. */
 const PASSAGE_FADE_HEIGHT = 28;
+
+/** Gap between a panel's heading block and its input. */
+const PANEL_GAP = 16;
+
+/**
+ * Vertical space the footer covers: `PillButton`'s 52pt minimum plus the footer's own top padding.
+ *
+ * The footer is positioned over the page rather than laid out above it, so mounting or dropping it
+ * can't resize the panels. Every panel reserves this much instead — whatever screen it is — which is
+ * what keeps the layout identical with the footer up or down. Add the bottom inset at the call site.
+ */
+const FOOTER_RESERVE = 52 + 16;
+
+/**
+ * Standing instruction above a speech question's passage, used when the study authored no
+ * `section_header` for it.
+ *
+ * The passage is just the text to be read — on its own it never says what to do with it, so without
+ * this the screen opens as a wall of prose above a record button. Studies that write their own
+ * `section_header` keep it; this only fills the gap.
+ */
+const SPEECH_DEFAULT_HEADER = 'Read the passage below aloud';
+
+/**
+ * Line under the heading on the speech review screen, where the passage used to be.
+ *
+ * The review screen drops the passage (there's nothing left to read) but keeps the heading, so the
+ * participant still knows which task they're in — this says what the screen is now for.
+ */
+const SPEECH_REVIEW_SUBTEXT = 'Take a listen. You can re-record if you would like another go';
+
+/**
+ * The same line for a study that doesn't allow playback — there's nothing to listen to, so it points
+ * at the only two things the screen still offers.
+ */
+const SPEECH_REVIEW_SUBTEXT_NO_REPLAY =
+  'Your recording is saved. You can re-record if you would like another go';
+
+/**
+ * TESTING: force the no-replay screen on, regardless of what the definition says.
+ *
+ * `allow_replay_speech` isn't in the published questionnaire definitions yet, so flip this to true to
+ * see the no-play-button variant. Leave it false — it's a development switch, not a study setting.
+ */
+const FORCE_NO_REPLAY_FOR_TESTING = false;
+
+/**
+ * Whether a speech question offers playback of the take just recorded.
+ *
+ * Absent means allowed: replay is the default, so definitions written before this field existed keep
+ * the play button. Only an explicit negative removes it, accepted as a real boolean or as one of the
+ * strings REDCap-style definitions use for one ('n', 'no', 'false', '0'), since a JSON definition
+ * that came from a spreadsheet rarely carries true booleans.
+ */
+function isReplayAllowed(question?: Question): boolean {
+  if (FORCE_NO_REPLAY_FOR_TESTING) return false;
+  const raw = question?.allow_replay_speech;
+  if (raw === undefined || raw === null) return true;
+  if (typeof raw === 'boolean') return raw;
+  const value = String(raw).trim().toLowerCase();
+  // An empty string is "unset" rather than "denied" — a blank spreadsheet cell shouldn't silently
+  // strip the button from every speech question in the study.
+  if (value === '') return true;
+  return !['n', 'no', 'false', '0'].includes(value);
+}
 
 /**
  * Accent used when the manifest sets none — Figma's `color/sky/200`, the fill the radio and
@@ -191,6 +255,15 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   const [timestamps, setTimestamps] = useState<Record<string, QuestionTimestamp>>({});
   // Reported by the speech input; drives whether this screen keeps its footer (see `showFooter`).
   const [speechPhase, setSpeechPhase] = useState<SpeechPhase>('idle');
+  /**
+   * Measured height of the review screen's heading, used to centre the controls on the *page* rather
+   * than in the space the heading leaves below it.
+   *
+   * Measuring is safe now that `StepSlider` keeps neighbours mounted: a review panel is laid out while
+   * parked a screen away, so this settles long before that panel slides in. It used to be measured on
+   * the active panel only, which is why it once settled mid-transition.
+   */
+  const [reviewHeaderHeight, setReviewHeaderHeight] = useState(0);
   /** Direction for the next panel slide, armed only by a phase the participant actually triggered. */
   const pendingSlide = useRef<'forward' | 'back' | null>(null);
   const handleSpeechPhase = useCallback((phase: SpeechPhase, meta?: { transition?: boolean }) => {
@@ -233,16 +306,14 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   const isLast = currentIndex === total - 1;
 
   /**
-   * Progress counts only the questions there are to *answer*.
+   * The *count* covers only the questions there are to answer.
    *
    * `info` and `descriptive` fields are preambles and explainers with no input, so counting them made
-   * the header read "1 of 4" on a screen with nothing to do, and the bar jump on a page the
-   * participant only had to read past. They still render and are still submitted — they just don't
-   * inflate the count.
+   * the header read "1 of 4" on a screen with nothing to do. They still render and are still
+   * submitted — they just don't inflate the total.
    *
-   * `answerable` is the count; `answeredSoFar` is how many are at or before the current page, which is
-   * what the position should reflect. On an info page that's the number already passed, so the bar
-   * holds still rather than advancing for a page that asked nothing.
+   * `answerable` is that total; `answeredSoFar` is how many are at or before the current page. Note
+   * the progress *bar* deliberately doesn't use these — see `progress`.
    */
   const isAnswerable = (q?: Question) =>
     q?.field_type !== 'info' && q?.field_type !== 'descriptive';
@@ -258,7 +329,15 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   const questionNumber = isAnswerable(currentQuestion)
     ? answeredSoFar
     : Math.min(answeredSoFar + 1, answerable);
-  const progress = answerable > 0 ? answeredSoFar / answerable : 0;
+  /**
+   * Position through *every* page, info screens included — unlike the count above.
+   *
+   * The two answer different questions. The counter says how much there is to do, so an explainer
+   * shouldn't inflate it. The bar says how far through the task you are, and an explainer is a page
+   * you still have to get past — leaving it out froze the bar on those pages, which read as the app
+   * having missed the tap.
+   */
+  const progress = total > 0 ? (currentIndex + 1) / total : 0;
 
   // The bar eases to its new position in step with the page slide, instead of snapping. Driven by a
   // manual shared value (not a layout animation) — see the note on entering/exiting stranding an
@@ -362,7 +441,9 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   const trackColor = withAlpha(brand, 0.12); // progress-bar track
 
   const topInset = useTopInset();
-  const bottomInset = useBottomInset(16);
+  // Just the home indicator / gesture bar — no extra gutter. The safe-area inset is already ~34pt on
+  // a notched phone, and adding the design's 16 on top left the buttons floating clear of the edge.
+  const bottomInset = useBottomInset();
   const { width } = useWindowDimensions();
 
   // Completion transition: the questions push out to the left while the "Well done" screen slides in
@@ -390,7 +471,22 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   // The speech question owns its own progression (record → stop → "Continue"), so it never shows Next.
   // It keeps the back/exit button on the idle screen as an escape hatch, but drops the footer entirely
   // once recording starts — there's no backing out mid-take or after one is captured.
-  const isSpeech = currentQuestion?.field_type === 'audio';
+  /**
+   * The question the footer is dressed for — the one being *landed on*, but only once the slide has
+   * landed.
+   *
+   * A speech question has no Next button, so moving to or from one adds or removes a footer button.
+   * Both are `flex: 1`, so doing that the moment the index changes snaps Back between half and full
+   * width while the panels are still moving — the glitch on every normal↔speech transition. Holding
+   * the old chrome until the slide finishes turns that into one discrete change after the motion.
+   */
+  const [settledIndex, setSettledIndex] = useState(currentIndex);
+  useEffect(() => {
+    if (settledIndex === currentIndex) return;
+    const id = setTimeout(() => setSettledIndex(currentIndex), SLIDE_DURATION);
+    return () => clearTimeout(id);
+  }, [currentIndex, settledIndex]);
+  const isSpeech = visibleQuestions[settledIndex]?.field_type === 'audio';
   // The speech review screen is a new screen of the *same* question, so the whole panel slides — title
   // included. (Sliding only the input left the title to unmount separately, which read as a vertical
   // jump followed by a horizontal one.) The direction follows the journey: forward into the review
@@ -422,10 +518,24 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
     transform: [{ translateX: reviewSlide.value }],
   }));
 
-  const showFooter = !isSpeech || speechPhase === 'idle';
+  /**
+   * Whether the footer is up — held still for the length of a page slide.
+   *
+   * Mounting or dropping the footer resizes `body`, and both panels are laid out inside it, so doing
+   * that mid-slide rewraps the outgoing question's text and shifts its controls — visible as the
+   * page "settling" as it leaves. It fires exactly there because `goNext` resets `speechPhase` to
+   * 'idle' synchronously, flipping this the instant the slide starts.
+   *
+   * Deferred only across a transition. Within a question — pressing record, which drops the footer —
+   * `settledIndex` already equals `currentIndex`, so it still applies immediately.
+   */
+  const targetShowFooter = !isSpeech || speechPhase === 'idle';
+  const [showFooter, setShowFooter] = useState(targetShowFooter);
+  useEffect(() => {
+    if (settledIndex !== currentIndex) return;
+    setShowFooter(targetShowFooter);
+  }, [targetShowFooter, settledIndex, currentIndex]);
   const showNext = !isSpeech;
-  // The passage stays up while it's being read (idle + recording) and goes once it's been captured.
-  const hideTitle = isSpeech && speechPhase === 'recorded';
 
   // --- "Well done" completion screen (Figma 3273:1821) ---------------------------------------------
   // Same header, but the count reads "Done" and the bar is full; the questions are replaced by the
@@ -451,7 +561,9 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
             </View>
           </View>
 
-          <View style={styles.doneBody}>
+          {/* Same reserve the question panels take. The footer is drawn over the page, so without it
+              this would centre against the full height and sit half a footer too low. */}
+          <View style={[styles.doneBody, { paddingBottom: FOOTER_RESERVE + bottomInset }]}>
             <WellDoneIllustration width={illustrationWidth} height={illustrationHeight} />
             <Text style={[styles.doneTitle, { color: brand }]}>Well done</Text>
             {/* The assessment's `endText`, when the study wrote one — its own debrief sits above the
@@ -497,8 +609,8 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
         style={[styles.screen, { paddingTop: topInset + 16 }, questionsStyle]}
         pointerEvents={isComplete ? 'none' : 'auto'}
       >
-      {/* Without the footer, the body takes over clearing the bottom safe area. */}
-      <View style={[styles.body, !showFooter && { paddingBottom: bottomInset }]}>
+      {/* A constant box. The footer is drawn over it, so nothing here moves when the footer does. */}
+      <View style={styles.body}>
         {/* Header: task name + item count, with the progress bar beneath. */}
         <View style={styles.headerBlock}>
           <View style={styles.countRow}>
@@ -520,9 +632,13 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
             back slides the previous in from the left (StepSlider derives the direction from the index
             change). The header above and footer below stay put. Title is the question text; the input
             is reused from QuestionRenderer (with its own header suppressed so it isn't shown twice). */}
-        <StepSlider index={currentIndex} duration={SLIDE_DURATION}>
+        <StepSlider index={currentIndex} duration={SLIDE_DURATION} count={total}>
           {(stepIndex) => {
             const question = visibleQuestions[stepIndex];
+            // The slider keeps the neighbouring steps mounted, so this runs for indices either side of
+            // the current one. Branching logic can shorten `visibleQuestions` under us, so a step can
+            // point at nothing.
+            if (!question) return null;
             // During a transition StepSlider renders both the outgoing and incoming panel. Anything
             // derived from the *current* question has to be scoped to the active one, or the outgoing
             // panel flips its title to match the incoming question and its speech input reports a
@@ -540,9 +656,23 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
               question?.field_type === 'audio' &&
               !!(question.field_name && answers[question.field_name]);
             const isSpeechPanel = question?.field_type === 'audio';
+            // Whether the read-aloud passage is the question's own `field_label` (rendered here, in a
+            // capped scroll region) rather than living in `select_choices_or_calculations`, which
+            // `SpeechInput` draws in its own fixed-height card. Decides both what the title block
+            // renders and whether it's allowed to shrink.
+            const hasInlinePassage = isSpeechPanel && !!question?.field_label?.trim();
+            // Drives both halves of the review screen: the play button, and which line sits under the
+            // heading — a "take a listen" prompt with no way to listen would be a lie.
+            const allowReplay = isReplayAllowed(question);
             // Falls back to the section header when the question has no label of its own — see the
             // note where the header is rendered.
             const questionTitle = question?.field_label?.trim() || question?.section_header;
+            // Speech questions get a standing instruction when the study wrote no header of their
+            // own; every other type shows a header only if one was authored.
+            const sectionHeader =
+              question?.field_type === 'audio'
+                ? question.section_header?.trim() || SPEECH_DEFAULT_HEADER
+                : question?.section_header;
             // A speech question is laid out in a plain View, not a ScrollView.
             //
             // That's the difference between the passage shrinking and not: a ScrollView's content
@@ -556,19 +686,18 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
               <Panel
                 style={[
                   styles.scroll,
-                  isSpeechPanel && styles.scrollContent,
-                  // The review screen has no title and no footer, so left at the top it sits against
-                  // the header with the page empty below. Centre it in the space instead.
-                  isSpeechPanel && hideTitleHere && styles.scrollContentCentered,
+                  // Reserved on every panel, on every screen, whether or not this one shows a footer.
+                  // The footer is drawn over the page, so this is what keeps its content clear of it —
+                  // and reserving it unconditionally is what makes the panel the same size before,
+                  // during and after a transition.
+                  isSpeechPanel && { paddingBottom: FOOTER_RESERVE + bottomInset },
                 ]}
                 contentContainerStyle={
                   isSpeechPanel
                     ? undefined
                     : [
                         styles.scrollContent,
-                        // The speech review screen has no title and no footer, so left at the top it
-                        // sits against the header with the page empty below. Centre it instead.
-                        hideTitleHere && styles.scrollContentCentered,
+                        { paddingBottom: FOOTER_RESERVE + bottomInset },
                       ]
                 }
                 showsVerticalScrollIndicator={false}
@@ -583,35 +712,71 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                       // height to shrink within. On the review screen there's no passage left to
                       // squeeze, and filling would defeat the panel's `justifyContent: center` —
                       // a body that fills has nothing left to centre.
-                      isSpeechPanel && !hideTitleHere && styles.panelBodyFill,
+                      isSpeechPanel && styles.panelBodyFill,
                       isActive && reviewSlideStyle,
                     ]}
                   >
                     {/* Section header + question text as one block, so the 16px page gap falls
                         between the text and the input rather than splitting the pair.
 
-                        Hidden once a speech question has been recorded: an `audio` question's
+                        Reduced once a speech question has been recorded: an `audio` question's
                         `field_label` is the passage to read aloud, which has served its purpose by the
                         review screen and would otherwise crowd out the re-record / continue cards
-                        (Figma 3528:6585 drops it too). */}
-                    {hideTitleHere ? null : (
-                      <View style={[styles.titleBlock, isSpeechPanel && styles.titleBlockShrink]}>
+                        (Figma 3528:6585 drops it too). The heading stays, so the participant can still
+                        see which task they're in, with a line saying what to do here instead. */}
+                    {hideTitleHere ? (
+                      <View
+                        style={styles.titleBlock}
+                        onLayout={(e) => {
+                          // Captured before the updater runs — React recycles the event.
+                          const height = e.nativeEvent.layout.height;
+                          setReviewHeaderHeight((current) =>
+                            Math.abs(current - height) > 1 ? height : current,
+                          );
+                        }}
+                      >
+                        {/* Same pairing as an `info` screen: the task name is the small grey kicker
+                            and the line telling you what to do is the heading. */}
+                        <Text style={[styles.sectionHeader, { color: muted }]}>{questionTitle}</Text>
+                        <Text style={[styles.title, { color: brand }]}>
+                          {allowReplay ? SPEECH_REVIEW_SUBTEXT : SPEECH_REVIEW_SUBTEXT_NO_REPLAY}
+                        </Text>
+                      </View>
+                    ) : (
+                      <View
+                        style={[
+                          styles.titleBlock,
+                          // Only shrink when the passage is actually in here. It's the passage that's
+                          // meant to yield to the controls; when the study puts the passage in
+                          // `select_choices_or_calculations` this block holds just a heading and a
+                          // line of copy, and letting that shrink collapses it to nothing — nothing
+                          // else in the panel gives way, so it absorbs the whole overflow.
+                          isSpeechPanel && hasInlinePassage && styles.titleBlockShrink,
+                        ]}
+                      >
                         {/* The small grey header only earns its place when there's a distinct question
                             beneath it. Plenty of `info` fields carry their heading in `section_header`
                             and leave `field_label` empty (THINC-it's "Time for THINC-it", say) — left
                             as-is that renders a small muted line with nothing under it, so promote it
                             into the title instead. */}
-                        {question.section_header && questionTitle !== question.section_header ? (
+                        {sectionHeader && questionTitle !== sectionHeader ? (
                           <Text style={[styles.sectionHeader, { color: muted }]}>
-                            {question.section_header}
+                            {sectionHeader}
                           </Text>
                         ) : null}
-                        {question.field_type === 'audio' ? (
+                        {hasInlinePassage ? (
                           // A speech question's `field_label` is a passage to read aloud — far longer
                           // than a normal question, and long enough to push the record button
                           // off-screen. Cap just the passage and let it scroll on its own, with edge
                           // fades marking that there's more; the instructions above it stay put, as
                           // do the controls below.
+                          //
+                          // Only when there IS one: aRMT speech questions routinely leave `field_label`
+                          // empty and put the passage in `select_choices_or_calculations` (which
+                          // `SpeechInput` draws in its own card) with just a heading in
+                          // `section_header`. Those fall through to the plain title below — rendering
+                          // the empty label here left the whole title block blank, since the heading
+                          // had already been promoted into `questionTitle`.
                           <ScrollablePassage
                             style={styles.titleScroll}
                             fadeColor={pageBg}
@@ -620,26 +785,60 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                             textStyle={[styles.title, { color: brand }]}
                             text={question.field_label}
                           />
+                        ) : isSpeechPanel ? (
+                          // The passage card below is the content here, so the task name reads as a
+                          // kicker above it rather than as the page's heading. Same size on idle and
+                          // recording as on review, so pressing record doesn't resize it mid-task.
+                          <Text style={[styles.sectionHeader, { color: muted }]}>{questionTitle}</Text>
                         ) : (
                           <Text style={[styles.title, { color: brand }]}>{questionTitle}</Text>
                         )}
                       </View>
                     )}
-                    <QuestionRenderer
-                      question={question}
-                      value={question.field_name ? answers[question.field_name] : undefined}
-                      onChange={handleAnswer}
-                      primaryColor={brand}
-                      textColor={tokens.text.primary}
-                      textSecondaryColor={muted}
-                      accentColor={accent}
-                      surfaceColor={tokens.card.background}
-                      hideHeader
-                      mode={mode}
-                      // Lets the speech question's "Continue" card advance the questionnaire itself.
-                      onContinue={goNext}
-                      onPhaseChange={isActive ? handleSpeechPhase : undefined}
-                    />
+                    {/* On the review screen the heading stays put at the top and only the controls
+                        below it centre in what's left — centring the panel as a whole would drag the
+                        heading down into the middle with them.
+
+                        Otherwise this is a link in the shrink chain: it sits between the bounded panel
+                        and the passage card, and RN defaults `flexShrink` to 0, so leaving it unstyled
+                        pins it at its natural height and the card below never gets to yield. */}
+                    <View
+                      style={
+                        hideTitleHere
+                          ? styles.reviewBody
+                          : isSpeechPanel
+                            ? styles.speechBody
+                            : undefined
+                      }
+                    >
+                      <QuestionRenderer
+                        question={question}
+                        value={question.field_name ? answers[question.field_name] : undefined}
+                        onChange={handleAnswer}
+                        primaryColor={brand}
+                        textColor={tokens.text.primary}
+                        textSecondaryColor={muted}
+                        accentColor={accent}
+                        surfaceColor={tokens.card.background}
+                        hideHeader
+                        mode={mode}
+                        // Lets the speech question's "Continue" card advance the questionnaire itself.
+                        onContinue={goNext}
+                        onPhaseChange={isActive ? handleSpeechPhase : undefined}
+                        allowReplay={allowReplay}
+                      />
+                      {hideTitleHere ? (
+                        <>
+                          <View style={styles.reviewSpacer} />
+                          <View
+                            style={[
+                              styles.reviewHeaderCompensator,
+                              { height: reviewHeaderHeight + PANEL_GAP },
+                            ]}
+                          />
+                        </>
+                      ) : null}
+                    </View>
                   </Animated.View>
                 )}
               </Panel>
@@ -783,14 +982,33 @@ const styles = StyleSheet.create({
    * ScrollView's only child, so a gap on the content container has nothing to space apart.
    */
   panelBody: {
-    gap: 16,
+    gap: PANEL_GAP,
   },
-  /** `flexGrow` lets the content container fill the scroll viewport, which is what gives
-   *  `justifyContent` something to centre within — without it the container is only as tall as its
-   *  content and centring is a no-op. Still scrolls if the content outgrows the screen. */
-  scrollContentCentered: {
-    flexGrow: 1,
-    justifyContent: 'center',
+  /**
+   * The speech review screen's controls, centred in the space the heading leaves.
+   *
+   * In flow, not absolutely filling the panel. Filling it centres them on the page, which is nominally
+   * what's wanted — but the controls are nearly as tall as the panel, so the centred group's top edge
+   * rises above the heading and the waveform draws straight over it. Sitting under the heading costs a
+   * little centring (there is barely any slack left to centre within anyway) and cannot overlap.
+   */
+  reviewBody: {
+    flex: 1,
+  },
+  /** Equal above and below the controls — what centres them. */
+  reviewSpacer: {
+    flex: 1,
+  },
+  /** Matches the heading, below the controls, so centring is measured against the whole page. Shrinks
+   *  before the spacers do, which is what stops the controls climbing over the heading. */
+  reviewHeaderCompensator: {
+    flexShrink: 1,
+  },
+  /** The idle/recording speech controls. `flexShrink: 1` passes the panel's height pressure down to
+   *  the passage card, which is the one part that can afford to be smaller — without it the chain
+   *  breaks here and the overflow lands on the stop button instead. */
+  speechBody: {
+    flexShrink: 1,
   },
   titleBlock: {
     gap: 4,
@@ -878,6 +1096,13 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
   footer: {
+    // Over the page, not above it. Laid out in flow, the footer's appearance shortened the slider's
+    // viewport, and both panels are absolutely filled inside it — so every screen that showed or hid
+    // a footer rewrapped the outgoing question's text and shifted its controls mid-slide.
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
