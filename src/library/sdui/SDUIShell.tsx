@@ -415,7 +415,10 @@ function TaskInstructionsHost({ context }: { context: SDUIContext }) {
       {...overlay.panHandlers}
       style={[StyleSheet.absoluteFill, styles.instructionsOverlay, overlay.overlayStyle]}
     >
-      {payload && showInstructions && phase === 'instructions' && (
+      {/* Gated on `showInstructions` alone, NOT on `phase === 'instructions'`: `start` flips the phase
+          up front and clears this only when the push lands, so the page has something to slide out.
+          Adding the phase check here unmounts it on the first frame and the animation never plays. */}
+      {payload && showInstructions && (
     <Animated.View style={[StyleSheet.absoluteFill, instructionsPushStyle]}>
         <TaskInstructionsScreen
           taskName={payload.taskName}
