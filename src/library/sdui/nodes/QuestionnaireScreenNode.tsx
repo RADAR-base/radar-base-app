@@ -9,7 +9,12 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { useCoreServices } from '../../../core/CoreServicesContext';
 import { EVENTS } from '../../../core/EventBus';
@@ -26,6 +31,7 @@ import {
 import WellDoneIllustration from '../../../theme/icons/welldoneillustration.svg';
 import type { NodeProps } from '../types';
 import { QuestionRenderer } from './questionnaire/QuestionRenderer';
+import { speechContent } from './questionnaire/speechContent';
 import type { SpeechPhase } from './questionnaire/SpeechInput';
 import { evaluateBranchingLogic } from './questionnaire/branchingLogic';
 import { PillButton } from '../PillButton';
@@ -220,6 +226,65 @@ function PassageFade({ color, edge }: { color: string; edge: 'top' | 'bottom' })
       </Defs>
       <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id})`} />
     </Svg>
+  );
+}
+
+/**
+ * A speech question's instruction, which folds away once recording starts.
+ *
+ * The instruction explains how to begin — "press Start, read the text, press Stop" — so by the time
+ * the recorder is running it is spent, and on a long one it was what pushed the stop button off the
+ * bottom of the screen. Reclaiming its whole height beats squeezing everything else around it.
+ *
+ * State lives here, per panel, rather than on the screen: `StepSlider` keeps neighbouring questions
+ * mounted, so one shared height would be whatever the last question measured — a two-line heading
+ * inheriting a seven-line one's, or worse.
+ *
+ * The measurement is taken *inside* the scroll view, on the content. Measuring the scroll view itself
+ * feeds the animated `maxHeight` straight back into what `onLayout` reports, and the block walks
+ * itself shut a frame at a time. Scroll content lays out at its natural size whatever the parent is
+ * clipped to.
+ */
+function CollapsibleHeading({
+  collapsed,
+  text,
+  textStyle,
+}: {
+  collapsed: boolean;
+  text?: string;
+  textStyle: StyleProp<TextStyle>;
+}) {
+  const height = useSharedValue(0);
+  const progress = useSharedValue(collapsed ? 1 : 0);
+
+  useEffect(() => {
+    progress.value = withTiming(collapsed ? 1 : 0, { duration: SLIDE_DURATION });
+  }, [collapsed, progress]);
+
+  const style = useAnimatedStyle(() => {
+    // Nothing measured yet — leave it at its natural size rather than pinning it shut.
+    if (height.value === 0) return {};
+    return {
+      maxHeight: height.value * (1 - progress.value),
+      opacity: 1 - progress.value,
+    };
+  });
+
+  return (
+    <Animated.View style={[styles.headingCollapse, style]}>
+      <View
+        onLayout={(e) => {
+          // Only while open. `maxHeight` above constrains this view too, so measuring mid-fold feeds
+          // the animation straight back into its own target and the block walks itself shut.
+          if (collapsed) return;
+          // Read out here — React recycles the event before an updater would run.
+          const measured = e.nativeEvent.layout.height;
+          if (measured > 0 && Math.abs(measured - height.value) > 1) height.value = measured;
+        }}
+      >
+        <Text style={textStyle}>{text}</Text>
+      </View>
+    </Animated.View>
   );
 }
 
@@ -660,13 +725,21 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
             // capped scroll region) rather than living in `select_choices_or_calculations`, which
             // `SpeechInput` draws in its own fixed-height card. Decides both what the title block
             // renders and whether it's allowed to shrink.
-            const hasInlinePassage = isSpeechPanel && !!question?.field_label?.trim();
+            // The passage now always goes to `SpeechInput`'s card, wherever the definition put it —
+            // rendering it here instead meant a question whose passage lived in `field_label` drew it
+            // as a bare scrolling title with no card behind it, while the same question authored with
+            // `select_choices_or_calculations` got the designed one.
+            const hasInlinePassage = false;
             // Drives both halves of the review screen: the play button, and which line sits under the
             // heading — a "take a listen" prompt with no way to listen would be a lie.
             const allowReplay = isReplayAllowed(question);
             // Falls back to the section header when the question has no label of its own — see the
             // note where the header is rendered.
-            const questionTitle = question?.field_label?.trim() || question?.section_header;
+            // A speech question's heading is whichever field isn't carrying the passage — see
+            // `speechContent`. Everything else keeps its own label.
+            const questionTitle = isSpeechPanel
+              ? speechContent(question).heading
+              : question?.field_label?.trim() || question?.section_header;
             // Speech questions get a standing instruction when the study wrote no header of their
             // own; every other type shows a header only if one was authored.
             const sectionHeader =
@@ -751,7 +824,11 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                           // `select_choices_or_calculations` this block holds just a heading and a
                           // line of copy, and letting that shrink collapses it to nothing — nothing
                           // else in the panel gives way, so it absorbs the whole overflow.
-                          isSpeechPanel && hasInlinePassage && styles.titleBlockShrink,
+                          // Every speech panel, not just one with the passage inline. A long
+                          // instruction here is the first thing that should give way: it's read once
+                          // before starting, whereas the passage is read *while* recording and the
+                          // stop button has to stay reachable throughout.
+                          isSpeechPanel && styles.titleBlockShrink,
                         ]}
                       >
                         {/* The small grey header only earns its place when there's a distinct question
@@ -789,7 +866,13 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                           // The passage card below is the content here, so the task name reads as a
                           // kicker above it rather than as the page's heading. Same size on idle and
                           // recording as on review, so pressing record doesn't resize it mid-task.
-                          <Text style={[styles.sectionHeader, { color: muted }]}>{questionTitle}</Text>
+                          //
+                          // Folds away once recording starts — see `CollapsibleHeading`.
+                          <CollapsibleHeading
+                            collapsed={isActive && speechPhase === 'recording'}
+                            text={questionTitle}
+                            textStyle={[styles.sectionHeader, { color: muted }]}
+                          />
                         ) : (
                           <Text style={[styles.title, { color: brand }]}>{questionTitle}</Text>
                         )}
@@ -1023,6 +1106,29 @@ const styles = StyleSheet.create({
    */
   titleBlockShrink: {
     flexShrink: 1,
+  },
+  /**
+   * The speech instruction's window. `flexGrow: 0` keeps it no taller than its text, `flexShrink: 1`
+   * lets it give way under pressure, and `minHeight` stops it collapsing to nothing — so there is
+   * always something readable, and something to scroll.
+   */
+  headingScroll: {
+    flexGrow: 0,
+    flexShrink: 1,
+    minHeight: 40,
+  },
+  /**
+   * Clips the instruction while its height is settling, so a shrinking box hides the text it is
+   * losing rather than letting it spill over what sits below.
+   *
+   * Deliberately NOT `flexShrink` — that let the panel squeeze the box under its own measured height,
+   * and `overflow: hidden` then cut the last line off. The passage card is the thing that gives way
+   * here; it scrolls, so losing height costs reading room rather than words.
+   */
+  headingCollapse: {
+    flexGrow: 0,
+    flexShrink: 0,
+    overflow: 'hidden',
   },
   /**
    * A speech question's read-aloud passage — the only scrollable thing on the screen.

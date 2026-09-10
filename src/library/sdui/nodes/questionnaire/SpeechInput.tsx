@@ -1013,16 +1013,18 @@ const styles = StyleSheet.create({
     height: WAVEFORM_HEIGHT,
   },
   timerPill: {
-    minWidth: 84,
-    minHeight: 32,
+    // Deliberately compact: it sits between the waveform and the stop button, and every point it
+    // takes is one the button loses on a screen that is already tight.
+    minWidth: 72,
+    minHeight: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: layoutTokens.cardPadding,
+    paddingHorizontal: 12,
     borderRadius: layoutTokens.radiusPill,
   },
   timerText: {
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 16,
     fontFamily: fontFamily.regular,
     includeFontPadding: false,
   },
