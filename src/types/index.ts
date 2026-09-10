@@ -76,6 +76,14 @@ export interface Question {
   identifier?: string;
   custom_alignment?: string;
   question_number?: string;
+  /**
+   * Speech questions only: may the participant play their recording back before continuing?
+   *
+   * Absent means yes — replay is the default, so existing definitions keep the play button without
+   * being edited. A study suppresses it by setting this false (or `'n'` / `'false'` / `'0'`, since
+   * REDCap-style definitions carry booleans as strings). See `isReplayAllowed`.
+   */
+  allow_replay_speech?: boolean | string;
 }
 
 export interface Answer {

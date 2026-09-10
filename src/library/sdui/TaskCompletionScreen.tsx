@@ -55,7 +55,9 @@ export function TaskCompletionScreen({
   const resolvedMode: ThemeMode = mode ?? (deviceScheme === 'dark' ? 'dark' : 'light');
   const tokens = getColorTokens(resolvedMode, brandColors);
   const topInset = useTopInset();
-  const bottomInset = useBottomInset(16);
+  // Just the home indicator / gesture bar — no extra gutter. The safe-area inset is already ~34pt on
+  // a notched phone, and adding the design's 16 on top left the buttons floating clear of the edge.
+  const bottomInset = useBottomInset();
 
   const brand = brandColors?.brand ?? tokens.button.background;
   const brandOnBrand = readableTextColor(brand);
