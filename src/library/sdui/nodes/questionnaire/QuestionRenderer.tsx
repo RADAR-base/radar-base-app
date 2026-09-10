@@ -8,6 +8,7 @@ import { SliderInput } from './SliderInput';
 import { TextQuestionInput } from './TextQuestionInput';
 import { InfoScreen } from './InfoScreen';
 import { SpeechInput, type SpeechPhase } from './SpeechInput';
+import { QuestionError } from './QuestionError';
 import { fontFamily, withAlpha, type ThemeMode } from '../../../../theme/theme';
 
 interface QuestionRendererProps {
@@ -30,6 +31,16 @@ interface QuestionRendererProps {
   onContinue?: () => void;
   /** Reports the speech question's phase, so the host can adapt its chrome (e.g. hide its footer). */
   onPhaseChange?: (phase: SpeechPhase, meta?: { transition?: boolean }) => void;
+  /** How many times the participant has tried to move on — text inputs surface their errors, and
+   *  shake, from here. */
+  submitAttempt?: number;
+  /** Reports whether the current answer would pass, so the screen knows to hold them here. */
+  onValidityChange?: (valid: boolean) => void;
+  /**
+   * Why this question was refused. Rendered under the input for every type except `text`, which draws
+   * its own lined up with its card.
+   */
+  errorMessage?: string | null;
 }
 
 const DEFAULT_YESNO_CHOICES = [
@@ -50,6 +61,9 @@ export function QuestionRenderer({
   mode,
   onContinue,
   onPhaseChange,
+  submitAttempt,
+  onValidityChange,
+  errorMessage,
 }: QuestionRendererProps) {
   const isRequired = question.required_field === 'y';
   // Hosts that don't theme their inputs still get something coherent: the brand as the selected fill
@@ -79,6 +93,18 @@ export function QuestionRenderer({
       ) : null}
 
       {renderInput()}
+
+      {/* Under the input, inside this container — a sibling of the container outside it would sit
+          below its bottom margin as well as the panel's gap, putting the message more than twice as
+          far from a radio group as from a text field. `text` is excluded: it draws its own, lined up
+          with its card. */}
+      {question.field_type !== 'text' ? (
+        <QuestionError
+          message={errorMessage}
+          style={styles.error}
+          shakeKey={submitAttempt}
+        />
+      ) : null}
     </View>
   );
 
@@ -155,6 +181,11 @@ export function QuestionRenderer({
             primaryColor={primaryColor}
             textColor={textColor}
             textSecondaryColor={textSecondaryColor}
+            accentColor={accentColor}
+            surfaceColor={surfaceColor}
+            submitAttempt={submitAttempt}
+            onValidityChange={onValidityChange}
+            errorMessage={errorMessage}
           />
         );
 
@@ -244,6 +275,10 @@ function deriveRange(question: Question) {
 const styles = StyleSheet.create({
   container: {
     marginBottom: 20,
+  },
+  /** The gap above the message — matched to the text field's own. */
+  error: {
+    marginTop: 16,
   },
   sectionHeader: {
     fontSize: 13,
