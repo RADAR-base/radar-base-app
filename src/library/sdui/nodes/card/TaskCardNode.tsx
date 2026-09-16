@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
   scrim: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: UNAVAILABLE_SCRIM,
     borderRadius: 24,
   },

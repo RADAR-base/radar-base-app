@@ -9,7 +9,11 @@ const config = getDefaultConfig(__dirname);
 // required for @radarbase/app-kit's header icons.
 config.transformer.babelTransformerPath = require.resolve('react-native-svg-transformer');
 config.resolver.assetExts = config.resolver.assetExts.filter((ext) => ext !== 'svg');
-config.resolver.sourceExts = ['js', 'json', 'ts', 'tsx', 'jsx', 'mjs', 'cjs', 'svg'];
+// Appended to Metro's own list rather than replacing it. The previous hardcoded order put `json`
+// ahead of `ts`/`tsx`, and on a case-insensitive filesystem `import App from './App'` then resolved
+// to **app.json** — the root component came back as `{ expo: {...} }` instead of a function. Keeping
+// Metro's order also means extensions it adds in future aren't silently dropped.
+config.resolver.sourceExts = [...config.resolver.sourceExts, 'svg'];
 
 // Prefer the `react-native` package export, then `browser`, then `main`.
 // Required by some Firebase ESM bundles.

@@ -6,7 +6,7 @@
       "DOM"
     ],
     "module": "ESNext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
@@ -29,5 +29,6 @@
     "lib",
     "node_modules",
     "**/*.test.*"
-  ]
+  ],
+  "extends": "expo/tsconfig.base"
 }

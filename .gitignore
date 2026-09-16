@@ -6,6 +6,8 @@
 /e2e/test-output/
 /.angular/
 .angular/
+.DS_Store
+
 
 # Node modules and dependency files
 /node_modules/
@@ -28,6 +30,9 @@ yarn-error.log*
 
 
 /lib
+
+# Expo CLI working directory
+.expo/
 
 starter-kit/ios
 starter-kit/android

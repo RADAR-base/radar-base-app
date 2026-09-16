@@ -6,16 +6,31 @@
     "scheme": "com.radarbase.starter",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
-    "plugins": [],
+    "newArchEnabled": true,
+    "plugins": [
+      "expo-font",
+      "@react-native-firebase/app",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static",
+            "privacyManifestAggregationEnabled": false
+          }
+        }
+      ],
+      "./plugins/withPodBuildSettings"
+    ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.radarbase.starter",
-      "scheme": "com.radarbase.starter"
+      "bundleIdentifier": "org.radarbase.starter",
+      "scheme": "com.radarbase.starter",
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "edgeToEdgeEnabled": true,
       "package": "org.radarbase.starter",
+      "googleServicesFile": "./google-services.json",
       "intentFilters": [
         {
           "action": "VIEW",
