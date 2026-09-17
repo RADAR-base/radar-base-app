@@ -92,8 +92,14 @@ const LAND_DIP = 0.88;
 const LAND_MS = 70;
 const LAND_SWELL = { damping: 9, stiffness: 220, mass: 0.6 } as const;
 
-/** The smallest a chip may get before the row stops being tappable. */
-const MIN_CHIP = 22;
+/**
+ * The smallest a chip may get before the row stops being tappable.
+ *
+ * It is also what a long scale settles at — past about nine steps there is no width left to spend, so
+ * this floor is the size those chips actually get. Raising it trades the gap between chips for their
+ * diameter, and the gap is what runs out first.
+ */
+const MIN_CHIP = 26;
 
 /**
  * The design's chip size, and the row height that follows from it.
@@ -104,7 +110,7 @@ const MIN_CHIP = 22;
  * incoming question mounts unmeasured, so it rendered a collapsed row and then jumped to size as the
  * measurement landed. A fixed height means the row occupies its final space from the first frame.
  */
-const MAX_CHIP = 30;
+const MAX_CHIP = 38;
 const ROW_HEIGHT = MAX_CHIP + TRACK_PAD * 2;
 
 /**
@@ -115,8 +121,8 @@ const ROW_HEIGHT = MAX_CHIP + TRACK_PAD * 2;
  * relative to its circle at any step count, and the ceiling stops a two-digit value outgrowing it.
  */
 const CHIP_TEXT_RATIO = 0.52;
-const CHIP_TEXT_MIN = 13;
-const CHIP_TEXT_MAX = 18;
+const CHIP_TEXT_MIN = 14;
+const CHIP_TEXT_MAX = 20;
 
 /** The ring the blob wears while the row is held — the accent at a fifth, as every handle does. */
 const RING_ALPHA = 0.2;
@@ -138,6 +144,14 @@ const DRAG_SLOP = 4;
 
 /** The value's own type size, matched to the other sliders rather than the design's 96. */
 const VALUE_SIZE = 88;
+
+/**
+ * The gap between the question text and the value, matching `SliderInput`'s own `paddingTop`.
+ *
+ * Keep the two in step: a participant moving between question types sees the big value land in the
+ * same place each time, and it only reads as deliberate if every scale agrees on it.
+ */
+const TOP_SPACE = 40;
 
 /** The distance from the value down to the row of numbers. */
 const BLOCK_GAP = 24;
@@ -651,19 +665,17 @@ function Chip({
 
 const styles = StyleSheet.create({
   /**
-   * The value at the top of the space and the scale at the bottom of it, the way `SliderInput` spreads
-   * its own two halves.
-   */
-  /**
-   * The value and the row as one block, centred in whatever the question text leaves.
+   * The value and the row as one block, held `TOP_SPACE` below the question text.
    *
-   * `space-between` put them at opposite ends of the space, so the distance between them wasn't the
-   * `gap` at all — it was everything left over, and grew with the screen. Centring makes `BLOCK_GAP`
-   * the real distance, and keeps the row within a thumb's reach since the chips are tap targets.
+   * Not `space-between`, which put them at opposite ends of the space — the distance between them was
+   * then everything left over rather than `gap`, and grew with the screen. Not centred either, which
+   * made `BLOCK_GAP` honest but let the value drift down the page as the question text got shorter.
+   * Pinning the top fixes the value where `SliderInput` puts its own, and `BLOCK_GAP` still decides
+   * the rest.
    */
   container: {
     flex: 1,
-    justifyContent: 'center',
+    paddingTop: TOP_SPACE,
     gap: BLOCK_GAP,
   },
   readout: {

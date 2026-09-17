@@ -71,8 +71,13 @@ export const SCALE_TYPES = ['range', 'slider', 'slider-vertical', 'slider-scale'
  * to content leaves it measuring zero and nothing but the handle is drawn. The others have intrinsic
  * height — a numeral and a track, an arc sized from its width — and are left to size themselves, the
  * way they always have.
+ *
+ * Adding a type here hands its control the whole screen's height, which is not free: a control laid
+ * out with `space-between` then spreads across all of it, and the distance between its halves becomes
+ * whatever is left over rather than its own `gap`. That is what put a screen-high gap between the
+ * horizontal slider's value and its track while `range` was listed here.
  */
-export const HEIGHT_DRIVEN_TYPES = ['slider-vertical', 'range'];
+export const HEIGHT_DRIVEN_TYPES = ['slider-vertical'];
 
 /**
  * A concrete `QuestionRange` for the controls that still require one.
@@ -187,13 +192,15 @@ export function QuestionRenderer({
 
       case 'range':
         return (
-          <RangeInput
-            range={concreteRange(question)}
+          <ScaleInput
+            range={question.range}
+            choices={parseChoices(question.select_choices_or_calculations)}
             value={typeof value === 'number' ? value : undefined}
             onChange={onChange}
+            accentColor={accentColor}
+            backgroundColor={backgroundColor}
             primaryColor={primaryColor}
             textColor={textColor}
-            textSecondaryColor={textSecondaryColor}
           />
         );
 
@@ -253,8 +260,8 @@ export function QuestionRenderer({
             onChange={onChange}
             accentColor={accentColor}
             backgroundColor={backgroundColor}
-            textColor={textColor}
             primaryColor={primaryColor}
+            textColor={textColor}
           />
         );
 
