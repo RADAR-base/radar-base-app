@@ -39,49 +39,34 @@ export function registerBuiltInNodes(): void {
   if (registered) return;
   const registry = NodeRegistry.getInstance();
 
-  // Layout
   registry.register('ViewNode', ViewNode);
   registry.register('SectionNode', SectionNode);
   registry.register('CardNode', CardNode);
   registry.register('StatCardNode', StatCardNode);
+  registry.register('CardSectionNode', CardSectionNode);
+  registry.register('HeaderNode', HeaderNode);
+  registry.register('NavbarNode', NavbarNode);
+  registry.register('TextNode', TextNode);
+  registry.register('ActionNode', ActionNode);
+  registry.register('ConnectDevicesMenuNode', ConnectDevicesMenuNode);
+  registry.register('SettingsRowNode', SettingsRowNode);
+  registry.register('AlertBannerNode', AlertBannerNode);
+  registry.register('InboxItemListCoordinatorNode', InboxItemListCoordinatorNode);
+  registry.register('InboxItemListNode', InboxItemListNode);
+  registry.register('RelativeActivityTodayNode', RelativeActivityTodayNode);
   registry.register('TaskCardNode', TaskCardNode);
   registry.register('ToDoStatusNode', ToDoStatusNode);
+  registry.register('TaskListSectionNode', TaskListSectionNode);
+  registry.register('CalendarNode', CalendarNode);
+  registry.register('SurveyTaskListNode', SurveyTaskListNode);
+  registry.register('QuestionnaireNode', QuestionnaireNode);
+  registry.register('QuestionnaireScreenNode', QuestionnaireScreenNode);
   registry.register('DataWheelCardNode', DataWheelCardNode);
   registry.register('BarChartCardNode', BarChartCardNode);
   registry.register('ArcDataCardNode', ArcDataCardNode);
   registry.register('LineGraphCardNode', LineGraphCardNode);
-  registry.register('CardSectionNode', CardSectionNode);
-  registry.register('TaskListSectionNode', TaskListSectionNode);
-  registry.register('NotificationListNode', NotificationListNode);
-
-  // Header — HeaderBarNode / HeaderTextNode are internal building blocks; only the
-  // composite HeaderNode is a blueprint-addressable node type.
-  registry.register('HeaderNode', HeaderNode);
-
-  // Navbar — NavbarItemNode is an internal building block; only NavbarNode is
-  // blueprint-addressable.
-  registry.register('NavbarNode', NavbarNode);
-
-  // Content
-  registry.register('TextNode', TextNode);
-  registry.register('ActionNode', ActionNode);
-
-  // Feature nodes
-  registry.register('SurveyTaskListNode', SurveyTaskListNode);
-  registry.register('QuestionnaireNode', QuestionnaireNode);
-  registry.register('QuestionnaireScreenNode', QuestionnaireScreenNode);
   registry.register('GraphDataNode', GraphDataNode);
-  registry.register('ConnectDevicesMenuNode', ConnectDevicesMenuNode);
-  registry.register('CalendarNode', CalendarNode);
-
-  // Stubs / future
-  registry.register('InboxItemListCoordinatorNode', InboxItemListCoordinatorNode);
-  registry.register('InboxItemListNode', InboxItemListNode);
-  registry.register('RelativeActivityTodayNode', RelativeActivityTodayNode);
-  registry.register('AlertBannerNode', AlertBannerNode);
-
-  // Settings
-  registry.register('SettingsRowNode', SettingsRowNode);
+  registry.register('NotificationListNode', NotificationListNode);
 
   registered = true;
 }
