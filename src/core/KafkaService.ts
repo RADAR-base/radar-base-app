@@ -69,6 +69,12 @@ export class DefaultKafkaService implements KafkaService {
     return [...this.topics];
   }
 
+  clear(): void {
+    this.baseUrl = '';
+    this.topics = [];
+    this.schemaCache.clear();
+  }
+
   // ---------------------------------------------------------------------------
   // Private
   // ---------------------------------------------------------------------------

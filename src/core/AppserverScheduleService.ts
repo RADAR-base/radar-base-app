@@ -62,6 +62,12 @@ export class AppserverScheduleService extends ScheduleServiceBase {
     super(storage, logger, bus, appServer);
   }
 
+  override destroy(): void {
+    super.destroy();
+    this.cachedProtocolVersion = null;
+    this.assessmentMap.clear();
+  }
+
   async fetchSchedule(): Promise<void> {
     // 0. Make sure the app server knows this project/subject before asking it for their data.
     await this.ensureRegistered();
