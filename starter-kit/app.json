@@ -7,11 +7,16 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
-    "plugins": [],
+    "plugins": [
+      "expo-audio"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.radarbase.starter",
-      "scheme": "com.radarbase.starter"
+      "scheme": "com.radarbase.starter",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "This app requires microphone access to record audio messages."
+      }
     },
     "android": {
       "edgeToEdgeEnabled": true,
