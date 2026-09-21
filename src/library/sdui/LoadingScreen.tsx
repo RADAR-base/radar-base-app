@@ -183,7 +183,7 @@ export function LoadingScreen({
 const styles = StyleSheet.create({
   screen: {
     // Absolute-fill so it overlays the content behind it and can slide away to reveal it.
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 16,

@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
   },
   progressTrackFill: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: 24,
     opacity: 0.1,
   },
