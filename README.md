@@ -1,18 +1,17 @@
 # @radarbase/app-kit
 
-A plugin-based React Native **library** of widgets, components, and services for building configuration-driven health research apps.
+A plugin-based React Native **library** of SDUI nodes, core services, and configuration contracts for building manifest-driven health research apps.
 
 The repo root **is the library**. A runnable host template lives in [`starter-kit/`](./starter-kit) and consumes the library exactly the way any other study app would — clone, rename, drop in a config, ship.
 
 ```text
 radar-base-app/                 <- the library (publishable as @radarbase/app-kit)
 ├── src/                        <- library source (TypeScript)
-│   ├── core/                   <- services: ApiService, ConfigService, AuthService, EventBus, ...
+│   ├── core/                   <- services: Auth, Token, Analytics, RemoteConfig, Schedule, ...
 │   ├── library/
-│   │   ├── app-shell/          <- AppShell, ThemeProvider, PluginManager
-│   │   ├── config/             <- configLoader + strategies + validation
-│   │   └── contracts/          <- type-only public contracts
-│   ├── widgets/                <- built-in widgets + WidgetFactory + WidgetRegistry
+│   │   ├── sdui/               <- SDUI engine: SDUIShell, AppShell, NodeRegistry, loaders, screens
+│   │   └── contracts/          <- Zod schemas + type-only public contracts
+│   ├── theme/                  <- design tokens, icons, font scaling
 │   └── index.ts                <- public API surface
 ├── lib/                        <- tsc build output (what consumers import)
 ├── starter-kit/                <- clone-and-rename host template (consumes the library)
@@ -24,12 +23,16 @@ radar-base-app/                 <- the library (publishable as @radarbase/app-ki
 
 ## Features
 
-- **Widget system**: `WidgetFactory` + `WidgetRegistry` for plug-and-play UI from JSON/YAML config.
-- **Built-in widgets**: Questionnaire, TaskList, Dashboard, DeviceStatus, Calendar.
-- **App shell**: `AppShell`, `ThemeProvider`, `PluginManager` for composing a configurable host app.
-- **Core services**: `CoreServicesProvider` + `useCoreServices()` for `ApiService`, `ConfigService`, `AuthService`, `EventBus`, `DataService`, etc.
-- **Configuration-driven**: `configLoader` with `LocalFileStrategy`, `RemoteUrlStrategy`, `ServerStrategy`; runtime validation via `validateAppConfig` + `defaultConfig`.
-- **TypeScript-first**: full type definitions for all config and props.
+- **SDUI engine**: `SDUIShell` / `AppShell` consumes a manifest + per-screen blueprint JSON files and renders the UI through a node-tree walker (`NodeRenderer`) with per-node error isolation.
+- **Built-in nodes**: layout, content, feature, and settings nodes — see [Built-in nodes](#built-in-nodes) below.
+- **Custom nodes**: register your own with `NodeRegistry.getInstance().register(...)`; nodes receive their blueprint slice, theme, dispatch, and template variables.
+- **Zod-validated configs**: `ManifestSchema`, `BlueprintSchema`, and `NodeSchema` guard every load.
+- **Pluggable loaders**: `ManifestLoader` and `BlueprintLoader` accept any async source (bundled JSON, remote fetch, hybrid) with primary + fallback strategies and in-memory caching.
+- **Core services**: `CoreServicesProvider` + `useCoreServices()` — extensible service architecture with Firebase and no-op base implementations.
+- **Auth flow**: Built-in `LoginScreen`, `RegistrationFlow`, `PostEnrolmentFlow` — fully manifest-driven via the `auth` and `login` blocks.
+- **Task flow**: `TaskInstructionsScreen` → `QuestionnaireNode` → `TaskCompletionScreen` — driven by `ScheduleService` and protocol config.
+- **Extensible services**: Each service follows a base + Firebase subclass pattern (e.g. `DefaultAnalyticsService` / `FirebaseAnalyticsService`). Hosts can subclass or swap implementations.
+- **TypeScript-first**: full type definitions for the public surface.
 
 ## Installation (consumer)
 
@@ -40,10 +43,13 @@ npm install @radarbase/app-kit
 Peer dependencies (the host provides these — React Native projects already have most of them):
 
 - `react >=16.8`, `react-native >=0.60`
-- Optional peers used by certain services / widgets:
+- `react-native-reanimated`, `react-native-safe-area-context`, `react-native-svg`
+- Optional peers used by certain services / built-in nodes:
   - `@react-native-firebase/app`, `/analytics`, `/messaging`, `/remote-config`
   - `@react-native-async-storage/async-storage`
   - `react-native-keychain`
+  - `@shopify/react-native-skia` (for `GradientMeshBackground`)
+  - `expo-camera` (for `CameraScanScreen` QR scanning)
 
 ## Usage
 
@@ -52,140 +58,197 @@ Everything is imported from the package root. You should never reach into `lib/.
 ```tsx
 import {
   AppShell,
-  ThemeProvider,
-  PluginManager,
-  WidgetFactory,
-  WidgetRegistry,
-  CoreServicesProvider,
+  NodeRegistry,
+  createAsyncStorageService,
   useCoreServices,
-  configLoader,
-  validateAppConfig,
-  defaultConfig,
-  LocalFileStrategy,
-  ServerStrategy,
+  eventBus,
 } from '@radarbase/app-kit';
-import type { AppConfig, WidgetConfig } from '@radarbase/app-kit';
+import type { NodeProps, CoreServiceOverrides } from '@radarbase/app-kit';
 ```
 
 ### Minimal host app
 
 ```tsx
-import React from 'react';
-import {
-  AppShell,
-  ThemeProvider,
-  CoreServicesProvider,
-  validateAppConfig,
-  defaultConfig,
-} from '@radarbase/app-kit';
-import appConfig from './config/myStudy.json';
+import React, { useMemo } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AppShell, createAsyncStorageService } from '@radarbase/app-kit';
+import appConfig from './config';
 
 export default function App() {
-  const { valid, config } = validateAppConfig(appConfig);
-  const resolved = valid ? config : defaultConfig;
-
+  const storage = useMemo(() => createAsyncStorageService(), []);
   return (
-    <CoreServicesProvider>
-      <ThemeProvider theme={resolved.theme}>
-        <AppShell config={resolved} />
-      </ThemeProvider>
-    </CoreServicesProvider>
+    <SafeAreaProvider>
+      <AppShell manifest={appConfig} storage={storage} />
+    </SafeAreaProvider>
   );
 }
 ```
+
+The `manifest` object combines the `app-manifest.json` with a `blueprints` map of all bundled view JSON files — see the starter-kit's [`config/index.ts`](./starter-kit/config/index.ts) for the pattern.
 
 ### Consuming core services from anywhere
 
 ```tsx
 import { useCoreServices } from '@radarbase/app-kit';
 
-function MyWidget() {
-  const { api, config, auth, eventBus } = useCoreServices();
-  // call api.get(...), config.get(...), auth.signIn(...), eventBus.emit(...)
+function MyNode() {
+  const { api, config, auth, schedule, eventBus } = useCoreServices();
+  // call api.get(...), config.get(...), auth.isAuthenticated(), schedule.getUpcomingTasks()
 }
 ```
 
-### Registering a custom widget
+### Registering a custom node
 
 ```tsx
-import { WidgetRegistry } from '@radarbase/app-kit';
-import MyCustomWidget from './MyCustomWidget';
+import { NodeRegistry } from '@radarbase/app-kit';
+import type { NodeProps } from '@radarbase/app-kit';
+import { Text, View } from 'react-native';
 
-WidgetRegistry.getInstance().register('my-custom', MyCustomWidget);
+function MyCustomNode({ node, context }: NodeProps) {
+  return (
+    <View>
+      <Text style={{ color: context.theme.textColor }}>
+        {String(node.title ?? 'Hello')}
+      </Text>
+    </View>
+  );
+}
+
+NodeRegistry.getInstance().register('MyCustomNode', MyCustomNode);
 ```
 
-Once registered, you can reference it from configuration by `type: 'my-custom'` and `WidgetFactory` will render it.
+Reference it from any blueprint by `"type": "MyCustomNode"` — the `NodeRenderer` will resolve and render it.
 
 ## Configuration
 
-The library is fully configuration-driven. The `AppConfig` shape covers `theme`, `header`, and a nested `tabs → screens → widgets` tree.
+The library is fully configuration-driven via the SDUI multi-file format.
 
-### Example JSON
+- **`app-manifest.json`** — lightweight entry point: app name, theme, header, tabs (each with a `viewPath` pointer), secondary views, custom node registry, auth config, login config, roles.
+- **`views/*.json`** — per-screen blueprints, each a `ScreenBlueprint` containing a node tree under `root`.
 
-```json
-{
-  "theme": {
-    "primary": "#007AFF",
-    "secondary": "#5856D6",
-    "background": "#FFFFFF",
-    "text": "#000000"
-  },
-  "header": {
-    "title": "Health Research App",
-    "showBackButton": false,
-    "showSettings": true
-  },
-  "tabs": [
-    {
-      "id": "dashboard",
-      "label": "Dashboard",
-      "icon": "📊",
-      "screens": [
-        {
-          "id": "overview",
-          "title": "Overview",
-          "widgets": [
-            {
-              "id": "daily-check",
-              "type": "questionnaire",
-              "title": "Daily Health Check",
-              "priority": 1,
-              "config": {
-                "questions": [
-                  { "id": "sleep", "question": "How many hours did you sleep?", "type": "number", "min": 0, "max": 24 },
-                  { "id": "mood",  "question": "How is your mood today?",      "type": "scale",  "min": 1, "max": 10 }
-                ]
-              }
-            }
-          ]
-        }
-      ]
-    }
-  ]
-}
-```
+### Manifest schema
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `appName` | string | Display name |
+| `description` | string | App description |
+| `version` | string | App version |
+| `theme` | object | `brandColors` (brand, accent, background) |
+| `header` | object | Dashboard header config (title, subtitle, settings/notifications paths) |
+| `tabs` | array | Tab definitions (`id`, `label`, `icon`, `viewPath`) |
+| `secondaryViews` | object | Named secondary view paths |
+| `widgetsRegistry` | array | Custom node type declarations |
+| `auth` | object | OAuth config (`clientId`, `endpoint`, `scopes`, `audience`, `redirectUri`, etc.) |
+| `login` | object | Login screen config (`showSignUp`) |
+| `roles` | object | Role-based view assignments |
 
 ### Loading strategies
 
-- `LocalFileStrategy` — bundle a JSON config with the app (Phase 1, what the `starter-kit` uses today).
-- `RemoteUrlStrategy` — fetch a JSON config from any HTTPS URL.
-- `ServerStrategy` — fetch project configuration from a RADAR-Base appserver (Phase 2 target).
+`ManifestLoader` and `BlueprintLoader` accept any async `() => Promise<unknown>` source:
 
-All strategies return the same validated `AppConfig`, so swapping strategies is a one-line change in the host.
+- **Bundled JSON** — `createBundledBlueprintSource({ 'views/home.json': home, … })` for static imports.
+- **Remote fetch** — `async (path) => (await fetch(\`\${cdn}/\${path}\`)).json()` for OTA updates.
+- **Hybrid** — a primary `source` + `fallback` chain (e.g. remote → bundled offline copy).
 
-## Built-in widgets
+Validation against the Zod schemas runs on every load; invalid blueprints throw before they reach the renderer.
 
-| Type                | Component               | Notes                                |
-| ------------------- | ----------------------- | ------------------------------------ |
-| `questionnaire`     | `QuestionnaireWidget`   | Multi-format surveys                                          |
-| `task-list`         | `TaskListWidget`        | Task tracking with status                                     |
-| `dashboard`         | `DashboardWidget`       | Config-driven charts (inline values, API source, range pills) |
-| `device-status`     | `DeviceStatusWidget`    | Wearable / sensor connection status                           |
-| `calendar`          | `CalendarWidget`        | Schedule of tasks / events                                    |
+## Core services
+
+All services are created and provided via `CoreServicesProvider`. Each follows an extensible base class + Firebase subclass pattern with auto-selecting factories.
+
+| Service | Base class | Firebase class | Factory |
+|---------|-----------|---------------|---------|
+| Analytics | `DefaultAnalyticsService` | `FirebaseAnalyticsService` | `analyticsServiceFactory` |
+| Remote Config | `DefaultRemoteConfigService` | `FirebaseRemoteConfigService` | `remoteConfigServiceFactory` |
+| Notifications | `DefaultNotificationService` | `FirebaseNotificationService` | `notificationServiceFactory` |
+| Token | `DefaultTokenService` | — | `tokenServiceFactory` |
+| Auth | `DefaultAuthService` | — | `authServiceFactory` |
+| Cache | `DefaultCacheService` | — | `cacheServiceFactory` |
+| Kafka | `DefaultKafkaService` | — | `kafkaServiceFactory` |
+| Config | `DefaultConfigService` | — | `configServiceFactory` |
+| Schedule | `AppserverScheduleService` | — | `scheduleServiceFactory` |
+| AppServer | `DefaultAppServerService` | — | `appServerServiceFactory` |
+| SubjectConfig | `ManagementPortalSubjectConfigService` | — | `subjectConfigServiceFactory` |
+| QuestionnaireData | `DefaultQuestionnaireDataService` | — | `questionnaireDataServiceFactory` |
+| DataPipeline | `DefaultDataPipeline` | — | `dataPipelineFactory` |
+
+Hosts can override services via `CoreServiceOverrides` (passed to `AppShell` or `CoreServicesProvider`):
+
+```tsx
+<AppShell
+  manifest={config}
+  storage={myStorageService}     // required for persistence
+  // Optional overrides:
+  // logger, localization, remoteConfig, subjectConfig
+/>
+```
+
+## Task flow
+
+The full task lifecycle, from schedule to completion:
+
+1. **Schedule** — `ScheduleService` fetches tasks from the AppServer, maps protocol `startText`/`endText` onto each task.
+2. **Task card** — `TaskListSectionNode` / `CalendarNode` renders tasks. Tapping emits `OPEN_TASK_INSTRUCTIONS`.
+3. **Instructions** — `TaskInstructionsScreen` slides in with the task's `startText` (or `description`), duration, question count, expiry.
+4. **Questionnaire** — `QuestionnaireNode` renders questions with branching logic, progress tracking, and per-question timestamps.
+5. **Completion** — `TaskCompletionScreen` shows a celebration with the task's `endText` (or a default message). Buttons: Home / Calendar.
+6. **Data pipeline** — `QuestionnaireDataService` submits results through `DataPipelineService` → `ConverterFactory` (ms → seconds) → `KafkaService`.
+
+## Built-in nodes
+
+| Type | Purpose |
+|------|---------|
+| **Layout** | |
+| `ViewNode` | Root scroll container for a screen |
+| `SectionNode` | Logical grouping with optional header + "See All" |
+| `CardNode` | Elevated surface for a child cluster |
+| `CardSectionNode` | Generic titled card list — vertical, horizontal-scroll, or 2-col grid |
+| **Content** | |
+| `TextNode` | Static / interpolated text (`{{user.firstName}}` etc.) |
+| `ActionNode` | Tappable button — `OpenCustomView`, `Navigate`, `OpenExternalUrl`, `TriggerEvent` |
+| **Task & Schedule** | |
+| `TaskListSectionNode` | `ScheduleService`-driven task list, rendered as `TaskCardNode`s |
+| `TaskCardNode` | Single task pill (questionnaire / speech / physical / medication) |
+| `ToDoStatusNode` | End-of-day status banner, derived from completed/total counts |
+| `CalendarNode` | Schedule of tasks / events (`calendar` / `agenda` variants) |
+| `SurveyTaskListNode` | ePRO task list (`singleCard` / `multiCard` variants) |
+| `QuestionnaireNode` | Full-page questionnaire form with branching logic |
+| **Data & Charts** | |
+| `StatCardNode` | Engagement stat card (check-in / streak / active days) |
+| `DataWheelCardNode` | Circular progress ring for a wearable metric |
+| `ArcDataCardNode` | 180° gauge that fills by value |
+| `BarChartCardNode` | Seven-day bar chart with a dashed average line |
+| `LineGraphCardNode` | Time-series line with drag-to-scrub tooltip |
+| `GraphDataNode` | Single-metric chart (`mini` sparkline / `detailed` bar) |
+| **Settings** | |
+| `SettingsRowNode` | Flexible settings row — 4 variants: `value`, `toggle`, `link`, `action` |
+| **Dashboard** | |
+| `HeaderNode` | Dashboard header — logo/avatar, sync/notifications/settings, greeting |
+| `NavbarNode` | Floating bottom tab bar, driven by the manifest's `tabs` |
+| **Other** | |
+| `ConnectDevicesMenuNode` | Wearable / sensor connection status |
+| `AlertBannerNode` | Inline banner (`info` / `warning` / `critical`) |
+| `InboxItemListCoordinatorNode` | Tabbed coordinator across multiple `InboxItemListNode`s |
+| `InboxItemListNode` | Filtered inbox list |
+| `RelativeActivityTodayNode` | Activity progress ring |
+| `NotificationListNode` | AppServer notification list (past/expired only) |
+
+## Screens (built-in)
+
+| Screen | Purpose |
+|--------|---------|
+| `LoginScreen` | Login / sign-up gate with `WelcomeCard` (configurable via `login.showSignUp`) |
+| `RegistrationFlow` | QR scan or manual enrolment |
+| `PostEnrolmentFlow` | Post-login onboarding (notifications, health connect) |
+| `TaskInstructionsScreen` | Pre-task briefing with task details and illustration |
+| `TaskCompletionScreen` | Post-task celebration with Home/Calendar navigation |
+| `NotificationsScreen` | AppServer notifications (fetched, filtered to past only) |
+| `ConnectHealthScreen` | Apple Health / Health Connect permission flow |
+| `InfoScreen` | Generic information screen |
+| `LoadingScreen` | Loading state with animated dots |
+| `CameraScanScreen` | QR code scanner for enrolment |
 
 ## Development
-
-The repo is laid out as a library + a sibling consumer app for fast feedback.
 
 ```bash
 ./scripts/dev.sh install     # install library + starter-kit deps
@@ -198,22 +261,21 @@ The repo is laid out as a library + a sibling consumer app for fast feedback.
 Equivalent npm scripts at the repo root:
 
 ```bash
-npm run build        # tsc
+npm run build        # tsc + copy assets
 npm run typecheck    # tsc --noEmit
 npm run clean        # rm -rf lib
-npm run prepublishOnly  # clean + build (runs automatically on `npm publish`)
 ```
 
 ### Editing the library
 
 1. Edit files under `src/`.
 2. Run `npm run build` at the repo root to refresh `lib/`.
-3. The `starter-kit/` pins `"@radarbase/app-kit": "^1.0.0"`. While the library is unpublished, point the starter at the workspace via either `"@radarbase/app-kit": "file:../"` (temporary edit, don't commit) or `npm link` — see [`starter-kit/README.md`](./starter-kit/README.md#local-library-development).
+3. The starter-kit consumes the library via `"file:../"` — changes are picked up after a rebuild.
 
 ### Editing the starter-kit
 
-1. `cd starter-kit && npm start` (or `./scripts/dev.sh starter` from root).
-2. Edit `starter-kit/App.tsx` and `starter-kit/config/*.json` to experiment with new configs / widgets.
+1. `cd starter-kit && npx expo start` (or `./scripts/dev.sh starter`).
+2. Edit `starter-kit/App.tsx` and `starter-kit/config/**/*.json`.
 
 ## Publishing
 
@@ -230,7 +292,3 @@ MIT — see [LICENSE](./LICENSE).
 3. Make your changes under `src/` and add a usage example in `starter-kit/` if relevant.
 4. Run `npm run typecheck` and `npm run build` at the repo root before opening a PR.
 5. Submit a pull request.
-
-## Support
-
-For questions and support, please open an issue on GitHub.
