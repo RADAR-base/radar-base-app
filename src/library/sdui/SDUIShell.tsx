@@ -38,7 +38,13 @@ import { NotificationsProvider } from './useNotifications';
 import { TaskInstructionsScreen } from './TaskInstructionsScreen';
 import { TaskCompletionScreen } from './TaskCompletionScreen';
 import type { TaskCardType } from './nodes/card/TaskCardNode';
-import { fontFamily, navbarLayout, layout as layoutTokens, resolveBackground } from '../../theme/theme';
+import {
+  fontFamily,
+  navbarLayout,
+  layout as layoutTokens,
+  resolveBackground,
+  type ThemeMode,
+} from '../../theme/theme';
 import type { SDUIContext, TemplateContext } from './types';
 
 const noopRender = () => null;
@@ -64,7 +70,15 @@ interface SecondaryEntry {
 export function SDUIShell(props: SDUIShellProps) {
   registerBuiltInNodes();
 
-  const colorScheme = useColorScheme();
+  /**
+   * The device's colour scheme, narrowed to the two the theme actually has.
+   *
+   * React Native 0.86 widened `ColorSchemeName` to include `'unspecified'` alongside `null`, which a
+   * `?? 'light'` at each use site no longer covers. Normalising once here keeps the widening in one
+   * place: anything that isn't explicitly dark is light, which is what the fallback always meant.
+   */
+  const scheme = useColorScheme();
+  const colorScheme: ThemeMode = scheme === 'dark' ? 'dark' : 'light';
   const [manifest, setManifest] = useState<AppManifest | null>(null);
   const [manifestError, setManifestError] = useState<string | null>(null);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
@@ -86,7 +100,7 @@ export function SDUIShell(props: SDUIShellProps) {
     const loader = new ManifestLoader({
       source: props.manifestSource,
       fallback: props.manifestFallback,
-      mode: colorScheme ?? 'light',
+      mode: colorScheme,
       onValidationError: (err) => console.warn('[SDUI] Manifest validation failed:', err),
     });
     loader
@@ -175,7 +189,7 @@ export function SDUIShell(props: SDUIShellProps) {
     template: props.templateContext ?? {},
     dispatch,
     theme: manifest.theme,
-    colorScheme: colorScheme ?? 'light',
+    colorScheme,
     eventBus: props.eventBus,
   };
 
@@ -187,7 +201,7 @@ export function SDUIShell(props: SDUIShellProps) {
       <View
         style={[
           styles.container,
-          { backgroundColor: resolveBackground(manifest.theme, colorScheme ?? 'light') },
+          { backgroundColor: resolveBackground(manifest.theme, colorScheme) },
         ]}
       >
         {/* The dashboard header now lives inside each tab's scroll view (bar sticky, title scrolls

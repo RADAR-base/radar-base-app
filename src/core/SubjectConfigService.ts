@@ -171,6 +171,17 @@ export function subjectIdFromAccessToken(accessToken: string): string | null {
   return null;
 }
 
+/**
+ * Node's `Buffer`, for the environments that have one.
+ *
+ * React Native provides `atob`, so on device the fallback below never runs — it's there for Node
+ * (tests, tooling). Declared locally rather than adding `@types/node`, which would put every Node
+ * global in scope for a React Native library and let one be used by accident.
+ */
+declare const Buffer:
+  | { from(data: string, encoding: string): { toString(encoding: string): string } }
+  | undefined;
+
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
     const parts = token.split('.');
@@ -180,7 +191,8 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
     const json =
       typeof atob === 'function'
         ? atob(padded)
-        : Buffer.from(padded, 'base64').toString('utf8');
+        : Buffer?.from(padded, 'base64').toString('utf8');
+    if (json == null) return null;
     return JSON.parse(json) as Record<string, unknown>;
   } catch {
     return null;

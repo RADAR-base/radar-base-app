@@ -6,14 +6,29 @@
     "scheme": "com.radarbase.starter",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "plugins": [
-      "expo-audio"
+      "expo-font",
+      "expo-audio",
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static",
+            "privacyManifestAggregationEnabled": false,
+            "deploymentTarget": "16.4"
+          }
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.radarbase.starter",
+      "bundleIdentifier": "org.radarbase.starter",
       "scheme": "com.radarbase.starter",
+      "deploymentTarget": "16.4",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "This app requires microphone access to record audio messages."
       }
@@ -21,6 +36,7 @@
     "android": {
       "edgeToEdgeEnabled": true,
       "package": "org.radarbase.starter",
+      "googleServicesFile": "./google-services.json",
       "intentFilters": [
         {
           "action": "VIEW",

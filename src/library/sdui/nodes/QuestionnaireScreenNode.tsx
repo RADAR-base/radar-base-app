@@ -973,7 +973,7 @@ const styles = StyleSheet.create({
   },
   // Each full-screen layer (questions / "Well done") stacks here so they can slide past each other.
   screen: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   body: {
     flex: 1,

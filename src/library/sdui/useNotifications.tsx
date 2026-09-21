@@ -59,7 +59,9 @@ function mapServerNotification(dto: ServerNotificationDto): AppNotification {
     title: dto.title ?? 'Notification',
     description: dto.body ?? dto.message ?? '',
     timestamp: ts ? new Date(ts).getTime() : Date.now(),
-    read: dto.read ?? dto.state === 'READ' ?? false,
+    // No trailing `?? false`: the comparison is already a boolean, so it can never be nullish and the
+    // fallback was unreachable. TypeScript 5.6 reports that rather than ignoring it.
+    read: dto.read ?? dto.state === 'READ',
   };
 }
 
