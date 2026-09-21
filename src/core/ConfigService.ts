@@ -277,6 +277,10 @@ export class DefaultConfigService implements ConfigService {
     }
   }
 
+  reset(): void {
+    this.isInitialized = false;
+  }
+
   private async ensureInitialized(): Promise<void> {
     if (!this.isInitialized) {
       await this.init();

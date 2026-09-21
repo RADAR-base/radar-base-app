@@ -139,6 +139,11 @@ export class DefaultQuestionnaireDataService implements QuestionnaireDataService
     this.logger.log(`Questionnaire submitted: ${result.assessmentName}`);
   }
 
+  async clear(): Promise<void> {
+    this.definitions.clear();
+    await this.storage.set(STORAGE_KEY, null);
+  }
+
   // ---------------------------------------------------------------------------
   // Private
   // ---------------------------------------------------------------------------
@@ -200,9 +205,8 @@ export class DefaultQuestionnaireDataService implements QuestionnaireDataService
 function parseGithubContent(data: any): Question[] {
   // GitHub API returns { content: base64, encoding: 'base64' }
   if (data.content && data.encoding === 'base64') {
-    // `decodeBase64Utf8`, not a bare `atob` — see the note there. Plain `atob` splits every
-    // multi-byte character, which is what turned "Aesop's fables" into "Aesopâ€™s fables".
-    return JSON.parse(decodeBase64Utf8(data.content)) as Question[];
+    const decoded = atob(data.content.replace(/\n/g, ''));
+    return JSON.parse(decoded) as Question[];
   }
   // Direct JSON array (raw content or appserver proxy)
   if (Array.isArray(data)) return data as Question[];

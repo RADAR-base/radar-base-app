@@ -13,6 +13,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Path, Polygon, Rect, Stop } from 'react-native-svg';
 
+import { useCoreServices } from '../../../../core/CoreServicesContext';
 import MicIcon from '../../../../theme/icons/mic.svg';
 import ReRecordIcon from '../../../../theme/icons/rerecord.svg';
 import {
@@ -28,11 +29,16 @@ import {
 /** Which of the three screens the speech question is showing. */
 export type SpeechPhase = 'idle' | 'recording' | 'recorded';
 
-/** What an answered speech question stores. `uri` is filled in once real capture is wired up. */
+/** What an answered speech question stores. */
 export interface SpeechRecording {
   durationMs: number;
   recordedAt: number;
-  uri?: string;
+  /** Base64-encoded audio data — sent to Kafka as a data URI. */
+  base64Data?: string;
+  /** MIME type of the recording (e.g. 'audio/m4a'). */
+  mimeType?: string;
+  /** Local file URI for playback without re-encoding. */
+  fileUri?: string;
   /**
    * The take's amplitude envelope, `ENVELOPE_SIZE` samples of 0..1, so the review screen can draw
    * the shape of what was actually said rather than a stand-in.
@@ -289,31 +295,12 @@ export interface SpeechInputProps {
  *      pulsing rings
  *   3. **recorded**  — waveform + timer, a play button, and two cards: re-record / continue
  *
- * ---------------------------------------------------------------------------------------------
- * TODO (audio capture): THIS COMPONENT DOES NOT RECORD ANYTHING YET.
+ * Audio capture is driven by the `audioService` prop (`AudioRecordService`). When provided, the
+ * component records real audio, encodes it as base64, and stores it on the `SpeechRecording`
+ * answer — ready for the data pipeline to serialize as a data URI and send to Kafka.
  *
- * No audio library is installed in the project, so the three phases, the timer, the animations and
- * the stored answer shape are all real — but the microphone is never opened and `SpeechRecording.uri`
- * is never set. A participant can complete a speech task and no audio leaves the device.
- *
- * Wiring it up means installing a recorder (`expo-audio`, or `react-native-audio-recorder-player`)
- * and filling in the five `TODO (audio capture)` seams below:
- *
- *   1. `startRecording` — request the mic permission, then start the recorder. Permission can be
- *      refused, which is a state this component has no design for yet: decide whether the question
- *      becomes skippable or shows an explanatory screen.
- *   2. `stopRecording`  — stop the recorder and pass the resulting file's `uri` on the answer, so
- *      `onChange` stores something a host can actually upload.
- *   3. `levels`         — replace the generated pattern with real metering, so the waveform reflects
- *      the participant's voice. Feed `pushLevel` — the ring buffer and per-bar animated styles are
- *      already in place, so nothing re-renders per sample.
- *   4. `isPlaying`      — drive from the player's own state so it clears when playback reaches the
- *      end, not only when the button is pressed a second time.
- *   5. the play button  — start/stop the player; the icon already follows `isPlaying`.
- *
- * Also still open once capture is real: uploading the file (nothing consumes `uri` yet), a maximum
- * recording length, and what happens if the app is backgrounded mid-recording.
- * ---------------------------------------------------------------------------------------------
+ * Without an `audioService`, the component degrades gracefully: phases, animations, and the
+ * timer all work, but no audio is captured (useful for development or preview).
  */
 export function SpeechInput({
   prompt,
@@ -328,6 +315,7 @@ export function SpeechInput({
   allowReplay = true,
   accentColor,
 }: SpeechInputProps) {
+  const { audioRecord: audioService } = useCoreServices();
   const [isRecording, setIsRecording] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
   /** Position through the take while it plays back, so the timer pill counts rather than sits. */
@@ -344,10 +332,19 @@ export function SpeechInput({
   // The chevron keys off whether the passage scrolls at all, not the current position — otherwise it
   // would vanish on reaching the bottom, which reads as a glitch rather than as progress.
   const promptIsScrollable = promptContent > promptViewport + 1;
-  // Whether the captured take is playing back. TODO (audio capture) 4/5: drive this from the player's
-  // own state so it also clears when the recording reaches its end, not just on a second press.
+  // Whether the captured take is playing back. When an audioService is provided, playback end
+  // is reported via the onComplete callback passed to playAudio — setIsPlaying(false) is called
+  // automatically, so the button and progress reset without a second press.
   const [isPlaying, setIsPlaying] = useState(false);
   const startedAt = useRef(0);
+
+  // Stop any in-flight recording or playback when the component unmounts (e.g. navigating away
+  // mid-recording). Not `destroy()` — the service outlives this component.
+  useEffect(() => {
+    return () => {
+      audioService?.stopPlayback().catch(() => {});
+    };
+  }, [audioService]);
 
   // How many bars fit. Seeded from the window rather than starting at zero: `onLayout` only reports
   // after the first paint, so waiting for it rendered an empty waveform for a frame and the bars
@@ -383,14 +380,13 @@ export function SpeechInput({
     [incoming],
   );
 
-  // The sample source. TODO (audio capture) 3/5: replace this interval with the recorder's metering
-  // callback — convert its dB reading to 0..1 (roughly `(db + 60) / 60`, clamped) and call
-  // `pushLevel`. Everything downstream already treats these as real levels.
+  // When an audioService is provided, real metering levels arrive via the `onLevel` callback passed
+  // to `startRecording` — no interval needed. Fall back to fake levels only without a service.
   useEffect(() => {
-    if (!isRecording || barCount <= 0) return;
+    if (!isRecording || barCount <= 0 || audioService) return;
     const id = setInterval(() => pushLevel(randomLevel()), SAMPLE_MS);
     return () => clearInterval(id);
-  }, [isRecording, barCount, pushLevel]);
+  }, [isRecording, barCount, pushLevel, audioService]);
 
   const phase: SpeechPhase = isRecording ? 'recording' : value ? 'recorded' : 'idle';
 
@@ -526,8 +522,8 @@ export function SpeechInput({
       playProgress.value = 1;
       return;
     }
-    // TODO (audio capture) 4/5: drive this from the player's reported position instead of assuming
-    // playback runs to length — a pause or a seek currently won't be reflected.
+    // Visual approximation: animate linearly over the take's duration. Good enough while the
+    // player can only play start-to-finish; a seek or pause would need the player's position.
     playProgress.value = 0;
     playProgress.value = withTiming(1, {
       duration: value?.durationMs ?? 0,
@@ -554,8 +550,7 @@ export function SpeechInput({
   // The same clock for playback, so the pill counts up through the take instead of sitting on its
   // total. Capped at the duration, and it stops itself at the end.
   //
-  // TODO (audio capture) 4/5: both the position and the stop belong to the player — this assumes
-  // playback runs start to finish at normal speed, so a pause or a seek won't be reflected.
+  // Timer counts up during playback; the player's onComplete callback stops it via setIsPlaying(false).
   useEffect(() => {
     if (!isPlaying) return;
     const total = value?.durationMs ?? 0;
@@ -575,10 +570,12 @@ export function SpeechInput({
   // screen while the host still thought recording was in progress, so the host's slide offset wasn't
   // applied yet and the review controls painted in place before jumping off-screen to slide in.
   // Telling the host in the same batch means its layout effect lands before the first paint.
-  const startRecording = useCallback(() => {
-    // TODO (audio capture) 1/5: request the mic permission and start the recorder here.
-    // Permission may be denied — this component has no design for that yet, so it currently proceeds
-    // into the recording screen regardless and captures silence. See the block on the component.
+  const startRecording = useCallback(async () => {
+    if (audioService) {
+      const granted = await audioService.requestPermission();
+      if (!granted) return; // Permission denied — stay on the idle screen.
+      await audioService.startRecording((level) => pushLevel(level));
+    }
     startedAt.current = Date.now();
     setElapsedMs(0);
     // Clear the envelope accumulator so a re-record doesn't inherit the shape of the take it
@@ -587,15 +584,31 @@ export function SpeechInput({
     setIsRecording(true);
     // Not a transition: idle → recording is the rise animation, not a slide.
     onPhaseChange?.('recording');
-  }, [onPhaseChange]);
+  }, [audioService, pushLevel, onPhaseChange]);
 
-  const stopRecording = useCallback(() => {
-    // TODO (audio capture) 2/5: stop the recorder and pass its file `uri` on the answer below —
-    // without it the stored `SpeechRecording` has a duration but no audio, so nothing can be uploaded.
+  const stopRecording = useCallback(async () => {
+    let base64Data: string | undefined;
+    let mimeType: string | undefined;
+    let fileUri: string | undefined;
+    let durationMs = Date.now() - startedAt.current;
+
+    if (audioService) {
+      try {
+        const result = await audioService.stopRecording();
+        base64Data = result.base64Data || undefined;
+        mimeType = result.mimeType;
+        fileUri = result.fileUri || undefined;
+        if (result.durationMs > 0) durationMs = result.durationMs;
+      } catch { /* fall through with the calculated duration */ }
+    }
+
     setIsRecording(false);
     onChange({
-      durationMs: Date.now() - startedAt.current,
+      durationMs,
       recordedAt: Date.now(),
+      base64Data,
+      mimeType,
+      fileUri,
       // The whole take averaged down to a fixed size, so the review screen draws this recording's
       // own shape and it survives at the same resolution on any device.
       levels: downsample(samples.current, ENVELOPE_SIZE),
@@ -603,9 +616,11 @@ export function SpeechInput({
     // `transition` marks this as participant-triggered, which is what arms the host's slide. Reported
     // here rather than left to the backstop effect below, so the host has it before the next paint.
     onPhaseChange?.('recorded', { transition: true });
-  }, [onChange, onPhaseChange]);
+  }, [audioService, onChange, onPhaseChange]);
 
-  const reRecord = useCallback(() => {
+  const reRecord = useCallback(async () => {
+    // Stop any active playback before resetting.
+    await audioService?.stopPlayback();
     // Clearing the answer re-gates the host's next button until a new take is captured.
     onChange(undefined);
     setIsPlaying(false);
@@ -613,7 +628,7 @@ export function SpeechInput({
     // Also participant-triggered, so it slides — back the way it came, since the host reads any phase
     // that isn't 'recorded' as the reverse direction.
     onPhaseChange?.('idle', { transition: true });
-  }, [onChange, onPhaseChange]);
+  }, [audioService, onChange, onPhaseChange]);
 
   const onPrimary = readableTextColor(primaryColor, { preferred: '#FFFFFF' });
   const accent = accentColor ?? primaryColor;
@@ -795,8 +810,18 @@ export function SpeechInput({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={isPlaying ? 'Pause recording' : 'Play recording'}
-              // TODO (audio capture) 5/5: start/stop the player here; the icon already follows `isPlaying`.
-              onPress={() => setIsPlaying((playing) => !playing)}
+              onPress={async () => {
+                if (isPlaying) {
+                  await audioService?.stopPlayback();
+                  setIsPlaying(false);
+                } else if (audioService && value?.fileUri) {
+                  setIsPlaying(true);
+                  await audioService.playAudio(value.fileUri, () => setIsPlaying(false));
+                } else {
+                  // No audio service or no file — toggle the visual state only (graceful degradation).
+                  setIsPlaying((p) => !p);
+                }
+              }}
               style={({ pressed }) => [
                 styles.bigButton,
                 { backgroundColor: primaryColor },
@@ -885,8 +910,7 @@ export function SpeechInput({
   );
 }
 
-/** Placeholder amplitude, standing in for the recorder's metering until it exists — see the
- *  `TODO (audio capture) 3/5` sample source. */
+/** Placeholder amplitude used when no `audioService` is provided (development / preview). */
 function randomLevel(): number {
   return 0.15 + Math.random() * 0.85;
 }

@@ -21,9 +21,11 @@ export {
   useAuthService,
   useNotificationService,
   useScheduleService,
-  useScheduleInit,
+  useServicesReady,
+  useSigningOut,
   useSubjectConfigService,
   useQuestionnaireDataService,
+  useAudioRecordService,
 } from './core/CoreServicesContext';
 export { useAuth } from './core/useAuth';
 export type { UseAuthResult } from './core/useAuth';
@@ -38,6 +40,8 @@ export { remoteConfigServiceFactory, DefaultRemoteConfigService, FirebaseRemoteC
 export { notificationServiceFactory, DefaultNotificationService, FirebaseNotificationService } from './core/NotificationService';
 export { scheduleServiceFactory } from './core/AppserverScheduleService';
 export { questionnaireDataServiceFactory } from './core/QuestionnaireDataService';
+export { audioRecordServiceFactory, DefaultAudioRecordService, ExpoAudioRecordService } from './core/AudioRecordService';
+export type { AudioRecordConfig } from './core/AudioRecordService';
 export {
   subjectConfigServiceFactory,
   ManagementPortalSubjectConfigService,
@@ -209,6 +213,8 @@ export type {
   NotificationService,
   ScheduleService,
   QuestionnaireDataService,
+  AudioRecordService,
+  AudioRecordingResult,
   ProtocolConfig,
   AssessmentConfig,
   AssessmentProtocol,

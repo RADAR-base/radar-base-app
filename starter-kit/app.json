@@ -9,6 +9,7 @@
     "newArchEnabled": true,
     "plugins": [
       "expo-font",
+      "expo-audio",
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
       [
@@ -27,7 +28,10 @@
       "bundleIdentifier": "org.radarbase.starter",
       "scheme": "com.radarbase.starter",
       "deploymentTarget": "16.4",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "This app requires microphone access to record audio messages."
+      }
     },
     "android": {
       "edgeToEdgeEnabled": true,

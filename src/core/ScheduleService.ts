@@ -106,6 +106,12 @@ export abstract class ScheduleServiceBase implements ScheduleService {
       this.appStateSubscription.remove();
       this.appStateSubscription = null;
     }
+    // Reset all state so the next init() starts fresh (e.g. after sign-out + re-login).
+    this.initialized = false;
+    this.tasks = [];
+    this.openedTaskIds.clear();
+    this.activeDays.clear();
+    this.notifiedReadyIds.clear();
   }
 
   // ---------------------------------------------------------------------------

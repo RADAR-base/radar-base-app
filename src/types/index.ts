@@ -76,13 +76,6 @@ export interface Question {
   identifier?: string;
   custom_alignment?: string;
   question_number?: string;
-  /**
-   * Speech questions only: may the participant play their recording back before continuing?
-   *
-   * Absent means yes — replay is the default, so existing definitions keep the play button without
-   * being edited. A study suppresses it by setting this false (or `'n'` / `'false'` / `'0'`, since
-   * REDCap-style definitions carry booleans as strings). See `isReplayAllowed`.
-   */
   allow_replay_speech?: boolean | string;
 }
 
@@ -154,6 +147,7 @@ export interface ApiService {
   setAuthTokenProvider(provider: () => Promise<string | null>): void;
   get<T = any>(path: string, options?: RequestInit): Promise<T>;
   post<T = any>(path: string, body: unknown, options?: RequestInit): Promise<T>;
+  put<T = any>(path: string, body: unknown, options?: RequestInit): Promise<T>;
 }
 
 // Generic dashboard data shape — drives nodes like `GraphDataNode`. Each series renders
@@ -387,6 +381,8 @@ export interface KafkaService {
   getTopics(): Promise<string[]>;
   /** Fetch schema from the schema registry for a given topic (key or value). */
   getSchema(topic: string, schemaType?: 'key' | 'value'): Promise<{ id: number; version: number; schema: string }>;
+  /** Clear in-memory state (base URL, topics, schema cache). Called on sign-out. */
+  clear(): void;
 }
 
 export interface SchemaService {
@@ -404,6 +400,8 @@ export interface ConfigService {
   setBaseUrl(uri: string): Promise<string>;
   sendCachedData(): Promise<{ successKeys: string[]; failedKeys: string[] }>;
   sendConfigChangeEvent(type: string, previous?: any, current?: any, error?: any, data?: any): void;
+  /** Reset initialization flag so the next `init()` re-runs. Called on sign-out. */
+  reset(): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -556,6 +554,41 @@ export interface QuestionnaireDataService {
   getQuestions(assessmentName: string): Promise<Question[]>;
   /** Submit completed questionnaire result. */
   submitResult(result: QuestionnaireResult): Promise<void>;
+  /** Clear in-memory definitions and persisted cache. Called on sign-out. */
+  clear(): Promise<void>;
+}
+
+// ---------------------------------------------------------------------------
+// Audio recording
+// ---------------------------------------------------------------------------
+
+export interface AudioRecordingResult {
+  /** Base64-encoded audio data. */
+  base64Data: string;
+  /** MIME type of the recording (e.g. 'audio/m4a'). */
+  mimeType: string;
+  /** Duration in milliseconds. */
+  durationMs: number;
+  /** Local file URI — usable for playback without decoding base64. */
+  fileUri: string;
+}
+
+export interface AudioRecordService {
+  /** Request microphone permission. Returns true if granted. */
+  requestPermission(): Promise<boolean>;
+  /**
+   * Start recording. The optional `onLevel` callback fires at ~100ms intervals
+   * with a normalised amplitude (0..1) for live waveform metering.
+   */
+  startRecording(onLevel?: (level: number) => void): Promise<void>;
+  /** Stop recording and return the result including base64-encoded audio. */
+  stopRecording(): Promise<AudioRecordingResult>;
+  /** Start playback of a local file. `onComplete` fires when playback finishes. */
+  playAudio(fileUri: string, onComplete?: () => void): Promise<void>;
+  /** Stop any active playback. */
+  stopPlayback(): Promise<void>;
+  /** Release all native resources (recorder + player). */
+  destroy(): Promise<void>;
 }
 
 export interface DataPipelineService {
