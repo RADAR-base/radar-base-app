@@ -23,8 +23,8 @@ const ON_PRIMARY = '#FFFFFF';
  *   - Answer timestamps per question
  *   - Submits QuestionnaireResult via QuestionnaireDataService
  *
- * Introduction and completion screens are handled by the parent
- * (TaskInstructionsScreen / TaskCompletionScreen in SDUIShell).
+ * The introduction screen is handled by the parent (TaskInstructionsScreen in SDUIShell); completion
+ * belongs to `QuestionnaireScreenNode`, which draws its own `TaskCompletionScreen`.
  */
 export function QuestionnaireNode({ node, context }: NodeProps) {
   const { questionnaireData, eventBus } = useCoreServices();

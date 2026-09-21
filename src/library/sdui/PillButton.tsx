@@ -30,6 +30,15 @@ export interface PillButtonProps {
   /** Which theme's tokens to use. Defaults to the device color scheme. */
   mode?: ThemeMode;
   brandColors?: ThemeColorOverrides;
+  /**
+   * Paint with this instead of the brand — fill for `primary`, border and label for `outline`.
+   *
+   * For surfaces that aren't the page background. A brand-filled button is invisible on a brand-filled
+   * page, so a screen that inverts its palette (the questionnaire's "Well done") hands the buttons the
+   * colour it is using for ink. The filled label is then chosen for contrast against *this* colour
+   * rather than assumed, since it is no longer the brand the theme's label was picked for.
+   */
+  accentColor?: string;
   /** Extra style for the button container (e.g. width or margin). */
   style?: StyleProp<ViewStyle>;
 }
@@ -41,6 +50,7 @@ export function PillButton({
   disabled = false,
   mode,
   brandColors,
+  accentColor,
   style,
 }: PillButtonProps) {
   const deviceScheme = useColorScheme();
@@ -50,13 +60,16 @@ export function PillButton({
   // Brand color for the filled/outline variants. Tracks the manifest brand in *both* themes — in dark
   // mode that's the raw brand (which reads on the dark page), not the theme's default navy button
   // surface (which never tracks the brand in dark mode).
-  const brand = brandColors?.brand ?? tokens.button.background;
+  const brand = accentColor ?? brandColors?.brand ?? tokens.button.background;
   const isOutline = variant === 'outline';
   const isText = variant === 'text';
   // Filled label: white in light mode (unchanged); in dark mode pick whatever reads on the brand fill
   // (a light brand needs a dark label), so a peach/pastel brand button stays legible.
+  //
+  // An explicit `accentColor` always takes the readable path, in either mode: the caller has replaced
+  // the fill with a colour of its own, so the theme's light-mode label was never chosen against it.
   const filledLabel =
-    resolvedMode === 'dark'
+    resolvedMode === 'dark' || accentColor
       ? readableTextColor(brand, { preferred: tokens.navbar.text.primary })
       : tokens.navbar.text.primary;
   const labelColor = isText
