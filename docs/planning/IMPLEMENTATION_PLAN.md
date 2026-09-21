@@ -61,8 +61,9 @@ This document outlines the detailed implementation plan for converting the RADAR
 
 - [x] Design SDUI multi-file config format (manifest + blueprints)
 - [x] Define Zod schemas: `ManifestSchema`, `BlueprintSchema`, `NodeSchema`
-- [ ] Implement `ManifestLoader` with strategy chain (Remote → Bundled → Cache)
-- [ ] Implement `BlueprintLoader` with per-screen lazy fetching and caching
+- [x] Implement `ManifestLoader` (source + fallback hooks; bundled strategy in starter)
+- [x] Implement `BlueprintLoader` with per-screen lazy fetching + in-memory caching
+- [ ] Add remote-fetch strategy with stale-while-revalidate TTL caching
 - [ ] Write unit tests for schema validation (valid + invalid manifests)
 - [ ] Create bundled fallback manifests and blueprints for offline use
 - [ ] Implement `configSchemaVersion` migration handler (v1 → v2 upgrade path)
@@ -71,37 +72,40 @@ This document outlines the detailed implementation plan for converting the RADAR
 
 ## **Phase 2: Widget System & Plugin Manager (Week 3-4)**
 
-### **2.1 Widget Registry**
-- [x] Create widget registration system (WidgetRegistry)
-- [x] Implement dynamic widget loading (lazy registration)
-- [x] Add widget lifecycle management (mount/update/unmount events)
-- [x] Create widget validation system (basic presence validation)
-- [ ] Register all SDUI node types (see node catalog in `SDUI_CONFIG_DESIGN.md`)
+### **2.1 Node Registry**
+> Legacy `WidgetRegistry` removed: nodes are now the only public extension point. The registry is the singleton `NodeRegistry` in `src/library/sdui/`.
+- [x] Create node registration system (`NodeRegistry`)
+- [x] Implement dynamic node loading (host calls `register()` at startup)
+- [x] Per-node `NodeErrorBoundary` isolation
+- [x] Schema-level validation (Zod against `NodeSchema`)
+- [x] Register core SDUI node types (View/Section/Card/Text/Action + feature nodes); remaining catalog nodes deferred to later phases
 
 ### **2.2 SDUI Engine (Route Resolver + Load & Render)**
-> Replaces the simple `PluginManager` block-renderer with a full SDUI pipeline.
-- [x] Implement PluginManager component (base)
-- [x] Add recursive widget rendering
-- [x] Create widget context provider
-- [x] Implement error boundaries for widgets (per-node `ErrorBoundary`)
-- [ ] Implement `RouteResolver`: maps `tab.viewPath` → fetch blueprint
-- [ ] Implement `NodeRenderer`: walks node tree, resolves type via `WidgetRegistry`
-- [ ] Implement `{{variable}}` template interpolation in node props
-- [ ] Implement secondary view navigation (ActionNode → `OpenCustomView`)
-- [ ] Add blueprint caching (stale-while-revalidate, TTL-based)
-- [ ] Write unit tests for `RouteResolver` and `NodeRenderer`
+> Replaces the legacy `AppShell` + `PluginManager` block-renderer with a full SDUI pipeline.
+- [x] Implement `NodeRenderer` (tree walker, replaces `PluginManager`)
+- [x] Add recursive node rendering with template interpolation
+- [x] Internal `WidgetContextProvider` (private plumbing for built-in widget components used by feature nodes)
+- [x] Per-node `NodeErrorBoundary`
+- [x] Implement route resolution via `SDUIShell` `TabView`: maps `tab.viewPath` → blueprint
+- [x] Implement `NodeRenderer`: walks node tree, resolves type via `NodeRegistry`
+- [x] Implement `{{variable}}` template interpolation in node props (`interpolate` / `interpolateDeep`)
+- [x] Implement secondary view navigation (`ActionNode` → `OpenCustomView` → stack)
+- [ ] Add blueprint caching (stale-while-revalidate, TTL-based) — in-memory cache only for v1
+- [ ] Write unit tests for `BlueprintLoader` and `NodeRenderer`
 
 ### **2.3 Core Components**
-- [x] Create AppShell component
-- [x] Implement Header component (config from manifest `header` block)
-- [x] Create TabBar component (tabs from manifest `tabs[]`)
-- [x] Add Screen container component
+> Legacy `AppShell` removed in favour of `SDUIShell`.
+- [x] Implement `SDUIShell` (replaces `AppShell`)
+- [x] Header component (config from manifest `header` block)
+- [x] TabBar component (tabs from manifest `tabs[]`)
+- [x] Screen container (`TabView` + `NodeRenderer`)
 
 ### **2.4 Theme System**
-- [x] Create ThemeProvider component
-- [x] Implement dynamic theme switching (runtime updates)
-- [x] Add theme validation
-- [x] Create theme utilities and hooks (useTheme)
+> Legacy `ThemeProvider` / `useTheme` removed. Theme now flows through `SDUIContext.theme` and is provided to legacy widget components via an internal `themeBridge` when feature nodes wrap them.
+- [x] `manifestThemeToLegacy` bridge for built-in widget components
+- [ ] Dynamic theme switching (runtime updates via manifest reload)
+- [x] Theme validation (Zod `ThemeSchema`)
+- [x] Theme available in every `NodeProps` via `context.theme`
 
 ## **Phase 3: Core Widgets Implementation (Week 5-6)**
 
@@ -144,11 +148,12 @@ This document outlines the detailed implementation plan for converting the RADAR
 - [ ] Write unit tests
 
 ### **3.5 New SDUI Layout & Utility Nodes**
-- [ ] Implement `InboxItemListCoordinatorNode` (tabbed coordinator)
-- [ ] Implement `InboxItemListNode` (per-category list)
-- [ ] Implement `RelativeActivityTodayNode` (activity ring)
-- [ ] Implement `ActionNode` with all action types (`OpenCustomView`, `OpenExternalUrl`, `Navigate`, `TriggerEvent`, `StartTeleHealth`, `BookAppointment`, `ExportPDF`)
-- [ ] Implement `AlertBannerNode` with `info`/`warning`/`critical` severities
+- [x] Implement `InboxItemListCoordinatorNode` (tabbed coordinator)
+- [x] Implement `InboxItemListNode` (per-category list, stub data until Phase 4 wiring)
+- [x] Implement `RelativeActivityTodayNode` (activity ring, demo data until HealthKit)
+- [x] Implement `ActionNode` with `OpenCustomView`, `OpenExternalUrl`, `Navigate`, `TriggerEvent`
+- [ ] Extend `ActionNode` with `StartTeleHealth`, `BookAppointment`, `ExportPDF` (backlog)
+- [x] Implement `AlertBannerNode` with `info`/`warning`/`critical` severities
 - [ ] Write unit tests for each node type
 
 ### **3.6 Health & Engagement Nodes (Huma-inspired)**

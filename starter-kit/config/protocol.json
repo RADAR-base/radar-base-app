@@ -1,0 +1,155 @@
+{
+  "version": "0.1.0",
+  "schemaVersion": "0.0.2",
+  "name": "RADAR Starter",
+  "protocols": [
+    {
+      "name": "Daily Mood Check",
+      "showIntroduction": false,
+      "questionnaire": {
+        "name": "daily_mood",
+        "avsc": "questionnaire"
+      },
+      "startText": {
+        "en": "How are you feeling today?"
+      },
+      "endText": {
+        "en": "Thank you for completing the mood check."
+      },
+      "warn": {
+        "en": ""
+      },
+      "estimatedCompletionTime": 2,
+      "protocol": {
+        "repeatProtocol": {
+          "unit": "day",
+          "amount": 1
+        },
+        "repeatQuestionnaire": {
+          "unit": "min",
+          "unitsFromZero": [600]
+        },
+        "reminders": {
+          "unit": "hour",
+          "amount": 2,
+          "repeat": 1
+        },
+        "completionWindow": {
+          "unit": "hour",
+          "amount": 12
+        }
+      }
+    },
+    {
+      "name": "Record Blood Pressure",
+      "showIntroduction": false,
+      "questionnaire": {
+        "name": "morning_vitals",
+        "avsc": "questionnaire"
+      },
+      "startText": {
+        "en": "Take your morning reading."
+      },
+      "endText": {
+        "en": "Thank you for recording your vitals."
+      },
+      "warn": {
+        "en": ""
+      },
+      "estimatedCompletionTime": 3,
+      "protocol": {
+        "repeatProtocol": {
+          "unit": "day",
+          "amount": 1
+        },
+        "repeatQuestionnaire": {
+          "unit": "min",
+          "unitsFromZero": [540]
+        },
+        "reminders": {
+          "unit": "hour",
+          "amount": 1,
+          "repeat": 1
+        },
+        "completionWindow": {
+          "unit": "hour",
+          "amount": 2
+        }
+      }
+    },
+    {
+      "name": "Log Medications",
+      "showIntroduction": false,
+      "questionnaire": {
+        "name": "medication_log",
+        "avsc": "questionnaire"
+      },
+      "startText": {
+        "en": "Record what you took today."
+      },
+      "endText": {
+        "en": "Thank you for logging your medications."
+      },
+      "warn": {
+        "en": ""
+      },
+      "estimatedCompletionTime": 1,
+      "protocol": {
+        "repeatProtocol": {
+          "unit": "day",
+          "amount": 1
+        },
+        "repeatQuestionnaire": {
+          "unit": "min",
+          "unitsFromZero": [1200]
+        },
+        "reminders": {
+          "unit": "hour",
+          "amount": 2,
+          "repeat": 1
+        },
+        "completionWindow": {
+          "unit": "hour",
+          "amount": 4
+        }
+      }
+    },
+    {
+      "name": "Weekly PHQ-9",
+      "showIntroduction": true,
+      "questionnaire": {
+        "name": "phq9",
+        "avsc": "questionnaire"
+      },
+      "startText": {
+        "en": "Weekly mental health assessment."
+      },
+      "endText": {
+        "en": "Thank you for completing the PHQ-9."
+      },
+      "warn": {
+        "en": ""
+      },
+      "estimatedCompletionTime": 5,
+      "protocol": {
+        "repeatProtocol": {
+          "unit": "week",
+          "amount": 1
+        },
+        "repeatQuestionnaire": {
+          "unit": "min",
+          "unitsFromZero": [600]
+        },
+        "reminders": {
+          "unit": "day",
+          "amount": 1,
+          "repeat": 1
+        },
+        "completionWindow": {
+          "unit": "day",
+          "amount": 1
+        }
+      }
+    }
+  ]
+}

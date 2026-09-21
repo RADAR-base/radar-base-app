@@ -1,0 +1,76 @@
+{
+  "blueprintVersion": "1",
+  "root": {
+    "id": "root_home",
+    "type": "ViewNode",
+    "isCanvas": true,
+    "title": "Health Dashboard",
+    "children": [
+      {
+        "id": "section_activity",
+        "type": "SectionNode",
+        "title": "My Activity",
+        "children": [
+          {
+            "id": "activity_today",
+            "type": "RelativeActivityTodayNode"
+          }
+        ]
+      },
+      {
+        "id": "section_tasks",
+        "type": "SectionNode",
+        "title": "My Tasks",
+        "showSeeAll": true,
+        "seeAllAction": "all_tasks",
+        "children": [
+          {
+            "id": "survey_tasks",
+            "type": "SurveyTaskListNode",
+            "variant": "multiCard",
+            "filter": { "status": "incomplete" }
+          }
+        ]
+      },
+      {
+        "id": "section_data",
+        "type": "SectionNode",
+        "title": "My Data",
+        "layout": "horizontal",
+        "children": [
+          {
+            "id": "vitals_sleep",
+            "type": "VitalsChartNode",
+            "vitalType": "sleep_hours",
+            "variant": "compact"
+          },
+          {
+            "id": "vitals_steps",
+            "type": "VitalsChartNode",
+            "vitalType": "steps",
+            "variant": "compact"
+          },
+          {
+            "id": "vitals_stress",
+            "type": "VitalsChartNode",
+            "vitalType": "stress",
+            "variant": "compact"
+          }
+        ]
+      },
+      {
+        "id": "card_custom_demo",
+        "type": "CardNode",
+        "isCanvas": true,
+        "children": [
+          {
+            "id": "custom_runtime_demo",
+            "type": "CustomDemoNode",
+            "title": "Runtime Registered Widget",
+            "description": "Loaded via manifest widgetsRegistry"
+          }
+        ]
+      }
+    ]
+  }
+}

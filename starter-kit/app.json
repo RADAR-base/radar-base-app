@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "RADAR-Base Starter",
+    "slug": "radar-base-starter",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
+    "plugins": [],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "org.radarbase.starter",
+      "scheme": "org.radarbase.starter"
+    },
+    "android": {
+      "edgeToEdgeEnabled": true,
+      "package": "org.radarbase.starter",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "org.radarbase.starter"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

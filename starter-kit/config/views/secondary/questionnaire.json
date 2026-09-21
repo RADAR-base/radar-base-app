@@ -1,0 +1,71 @@
+{
+  "blueprintVersion": "1",
+  "root": {
+    "id": "root_daily_questionnaire",
+    "type": "ViewNode",
+    "isCanvas": true,
+    "title": "Daily Health Check",
+    "children": [
+      {
+        "id": "text_intro",
+        "type": "TextNode",
+        "text": "## Daily Health Check\nA few quick questions to track how you're doing today.",
+        "style": "markdown"
+      },
+      {
+        "id": "questionnaire_daily_form",
+        "type": "QuestionnaireNode",
+        "questionnaireId": "daily_health_check",
+        "questions": [
+          {
+            "id": "mood",
+            "type": "scale",
+            "question": "How is your mood today?",
+            "scale": {
+              "min": 1,
+              "max": 10,
+              "labels": ["Very Poor", "Excellent"]
+            },
+            "required": true
+          },
+          {
+            "id": "sleep_hours",
+            "type": "number",
+            "question": "How many hours did you sleep last night?",
+            "min": 0,
+            "max": 24,
+            "required": true
+          },
+          {
+            "id": "symptoms",
+            "type": "multiple_choice",
+            "question": "Any symptoms today?",
+            "options": ["Headache", "Fatigue", "Nausea", "None"],
+            "required": false
+          },
+          {
+            "id": "notes",
+            "type": "text",
+            "question": "Any additional notes about your health today?",
+            "required": false
+          }
+        ]
+      },
+      {
+        "id": "card_submit",
+        "type": "CardNode",
+        "isCanvas": true,
+        "children": [
+          {
+            "id": "action_submit_questionnaire",
+            "type": "ActionNode",
+            "title": "Submit",
+            "action": "TriggerEvent",
+            "eventName": "questionnaire.submit",
+            "payload": { "questionnaireId": "daily_health_check" }
+          }
+        ]
+      }
+    ]
+  }
+}
