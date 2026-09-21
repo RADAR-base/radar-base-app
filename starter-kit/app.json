@@ -15,11 +15,11 @@
         {
           "ios": {
             "useFrameworks": "static",
-            "privacyManifestAggregationEnabled": false
+            "privacyManifestAggregationEnabled": false,
+            "deploymentTarget": "16.4"
           }
         }
-      ],
-      "./plugins/withPodBuildSettings"
+      ]
     ],
     "ios": {
       "supportsTablet": true,
