@@ -10,6 +10,7 @@
     "plugins": [
       "expo-font",
       "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
       [
         "expo-build-properties",
         {
@@ -25,6 +26,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "org.radarbase.starter",
       "scheme": "com.radarbase.starter",
+      "deploymentTarget": "16.4",
       "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {

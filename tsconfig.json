@@ -29,6 +29,5 @@
     "lib",
     "node_modules",
     "**/*.test.*"
-  ],
-  "extends": "expo/tsconfig.base"
+  ]
 }
