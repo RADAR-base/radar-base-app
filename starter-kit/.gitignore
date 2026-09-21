@@ -39,7 +39,6 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
-src/auth/authConfig.ts
 
-ios/build/
-ios/Pods/
+ios/
+android/
