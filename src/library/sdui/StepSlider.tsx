@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
+  type SharedValue,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
@@ -111,7 +112,7 @@ function Panel({
 }: {
   step: number;
   index: number;
-  position: Animated.SharedValue<number>;
+  position: SharedValue<number>;
   width: number;
   children: React.ReactNode;
 }) {
