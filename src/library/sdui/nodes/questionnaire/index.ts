@@ -4,5 +4,7 @@ export { RangeInput } from './RangeInput';
 export { SliderInput } from './SliderInput';
 export { TextQuestionInput } from './TextQuestionInput';
 export { InfoScreen } from './InfoScreen';
+export { SpeechInput } from './SpeechInput';
+export type { SpeechRecording } from './SpeechInput';
 export { QuestionRenderer } from './QuestionRenderer';
 export { evaluateBranchingLogic } from './branchingLogic';

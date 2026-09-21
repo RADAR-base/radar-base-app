@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { fontFamily } from '../../theme/theme';
 
 /**
  * Lightweight, dependency-free chart primitives used by built-in SDUI nodes such as
@@ -88,6 +89,8 @@ const barStyles = StyleSheet.create({
   },
   dayLabel: {
     fontSize: 10,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
     fontWeight: '600',
     color: '#8E8E93',
   },

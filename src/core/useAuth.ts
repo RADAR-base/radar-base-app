@@ -10,6 +10,13 @@ export interface UseAuthResult {
   startLogin: () => Promise<void>;
   logout: () => Promise<void>;
   clearError: () => void;
+  /**
+   * Cancel an in-progress login: if the status is `authenticating` (e.g. the user opened the
+   * OAuth browser but returned without finishing), reset it to `unauthenticated` and clear any
+   * error. UI-only — it doesn't touch stored tokens, so a real callback that still arrives later
+   * will re-drive the status via the EventBus.
+   */
+  cancelLogin: () => void;
 }
 
 export function useAuth(): UseAuthResult {
@@ -80,7 +87,12 @@ export function useAuth(): UseAuthResult {
 
   const clearError = useCallback(() => setError(null), []);
 
-  return { status, error, startLogin, logout, clearError };
+  const cancelLogin = useCallback(() => {
+    setStatus((prev) => (prev === 'authenticating' ? 'unauthenticated' : prev));
+    setError(null);
+  }, []);
+
+  return { status, error, startLogin, logout, clearError, cancelLogin };
 }
 
 function parseOAuthCallback(rawUrl: string): {

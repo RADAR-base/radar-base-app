@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { NodeProps } from '../types';
+import { fontFamily } from '../../../theme/theme';
 
 type Severity = 'info' | 'warning' | 'critical';
 
@@ -38,10 +39,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 14,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     fontWeight: '700',
     marginBottom: 2,
   },
   body: {
     fontSize: 13,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
   },
 });

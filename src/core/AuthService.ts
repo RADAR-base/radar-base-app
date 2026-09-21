@@ -11,6 +11,7 @@ import {
   OAuthConfig,
 } from '../types';
 import { EVENTS } from './EventBus';
+import { BASE_URI_KEY } from './ConfigService';
 import type { AuthStatus } from '../types';
 
 const OAUTH_STATE_KEY = '@radarbase/oauth_pending_state';
@@ -67,7 +68,10 @@ export class DefaultAuthService implements AuthService {
       if (!this.pendingState) {
         this.pendingState = await this.storage.get<string>(OAUTH_STATE_KEY);
       }
-      if (!this.pendingState) return; // No pending auth flow
+      if (!this.pendingState) {
+        this.logger.log('[AuthService] handleAuthCallback ignored — no pending OAuth state');
+        return; // No pending auth flow
+      }
       if (this.pendingState !== state) {
         this.pendingState = null;
         await this.storage.set(OAUTH_STATE_KEY, null);
@@ -102,18 +106,25 @@ export class DefaultAuthService implements AuthService {
       }
 
       const tokens: TokenPair = await response.json();
+      // Debug enrolment: log shape only (never full secrets).
+      this.logger.log(
+        `[AuthService] token exchange ok — keys=[${Object.keys(tokens as object).join(', ')}] ` +
+          `access=${tokenDebug(tokens.access_token)} refresh=${tokenDebug(tokens.refresh_token)}`,
+      );
       if (!tokens.access_token) throw new Error('Token response missing access_token.');
       if (!tokens.refresh_token) throw new Error('Token response missing refresh_token.');
 
       // Store tokens and configure endpoints — single token call, no refresh needed
-      await this.token.setURI(this.oauthConfig.endpoint);
+      await this.config.setBaseUrl(this.oauthConfig.endpoint);
       await this.token.setTokenEndpoint(tokenEndpoint);
-      await this.token.register({ refresh_token: tokens.refresh_token, access_token: tokens.access_token });
+      await this.configureTokenClient();
+      await this.token.register({ refresh_token: tokens.refresh_token, access_token: tokens.access_token, expires_in: tokens.expires_in });
 
       await this.analytics.setUserProperties({ baseUrl: this.oauthConfig.endpoint });
       await this.analytics.logAuthenticationEvent('login', true);
       this.logger.log('Authentication completed successfully');
       this.emitAuthState('authenticated');
+      this.onPostAuth();
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Authentication failed.';
       this.emitAuthState('unauthenticated', msg);
@@ -146,9 +157,10 @@ export class DefaultAuthService implements AuthService {
     if (!baseUrl) throw new Error('Base URL is required for authentication');
 
     try {
-      await this.token.setURI(baseUrl);
+      await this.config.setBaseUrl(baseUrl);
       await this.analytics.setUserProperties({ baseUrl });
       await this.token.setTokenEndpoint(tokenEndpoint);
+      await this.configureTokenClient();
       await this.token.register({ refresh_token: refreshToken, access_token: accessToken });
       await this.registerAsSource();
 
@@ -162,6 +174,7 @@ export class DefaultAuthService implements AuthService {
       this.logger.log('Authentication completed successfully');
       this.analytics.logAuthenticationEvent('login', true);
       this.emitAuthState('authenticated');
+      this.onPostAuth();
       return tokens;
     } catch (error: any) {
       this.logger.error('Authentication completion failed', error);
@@ -175,6 +188,8 @@ export class DefaultAuthService implements AuthService {
     try {
       this.logger.log('Resetting authentication state');
       await this.token.clearTokens();
+      await this.storage.remove(BASE_URI_KEY);
+      await this.subjectConfig.clear?.();
       this.analytics.logAuthenticationEvent('logout', true);
       this.emitAuthState('unauthenticated');
     } catch (error: any) {
@@ -197,8 +212,24 @@ export class DefaultAuthService implements AuthService {
   // Private helpers
   // ---------------------------------------------------------------------------
 
+  /** Fire-and-forget post-auth tasks: init Kafka and flush any unsent cached data. */
+  private onPostAuth(): void {
+    this.config.init()
+      .then(() => this.config.sendCachedData())
+      .catch(e => this.logger.log(`Post-auth init/flush failed: ${e}`));
+  }
+
   private emitAuthState(status: AuthStatus, error?: string): void {
     this.bus.emit(EVENTS.AUTH_STATE_CHANGED, { status, error: error ?? null });
+  }
+
+  /** Keep TokenService's refresh client_id/secret in sync with the app's OAuth config. */
+  private async configureTokenClient(): Promise<void> {
+    if (!this.oauthConfig?.clientId) return;
+    await this.token.configureOAuthClient({
+      clientId: this.oauthConfig.clientId,
+      clientSecret: this.oauthConfig.clientSecret,
+    });
   }
 
   private isManagementPortalAuth(credentials: string | Record<string, any>): boolean {
@@ -258,6 +289,14 @@ export class DefaultAuthService implements AuthService {
       this.logger.error('Failed to register as source', error);
     }
   }
+}
+
+/** Safe token summary for logs — presence + length only. */
+function tokenDebug(value: unknown): string {
+  if (value == null) return 'missing';
+  if (typeof value !== 'string') return `non-string(${typeof value})`;
+  if (!value) return 'empty';
+  return `present(len=${value.length})`;
 }
 
 function generateRandomState(): string {

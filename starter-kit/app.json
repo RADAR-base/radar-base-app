@@ -3,25 +3,48 @@
     "name": "RADAR-Base Starter",
     "slug": "radar-base-starter",
     "version": "0.1.0",
+    "scheme": "com.radarbase.starter",
     "orientation": "portrait",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": false,
-    "plugins": [],
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "plugins": [
+      "expo-font",
+      "expo-audio",
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static",
+            "privacyManifestAggregationEnabled": false,
+            "deploymentTarget": "16.4"
+          }
+        }
+      ]
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "org.radarbase.starter",
-      "scheme": "org.radarbase.starter"
+      "scheme": "com.radarbase.starter",
+      "deploymentTarget": "16.4",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "This app requires microphone access to record audio messages."
+      }
     },
     "android": {
       "edgeToEdgeEnabled": true,
       "package": "org.radarbase.starter",
+      "googleServicesFile": "./google-services.json",
       "intentFilters": [
         {
           "action": "VIEW",
           "autoVerify": true,
           "data": [
             {
-              "scheme": "org.radarbase.starter"
+              "scheme": "com.radarbase.starter",
+              "host": "enrol"
             }
           ],
           "category": [

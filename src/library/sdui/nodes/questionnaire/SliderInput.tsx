@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { QuestionRange } from '../../../../types';
+import { fontFamily } from '../../../../theme/theme';
 
 interface SliderInputProps {
   range: QuestionRange;
@@ -69,7 +70,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 6,
   },
-  rangeLabel: { fontSize: 12 },
+  rangeLabel: { fontSize: 12, fontFamily: fontFamily.regular, includeFontPadding: false },
   track: {
     height: 36,
     backgroundColor: '#e0e0e0',
@@ -99,6 +100,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     fontSize: 16,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
     fontWeight: '600',
   },
 });

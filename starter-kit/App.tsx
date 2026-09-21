@@ -1,110 +1,61 @@
 import React, { useEffect, useMemo } from 'react';
-import {
-  ActivityIndicator,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { StyleSheet, useColorScheme, View } from 'react-native';
 import firebase from '@react-native-firebase/app';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import {
+  useFonts,
+  Inter_300Light,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from '@expo-google-fonts/inter';
 
 import {
-  CoreServicesProvider,
-  NodeRegistry,
-  SDUIShell,
-  createBundledBlueprintSource,
-  eventBus,
-  useAuth,
-  useScheduleService,
-  type CoreServiceOverrides,
-  type ThemeManifest,
-  type ProtocolConfig,
+  AppShell,
+  getColorTokens,
+  layout,
+  createAsyncStorageService,
+  type ThemeColorOverrides,
 } from '@radarbase/app-kit';
 
-import { createAsyncStorageService, LoginScreen } from './src';
-import { DEFAULT_AUTH_CONFIG } from './src/auth';
-
-import appManifest from './config/app-manifest.json';
-import homeBlueprint from './config/views/home.json';
-import profileBlueprint from './config/views/profile.json';
-import inboxHistoryBlueprint from './config/views/secondary/inbox-history.json';
-import questionnaireBlueprint from './config/views/secondary/questionnaire.json';
-import comingSoonBlueprint from './config/views/coming-soon.json';
-
+import appConfig from './config';
 import CustomDemoNode from './CustomDemoNode';
-import protocolConfig from './config/protocol.json';
 
-const BUNDLED_BLUEPRINTS: Record<string, unknown> = {
-  'views/home.json': homeBlueprint,
-  'views/profile.json': profileBlueprint,
-  'views/coming-soon.json': comingSoonBlueprint,
-  'views/secondary/inbox-history.json': inboxHistoryBlueprint,
-  'views/secondary/questionnaire.json': questionnaireBlueprint,
-};
-
-NodeRegistry.getInstance().register('CustomDemoNode', CustomDemoNode);
+const PLUGINS = { CustomDemoNode };
 
 export default function App() {
-  const serviceOverrides = useMemo<CoreServiceOverrides>(() => {
-    const storage = createAsyncStorageService();
-    return {
-      storage,
-      authConfig: DEFAULT_AUTH_CONFIG,
-    };
-  }, []);
+  const storage = useMemo(() => createAsyncStorageService(), []);
 
-  return (
-    <CoreServicesProvider overrides={serviceOverrides}>
-      <AppRoot serviceOverrides={serviceOverrides} />
-    </CoreServicesProvider>
-  );
-}
-
-function useScheduleInit() {
-  const schedule = useScheduleService();
-  useEffect(() => {
-    (async () => {
-      await schedule.init();
-      await schedule.loadProtocol(protocolConfig as ProtocolConfig);
-    })();
-    return () => schedule.destroy();
-  }, [schedule]);
-}
-
-function AppRoot({ serviceOverrides }: { serviceOverrides: CoreServiceOverrides }) {
-  const { status } = useAuth();
   useFirebaseBootstrap();
-  useScheduleInit();
 
-  const theme = appManifest.theme as ThemeManifest;
-  const primary = theme.primaryColor;
-  const background = theme.backgroundColor ?? '#f8f9fa';
-  const textSecondary = theme.textSecondaryColor ?? '#6D6D80';
+  const [fontsLoaded] = useFonts({
+    Inter_300Light,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
 
-  if (status === 'unknown') {
-    return (
-      <FullScreenStatus
-        background={background}
-        primary={primary}
-        text={textSecondary}
-        message="Preparing your session..."
-      />
-    );
-  }
-
-  if (status === 'unauthenticated' || status === 'authenticating') {
-    return <LoginScreen theme={theme} />;
-  }
+  const scheme = useColorScheme();
+  const bootBackground = getColorTokens(
+    scheme === 'dark' ? 'dark' : 'light',
+    (appConfig.theme as Record<string, unknown>)?.brandColors as ThemeColorOverrides,
+  ).background.primary;
+  if (!fontsLoaded) return <View style={[styles.root, { backgroundColor: bootBackground }]} />;
 
   return (
-    <View style={styles.shellWrapper}>
-      <SDUIShell
-        manifestSource={async () => appManifest}
-        blueprintSource={createBundledBlueprintSource(BUNDLED_BLUEPRINTS)}
-        serviceOverrides={serviceOverrides}
-        eventBus={{ emit: (event, data) => eventBus.emit(event, data) }}
-      />
-    </View>
+    <SafeAreaProvider>
+      <View style={styles.appBackdrop}>
+        <View style={styles.screenFrame}>
+          <AppShell
+            manifest={appConfig}
+            storage={storage}
+            plugins={PLUGINS}
+          />
+        </View>
+      </View>
+    </SafeAreaProvider>
   );
 }
 
@@ -119,38 +70,17 @@ function useFirebaseBootstrap() {
   }, []);
 }
 
-function FullScreenStatus({
-  background,
-  primary,
-  text,
-  message,
-}: {
-  background: string;
-  primary: string;
-  text: string;
-  message: string;
-}) {
-  return (
-    <SafeAreaView style={[styles.fullScreen, { backgroundColor: background }]}>
-      <ActivityIndicator size="large" color={primary} />
-      <Text style={[styles.fullScreenText, { color: text }]}>{message}</Text>
-    </SafeAreaView>
-  );
-}
-
 const styles = StyleSheet.create({
-  shellWrapper: {
+  root: {
     flex: 1,
   },
-  fullScreen: {
+  appBackdrop: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
+    backgroundColor: '#000000',
   },
-  fullScreenText: {
-    marginTop: 16,
-    fontSize: 16,
-    textAlign: 'center',
+  screenFrame: {
+    flex: 1,
+    borderRadius: layout.radiusScreen,
+    overflow: 'hidden',
   },
 });
