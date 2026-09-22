@@ -30,7 +30,11 @@ import {
 } from '../../../theme/theme';
 import WellDoneIllustration from '../../../theme/icons/welldoneillustration.svg';
 import type { NodeProps } from '../types';
-import { QuestionRenderer } from './questionnaire/QuestionRenderer';
+import {
+  QuestionRenderer,
+  HEIGHT_DRIVEN_TYPES,
+  SCALE_TYPES,
+} from './questionnaire/QuestionRenderer';
 import { speechContent } from './questionnaire/speechContent';
 import type { SpeechPhase } from './questionnaire/SpeechInput';
 import { evaluateBranchingLogic } from './questionnaire/branchingLogic';
@@ -721,6 +725,10 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
               question?.field_type === 'audio' &&
               !!(question.field_name && answers[question.field_name]);
             const isSpeechPanel = question?.field_type === 'audio';
+            // A scale is a short answer on a tall page — left at the top it sits under the question
+            // with the rest of the screen empty beneath it. Centring gives the value and its track a
+            // middle to sit in, which is also where the thumb is easiest to reach.
+            const isScalePanel = SCALE_TYPES.includes(question?.field_type ?? '');
             // Whether the read-aloud passage is the question's own `field_label` (rendered here, in a
             // capped scroll region) rather than living in `select_choices_or_calculations`, which
             // `SpeechInput` draws in its own fixed-height card. Decides both what the title block
@@ -754,7 +762,12 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
             // the recording controls get pushed off the bottom. A View bounded by `flex: 1` gives the
             // children a fixed height to divide up, so the passage yields and the controls stay put.
             // The page doesn't need to scroll anyway — only the passage does.
-            const Panel = isSpeechPanel ? View : ScrollView;
+            // The vertical slider needs the same bounded box, and for the same reason: it divides the
+            // height it is given between its track and end labels, so a container that grows to fit
+            // its content feeds its own measurement and the track walks off the bottom of the page.
+            const isFixedPanel =
+              isSpeechPanel || HEIGHT_DRIVEN_TYPES.includes(question?.field_type ?? '');
+            const Panel = isFixedPanel ? View : ScrollView;
             return (
               <Panel
                 style={[
@@ -763,17 +776,31 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                   // The footer is drawn over the page, so this is what keeps its content clear of it —
                   // and reserving it unconditionally is what makes the panel the same size before,
                   // during and after a transition.
+                  // Speech only, not every fixed panel: a height-driven slider measures itself against
+                  // the window and subtracts this same reserve itself (`bottomReserve` below), so
+                  // padding it out here as well would take the footer's height off it twice.
                   isSpeechPanel && { paddingBottom: FOOTER_RESERVE + bottomInset },
                 ]}
                 contentContainerStyle={
-                  isSpeechPanel
+                  isFixedPanel
                     ? undefined
                     : [
                         styles.scrollContent,
                         { paddingBottom: FOOTER_RESERVE + bottomInset },
+                        // Fill the viewport so the scale below has a height to centre within. Not
+                        // `justifyContent: center` — that would carry the question text down too.
+                        isScalePanel && styles.scrollContentFill,
                       ]
                 }
                 showsVerticalScrollIndicator={false}
+                /**
+                 * A scale never scrolls.
+                 *
+                 * It sizes itself to the space it is given, so any scroll it allows is drift of a
+                 * point or two — and the page sliding under a finger that meant to move the handle
+                 * is worse than the drift. `false` on a plain `View` panel is simply ignored.
+                 */
+                scrollEnabled={!isScalePanel}
               >
                 {!question ? (
                   <Text style={[styles.emptyText, { color: muted }]}>No questions available</Text>
@@ -786,6 +813,7 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                       // squeeze, and filling would defeat the panel's `justifyContent: center` —
                       // a body that fills has nothing left to centre.
                       isSpeechPanel && styles.panelBodyFill,
+                      isScalePanel && styles.panelBodyFill,
                       isActive && reviewSlideStyle,
                     ]}
                   >
@@ -891,7 +919,9 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                           ? styles.reviewBody
                           : isSpeechPanel
                             ? styles.speechBody
-                            : undefined
+                            : isScalePanel
+                              ? styles.scaleBody
+                              : undefined
                       }
                     >
                       <QuestionRenderer
@@ -903,12 +933,18 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                         textSecondaryColor={muted}
                         accentColor={accent}
                         surfaceColor={tokens.card.background}
+                        backgroundColor={pageBg}
                         hideHeader
                         mode={mode}
                         // Lets the speech question's "Continue" card advance the questionnaire itself.
                         onContinue={goNext}
                         onPhaseChange={isActive ? handleSpeechPhase : undefined}
                         allowReplay={allowReplay}
+                        // What stands between the input and the bottom of the screen, for an input that
+                        // sizes itself against it. The footer is drawn over the page rather than laid
+                        // out above it, so this is the same fixed reserve every panel leaves — nothing
+                        // to measure.
+                        bottomReserve={FOOTER_RESERVE + bottomInset}
                       />
                       {hideTitleHere ? (
                         <>
@@ -1057,6 +1093,19 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 8,
+  },
+  /** Fills the viewport, so a scale panel has a height to spread itself within. */
+  scrollContentFill: {
+    flexGrow: 1,
+  },
+  /**
+   * The space below the question text, handed to the scale in full.
+   *
+   * The scale spreads itself within it — value at the top, track at the bottom — rather than being
+   * centred as a block.
+   */
+  scaleBody: {
+    flex: 1,
   },
   /**
    * Spacing between the question text and its input.
