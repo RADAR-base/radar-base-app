@@ -64,12 +64,21 @@ export class DefaultAuthService implements AuthService {
       if (!code) throw new Error('Authorization code is missing.');
       if (!state) throw new Error('State parameter is missing.');
 
-      // Restore pendingState from storage if lost (e.g. web page reload, app cold start)
+      // Restore pendingState from storage if lost (e.g. app cold start from deep link).
+      // Retry briefly — AsyncStorage may not be readable on the very first tick after
+      // the JS bundle loads, particularly when the app was launched via a deep link.
       if (!this.pendingState) {
         this.pendingState = await this.storage.get<string>(OAUTH_STATE_KEY);
       }
       if (!this.pendingState) {
-        this.logger.log('[AuthService] handleAuthCallback ignored — no pending OAuth state');
+        // One retry after a short delay — gives storage time to initialise on cold start.
+        await new Promise(r => setTimeout(r, 500));
+        this.pendingState = await this.storage.get<string>(OAUTH_STATE_KEY);
+      }
+      if (!this.pendingState) {
+        this.logger.log(
+          `[AuthService] handleAuthCallback ignored — no pending OAuth state in memory or storage (callback state=${state})`,
+        );
         return; // No pending auth flow
       }
       if (this.pendingState !== state) {

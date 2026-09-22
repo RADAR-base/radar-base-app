@@ -64,8 +64,16 @@ try {
   healthModule = null;
 }
 
+/** Default read types requested when no config is provided. */
+const DEFAULT_READ_PERMISSIONS = [
+  'HKQuantityTypeIdentifierStepCount',
+  'HKQuantityTypeIdentifierHeartRate',
+  'HKCategoryTypeIdentifierSleepAnalysis',
+];
+
 export interface HealthKitConfig {
-  /** HealthKit data types to request read access for (e.g. `HKQuantityTypeIdentifierStepCount`). */
+  /** HealthKit data types to request read access for.
+   *  Defaults to step count, heart rate, and sleep analysis. */
   read?: string[];
   /** HealthKit data types to request write access for. */
   write?: string[];
@@ -92,32 +100,39 @@ export class KingstinctHealthKitService extends DefaultHealthKitService {
       return false;
     }
 
-    try {
-      const mod = healthModule.default ?? healthModule;
+    const read = this.config.read ?? DEFAULT_READ_PERMISSIONS;
+    const write = this.config.write ?? [];
 
-      // Check if HealthKit is available on this device
-      const isAvailable = mod.isHealthDataAvailable ?? healthModule.isHealthDataAvailable;
+    this.logger.log(`[HealthKit] Requesting permissions — read: [${read.join(', ')}], write: [${write.join(', ')}]`);
+
+    try {
+      // The module exports both a default object and named exports.
+      const requestAuth = healthModule.requestAuthorization
+        ?? healthModule.default?.requestAuthorization;
+
+      if (typeof requestAuth !== 'function') {
+        this.logger.log('[HealthKit] requestAuthorization not found on module — available keys: '
+          + Object.keys(healthModule).join(', '));
+        return false;
+      }
+
+      const isAvailable = healthModule.isHealthDataAvailable
+        ?? healthModule.default?.isHealthDataAvailable;
+
       if (typeof isAvailable === 'function') {
         const available = await isAvailable();
         if (!available) {
-          this.logger.log('HealthKit is not available on this device');
+          this.logger.log('[HealthKit] HealthKit is not available on this device (simulator?)');
           return false;
         }
       }
 
-      // Request authorization
-      const requestAuth = mod.requestAuthorization ?? healthModule.requestAuthorization;
-      if (typeof requestAuth !== 'function') {
-        this.logger.log('requestAuthorization not found on healthkit module');
-        return false;
-      }
-
-      await requestAuth(this.config.read ?? [], this.config.write ?? []);
-      this.logger.log('HealthKit permissions requested successfully');
+      await requestAuth(read, write);
+      this.logger.log('[HealthKit] Permission request completed');
       this.authorized = true;
       return true;
     } catch (err) {
-      this.logger.log(`HealthKit permission request failed: ${err}`);
+      this.logger.log(`[HealthKit] Permission request failed: ${err}`);
       this.authorized = false;
       return false;
     }
