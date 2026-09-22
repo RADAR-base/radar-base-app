@@ -9,12 +9,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
-import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { useCoreServices } from '../../../core/CoreServicesContext';
 import { EVENTS } from '../../../core/EventBus';
@@ -28,15 +23,16 @@ import {
   withAlpha,
   type ThemeMode,
 } from '../../../theme/theme';
-import WellDoneIllustration from '../../../theme/icons/welldoneillustration.svg';
 import type { NodeProps } from '../types';
 import { QuestionRenderer } from './questionnaire/QuestionRenderer';
 import { speechContent } from './questionnaire/speechContent';
+import { TaskCompletionScreen } from './questionnaire/TaskCompletionScreen';
 import type { SpeechPhase } from './questionnaire/SpeechInput';
 import { evaluateBranchingLogic } from './questionnaire/branchingLogic';
 import { PillButton } from '../PillButton';
 import { useTopInset } from '../useTopInset';
 import { useBottomInset } from '../useBottomInset';
+import { useLocalMetric } from '../useLocalMetric';
 import { StepSlider } from '../StepSlider';
 
 /** Page-transition duration (ms). Shared by the question slide and the progress bar so they move
@@ -288,10 +284,6 @@ function CollapsibleHeading({
   );
 }
 
-/** Intrinsic size of `welldoneillustration.svg`, used to keep its aspect ratio when scaled to fit. */
-const ILLUSTRATION_WIDTH = 323;
-const ILLUSTRATION_HEIGHT = 231;
-
 /**
  * Full-screen questionnaire (Figma "Likert Scale 4 Point", node 3273:1699). Unlike `QuestionnaireNode`
  * (a card rendered inside the task-instructions overlay), this owns the whole screen:
@@ -511,20 +503,20 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   const bottomInset = useBottomInset();
   const { width } = useWindowDimensions();
 
-  // Completion transition: the questions push out to the left while the "Well done" screen slides in
-  // from the right — same direction and duration as advancing between questions, so finishing reads as
-  // one more page rather than an abrupt swap. Manual shared value, not a layout animation (see the note
-  // on entering/exiting stranding a touch-blocking overlay on Android).
-  const completeProgress = useSharedValue(0);
-  useEffect(() => {
-    if (isComplete) completeProgress.value = withTiming(1, { duration: SLIDE_DURATION });
-  }, [isComplete, completeProgress]);
-  const questionsStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: -completeProgress.value * width }],
-  }));
-  const doneStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: (1 - completeProgress.value) * width }],
-  }));
+  /**
+   * Today's completed tasks and today's total, for the ring on the completion screen.
+   *
+   * Read here rather than in that screen so it stays presentational, and because this hook tracks
+   * `SCHEDULE_UPDATED` — the host marks the task complete off the submission event, which lands a
+   * moment *after* the screen appears. The task just finished therefore arrives as an update rather
+   * than being there on mount, and the ring animates to whatever has settled by the time it runs.
+   */
+  const todaysTasks = useLocalMetric('task_completed');
+
+  // Completion is no longer a horizontal push. `TaskCompletionScreen` opens its own background
+  // out of the centre of the screen and covers the questions where they stand, so there is nothing to
+  // slide: the questions simply stay put underneath until they are hidden. Sliding as well would have
+  // the page arriving from the right *and* growing from the middle at the same time.
 
   // Required-field gate for the primary button (matches QuestionnaireNode).
   const isInfoType =
@@ -605,73 +597,27 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   // --- "Well done" completion screen (Figma 3273:1821) ---------------------------------------------
   // Same header, but the count reads "Done" and the bar is full; the questions are replaced by the
   // illustration + thanks, and the footer offers Home / Calendar.
-  let doneScreen: React.ReactNode = null;
-  if (isComplete) {
-    const illustrationWidth = Math.min(width - 64, ILLUSTRATION_WIDTH);
-    const illustrationHeight = (illustrationWidth * ILLUSTRATION_HEIGHT) / ILLUSTRATION_WIDTH;
-    doneScreen = (
-      <Animated.View
-        style={[styles.screen, { backgroundColor: pageBg, paddingTop: topInset + 16 }, doneStyle]}
-      >
-        <View style={styles.body}>
-          <View style={styles.headerBlock}>
-            <View style={styles.countRow}>
-              <Text style={[styles.countText, { color: muted }]} numberOfLines={1}>
-                {taskName}
-              </Text>
-              <Text style={[styles.countText, styles.countRight, { color: muted }]}>Done</Text>
-            </View>
-            <View style={[styles.progressTrack, { backgroundColor: trackColor }]}>
-              <View style={[styles.progressFill, styles.progressFull, { backgroundColor: brand }]} />
-            </View>
-          </View>
-
-          {/* Same reserve the question panels take. The footer is drawn over the page, so without it
-              this would centre against the full height and sit half a footer too low. */}
-          <View style={[styles.doneBody, { paddingBottom: FOOTER_RESERVE + bottomInset }]}>
-            <WellDoneIllustration width={illustrationWidth} height={illustrationHeight} />
-            <Text style={[styles.doneTitle, { color: brand }]}>Well done</Text>
-            {/* The assessment's `endText`, when the study wrote one — its own debrief sits above the
-                generic thank-you rather than replacing it. */}
-            {endText ? (
-              <Text style={[styles.doneEndText, { color: tokens.text.primary }]}>{endText}</Text>
-            ) : null}
-            <Text style={[styles.doneSubtitle, { color: muted }]}>
-              Thank you for your continuous support!
-            </Text>
-          </View>
-        </View>
-
-        <View style={[styles.footer, { paddingBottom: bottomInset }]}>
-          <View style={styles.footerButton}>
-            <PillButton
-              variant="outline"
-              label="Home"
-              onPress={() => finishTo(homeTabId)}
-              mode={mode}
-              brandColors={context.theme.brandColors}
-            />
-          </View>
-          <View style={styles.footerButton}>
-            <PillButton
-              variant="primary"
-              label="Calendar"
-              onPress={() => finishTo(calendarTabId)}
-              mode={mode}
-              brandColors={context.theme.brandColors}
-            />
-          </View>
-        </View>
-      </Animated.View>
-    );
-  }
+  const doneScreen = isComplete ? (
+    <TaskCompletionScreen
+      taskName={taskName}
+      endText={endText}
+      onHome={() => finishTo(homeTabId)}
+      onCalendar={() => finishTo(calendarTabId)}
+      tasksCompleted={todaysTasks?.value ?? 0}
+      tasksTotal={todaysTasks?.target ?? 0}
+      brandColor={brand}
+      backgroundColor={pageBg}
+      mode={mode}
+      brandColors={context.theme.brandColors}
+    />
+  ) : null;
 
   return (
     <View style={[styles.root, { backgroundColor: pageBg }]}>
-      {/* Both screens are mounted through the transition so the questions can slide out to the left as
-          the "Well done" screen slides in from the right — the same push used between questions. */}
+      {/* The questions stay mounted and in place beneath the completion screen, which covers them as
+          its background opens outward. `pointerEvents` retires them, not a transform. */}
       <Animated.View
-        style={[styles.screen, { paddingTop: topInset + 16 }, questionsStyle]}
+        style={[styles.screen, { paddingTop: topInset + 16 }]}
         pointerEvents={isComplete ? 'none' : 'auto'}
       >
       {/* A constant box. The footer is drawn over it, so nothing here moves when the footer does. */}
@@ -1011,46 +957,6 @@ const styles = StyleSheet.create({
   progressFill: {
     height: '100%',
     borderRadius: 3,
-  },
-  // The completion screen's bar is simply full — no animation to drive.
-  progressFull: {
-    width: '100%',
-  },
-  // Illustration + copy, centred in the space between the header and the footer.
-  doneBody: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-  },
-  doneTitle: {
-    fontSize: 40,
-    // Taller than the font size so descenders aren't clipped on Android.
-    lineHeight: 46,
-    textAlign: 'center',
-    fontFamily: fontFamily.bold,
-    fontWeight: '700',
-    letterSpacing: tracking.bold,
-    includeFontPadding: false,
-  },
-  /** Study-authored debrief. A step up from the generic subtitle, since it's the study's own words. */
-  doneEndText: {
-    fontSize: 16,
-    // Taller than the font size so tall glyphs/descenders aren't clipped on Android.
-    lineHeight: 22,
-    textAlign: 'center',
-    fontFamily: fontFamily.medium,
-    fontWeight: '500',
-    letterSpacing: tracking.medium,
-    includeFontPadding: false,
-  },
-  doneSubtitle: {
-    fontSize: 14,
-    lineHeight: 18,
-    textAlign: 'center',
-    fontFamily: fontFamily.regular,
-    letterSpacing: tracking.regular,
-    includeFontPadding: false,
   },
   scroll: {
     flex: 1,
