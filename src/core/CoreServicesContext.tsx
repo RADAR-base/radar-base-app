@@ -103,6 +103,7 @@ export const useQuestionnaireDataService = () => useCoreServices().questionnaire
 export const useDataPipeline = () => useCoreServices().dataPipeline;
 export const useSubjectConfigService = () => useCoreServices().subjectConfig;
 export const useAudioRecordService = () => useCoreServices().audioRecord;
+export const useHealthKitService = () => useCoreServices().healthKit;
 
 /** True once all core services have initialised (or been skipped for unauthenticated users). */
 export function useServicesReady(): boolean {

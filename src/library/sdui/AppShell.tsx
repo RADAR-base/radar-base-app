@@ -130,6 +130,7 @@ function AppShellInner({
   const version = manifest.version as string | undefined;
   const themeBlock = manifest.theme as Record<string, unknown> | undefined;
   const theme = (themeBlock?.brandColors as ThemeColorOverrides | undefined) ?? themeBlock as ThemeColorOverrides | undefined;
+  const enrolmentBlock = manifest.enrolment as Record<string, unknown> | undefined;
   const loginBlock = manifest.login as Record<string, unknown> | undefined;
   const showSignUp = loginBlock?.showSignUp !== false;
   const blueprintBaseUrl = manifest.blueprintBaseUrl as string | undefined;
@@ -239,6 +240,7 @@ function AppShellInner({
       content = (
         <PostEnrolmentFlow
           onDone={() => { setEnteredApp(true); setPostEnrolmentLoading(true); }}
+          enrolment={enrolmentBlock as any}
           brandColors={theme}
         />
       );

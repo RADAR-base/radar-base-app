@@ -31,7 +31,8 @@
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "This app requires microphone access to record audio messages."
-      }
+      },
+      "appleTeamId": "J7SH7ST98B"
     },
     "android": {
       "edgeToEdgeEnabled": true,
@@ -52,6 +53,12 @@
             "DEFAULT"
           ]
         }
+      ],
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ]
     },
     "web": {

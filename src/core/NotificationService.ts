@@ -102,6 +102,10 @@ export class DefaultNotificationService implements NotificationService {
     return this.pushToken;
   }
 
+  async requestPermission(): Promise<boolean> {
+    return true;
+  }
+
   // ---------------------------------------------------------------------------
   // Publish / cancel
   // ---------------------------------------------------------------------------
@@ -335,11 +339,6 @@ export class FirebaseNotificationService extends DefaultNotificationService {
     }
 
     try {
-      // iOS requires explicit permission
-      if (Platform.OS === 'ios') {
-        await msg.requestPermission();
-      }
-
       // Acquire token
       const token: string | null = await msg.getToken();
       if (token) {
@@ -363,6 +362,24 @@ export class FirebaseNotificationService extends DefaultNotificationService {
       });
     } catch (err) {
       this.logger.log(`Firebase messaging init failed, using stored token fallback: ${err}`);
+    }
+  }
+
+  override async requestPermission(): Promise<boolean> {
+    const msg = getMessaging();
+    if (!msg) return false;
+    try {
+      const authStatus = await msg.requestPermission();
+      // Firebase returns 1 for AUTHORIZED, 2 for PROVISIONAL
+      const granted = authStatus === 1 || authStatus === 2;
+      if (granted) {
+        const token: string | null = await msg.getToken();
+        if (token) await this.setPushToken(token);
+      }
+      return granted;
+    } catch {
+      this.logger.log('Firebase notification permission request failed');
+      return false;
     }
   }
 
