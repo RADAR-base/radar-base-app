@@ -43,7 +43,7 @@ export function TaskListSectionNode({ node, context }: NodeProps) {
         </View>
       )}
 
-      <TaskDayList context={context} date={new Date()} variant={variant} filter={filter} idPrefix={node.id} />
+      <TaskDayList context={context} date={new Date()} variant={variant} filter={filter} scope="open" idPrefix={node.id} />
     </View>
   );
 }
