@@ -13,6 +13,13 @@
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
       [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "This app reads your health data to track study metrics.",
+          "NSHealthUpdateUsageDescription": "This app writes health data related to your study participation."
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "ios": {

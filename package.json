@@ -46,7 +46,7 @@
     "react-native-svg": ">=13.0.0",
     "expo-audio": ">=0.3.0",
     "expo-web-browser": ">=14.0.0",
-    "react-native-health": ">=1.0.0"
+    "@kingstinct/react-native-healthkit": ">=7.0.0"
   },
   "peerDependenciesMeta": {
     "@react-native-async-storage/async-storage": {
@@ -82,7 +82,7 @@
     "expo-web-browser": {
       "optional": true
     },
-    "react-native-health": {
+    "@kingstinct/react-native-healthkit": {
       "optional": true
     }
   },

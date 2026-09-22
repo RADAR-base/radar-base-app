@@ -43,8 +43,8 @@ export { scheduleServiceFactory } from './core/AppserverScheduleService';
 export { questionnaireDataServiceFactory } from './core/QuestionnaireDataService';
 export { audioRecordServiceFactory, DefaultAudioRecordService, ExpoAudioRecordService } from './core/AudioRecordService';
 export type { AudioRecordConfig } from './core/AudioRecordService';
-export { healthKitServiceFactory, DefaultHealthKitService, RNHealthKitService } from './core/HealthKitService';
-export type { RNHealthKitConfig } from './core/HealthKitService';
+export { healthKitServiceFactory, DefaultHealthKitService, KingstinctHealthKitService } from './core/HealthKitService';
+export type { HealthKitConfig } from './core/HealthKitService';
 export {
   subjectConfigServiceFactory,
   ManagementPortalSubjectConfigService,

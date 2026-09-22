@@ -26,8 +26,8 @@ export { dataPipelineFactory, DefaultDataPipeline } from './pipeline';
 export { SchemaType, ConverterFactory } from './pipeline';
 export { audioRecordServiceFactory, DefaultAudioRecordService, ExpoAudioRecordService } from './AudioRecordService';
 export type { AudioRecordConfig } from './AudioRecordService';
-export { healthKitServiceFactory, DefaultHealthKitService, RNHealthKitService } from './HealthKitService';
-export type { HealthKitServiceDeps, RNHealthKitConfig } from './HealthKitService';
+export { healthKitServiceFactory, DefaultHealthKitService, KingstinctHealthKitService } from './HealthKitService';
+export type { HealthKitServiceDeps, HealthKitConfig } from './HealthKitService';
 export {
   subjectConfigServiceFactory,
   ManagementPortalSubjectConfigService,

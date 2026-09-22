@@ -7,24 +7,19 @@
  *     library is installed. The connect-health enrolment step still renders but the
  *     "Connect" button is effectively a skip.
  *
- *   - `RNHealthKitService` — wraps `react-native-health` (iOS HealthKit). The host app
- *     must install `react-native-health` and pass an instance via
- *     `ServiceOverrides.healthKit`.
+ *   - `KingstinctHealthKitService` — wraps `@kingstinct/react-native-healthkit` (iOS).
+ *     Modern, TypeScript-first, New Architecture compatible, with an Expo config plugin.
+ *     Auto-selected by the factory when the module is installed.
  *
- * Usage in the host app:
- * ```ts
- * import { RNHealthKitService } from '@radarbase/app-kit';
- *
- * <AppShell
- *   serviceOverrides={{
- *     healthKit: new RNHealthKitService({
- *       permissions: {
- *         read: ['StepCount', 'HeartRate', 'SleepAnalysis'],
- *       },
- *     }),
- *   }}
- * />
+ * Usage in the host app (auto-detected):
  * ```
+ * npx expo install @kingstinct/react-native-healthkit
+ * ```
+ * Then add to app.json plugins:
+ * ```json
+ * ["@kingstinct/react-native-healthkit"]
+ * ```
+ * The factory picks it up automatically — no serviceOverrides needed.
  */
 import type { HealthKitService, LoggerService } from '../types';
 
@@ -58,69 +53,74 @@ export class DefaultHealthKitService implements HealthKitService {
 }
 
 // ---------------------------------------------------------------------------
-// RNHealthKitService — backed by react-native-health (iOS)
+// KingstinctHealthKitService — backed by @kingstinct/react-native-healthkit
 // ---------------------------------------------------------------------------
 
 let healthModule: any;
 try {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  healthModule = require('react-native-health');
+  healthModule = require('@kingstinct/react-native-healthkit');
 } catch {
   healthModule = null;
 }
 
-export interface RNHealthKitConfig {
-  permissions?: {
-    read?: string[];
-    write?: string[];
-  };
+export interface HealthKitConfig {
+  /** HealthKit data types to request read access for (e.g. `HKQuantityTypeIdentifierStepCount`). */
+  read?: string[];
+  /** HealthKit data types to request write access for. */
+  write?: string[];
 }
 
 /**
- * `react-native-health` implementation (iOS only). Wraps HealthKit permission
- * requests and authorization checks.
+ * `@kingstinct/react-native-healthkit` implementation (iOS only). Wraps HealthKit
+ * permission requests and authorization checks.
  *
- * Falls back to the no-op base when `react-native-health` is not installed.
+ * Falls back to the no-op base when the module is not installed.
  */
-export class RNHealthKitService extends DefaultHealthKitService {
-  private readonly config: RNHealthKitConfig;
+export class KingstinctHealthKitService extends DefaultHealthKitService {
+  private readonly config: HealthKitConfig;
   private authorized = false;
 
-  constructor(deps: HealthKitServiceDeps, config?: RNHealthKitConfig) {
+  constructor(deps: HealthKitServiceDeps, config?: HealthKitConfig) {
     super(deps);
     this.config = config ?? {};
   }
 
   override async requestPermission(): Promise<boolean> {
     if (!healthModule) {
-      this.logger.log('react-native-health not installed — cannot request HealthKit permissions');
+      this.logger.log('@kingstinct/react-native-healthkit not installed — cannot request permissions');
       return false;
     }
 
-    const AppleHealthKit = healthModule.default ?? healthModule;
-    const read = this.config.permissions?.read ?? [];
-    const write = this.config.permissions?.write ?? [];
+    try {
+      const mod = healthModule.default ?? healthModule;
 
-    const permissions = {
-      permissions: {
-        read: read.map((p: string) => AppleHealthKit.Constants?.Permissions?.[p] ?? p),
-        write: write.map((p: string) => AppleHealthKit.Constants?.Permissions?.[p] ?? p),
-      },
-    };
-
-    return new Promise<boolean>((resolve) => {
-      AppleHealthKit.initHealthKit(permissions, (err: any) => {
-        if (err) {
-          this.logger.log(`HealthKit permission request failed: ${err}`);
-          this.authorized = false;
-          resolve(false);
-          return;
+      // Check if HealthKit is available on this device
+      const isAvailable = mod.isHealthDataAvailable ?? healthModule.isHealthDataAvailable;
+      if (typeof isAvailable === 'function') {
+        const available = await isAvailable();
+        if (!available) {
+          this.logger.log('HealthKit is not available on this device');
+          return false;
         }
-        this.logger.log('HealthKit permissions granted');
-        this.authorized = true;
-        resolve(true);
-      });
-    });
+      }
+
+      // Request authorization
+      const requestAuth = mod.requestAuthorization ?? healthModule.requestAuthorization;
+      if (typeof requestAuth !== 'function') {
+        this.logger.log('requestAuthorization not found on healthkit module');
+        return false;
+      }
+
+      await requestAuth(this.config.read ?? [], this.config.write ?? []);
+      this.logger.log('HealthKit permissions requested successfully');
+      this.authorized = true;
+      return true;
+    } catch (err) {
+      this.logger.log(`HealthKit permission request failed: ${err}`);
+      this.authorized = false;
+      return false;
+    }
   }
 
   override async isAuthorized(): Promise<boolean> {
@@ -134,8 +134,8 @@ export class RNHealthKitService extends DefaultHealthKitService {
 
 export const healthKitServiceFactory = (
   deps: HealthKitServiceDeps,
-  config?: RNHealthKitConfig,
+  config?: HealthKitConfig,
 ): HealthKitService =>
   healthModule
-    ? new RNHealthKitService(deps, config)
+    ? new KingstinctHealthKitService(deps, config)
     : new DefaultHealthKitService(deps);
