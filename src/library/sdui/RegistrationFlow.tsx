@@ -35,6 +35,8 @@ export interface RegistrationFlowProps {
   onExit: () => void;
   /** Enter-login-details — run the OAuth redirect. */
   onEnterLoginDetails: () => void;
+  /** Called when a QR code is scanned — the raw string data from the code. */
+  onQrCodeScanned?: (data: string) => void;
   /** Cancel an in-progress login (see `useAuth.cancelLogin`); fired on any step/camera change. */
   onResetLogin?: () => void;
   /** Reflects `status === 'authenticating'`. */
@@ -50,6 +52,7 @@ const STEP_PROGRESS = [1 / 3, 0.6];
 export function RegistrationFlow({
   onExit,
   onEnterLoginDetails,
+  onQrCodeScanned,
   onResetLogin,
   isAuthenticating = false,
   mode,
@@ -119,7 +122,10 @@ export function RegistrationFlow({
         >
           <CameraScanScreen
             onBack={closeCamera}
-            // Frontend only: returns to the QR step for now; wire to the login-token flow later.
+            onCodeScanned={(data) => {
+              closeCamera();
+              onQrCodeScanned?.(data);
+            }}
             onEnterToken={closeCamera}
             brandColors={brandColors}
           />

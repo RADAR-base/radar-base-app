@@ -26,6 +26,7 @@ export {
   useSubjectConfigService,
   useQuestionnaireDataService,
   useAudioRecordService,
+  useHealthKitService,
 } from './core/CoreServicesContext';
 export { useAuth } from './core/useAuth';
 export type { UseAuthResult } from './core/useAuth';
@@ -42,6 +43,8 @@ export { scheduleServiceFactory } from './core/AppserverScheduleService';
 export { questionnaireDataServiceFactory } from './core/QuestionnaireDataService';
 export { audioRecordServiceFactory, DefaultAudioRecordService, ExpoAudioRecordService } from './core/AudioRecordService';
 export type { AudioRecordConfig } from './core/AudioRecordService';
+export { healthKitServiceFactory, DefaultHealthKitService, KingstinctHealthKitService } from './core/HealthKitService';
+export type { HealthKitConfig } from './core/HealthKitService';
 export {
   subjectConfigServiceFactory,
   ManagementPortalSubjectConfigService,
@@ -90,6 +93,7 @@ export {
   TextNode,
   ViewNode,
   GraphDataNode,
+  HealthKitNode,
   RadioInput,
   CheckboxInput,
   RangeInput,
@@ -161,13 +165,15 @@ export type {
 } from './library/sdui';
 
 // SDUI contracts
-export { ManifestSchema, BlueprintSchema, NodeSchema } from './library/contracts';
+export { ManifestSchema, BlueprintSchema, NodeSchema, EnrolmentStepSchema, EnrolmentSchema } from './library/contracts';
 export type {
   AppManifest,
   ThemeManifest,
   HeaderManifest,
   TabManifest,
   WidgetRegistryEntry,
+  EnrolmentStep,
+  EnrolmentManifest,
   ScreenBlueprint,
   Node,
 } from './library/contracts';
@@ -215,6 +221,7 @@ export type {
   QuestionnaireDataService,
   AudioRecordService,
   AudioRecordingResult,
+  HealthKitService,
   ProtocolConfig,
   AssessmentConfig,
   AssessmentProtocol,

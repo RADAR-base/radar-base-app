@@ -324,6 +324,8 @@ export interface AuthService {
   completeAuthentication(refreshToken: string, baseUrl: string, tokenEndpoint: string, accessToken?: string): Promise<TokenPair>;
   reset(): Promise<void>;
   isAuthenticated(): Promise<boolean>;
+  /** Override the OAuth endpoint at runtime (e.g. from Firebase Remote Config's `platform_url`). */
+  setEndpoint(url: string): void;
 }
 
 export interface AnalyticsService {
@@ -348,6 +350,8 @@ export interface NotificationService {
   cancelSingleNotification(user: Subject, notificationId: string | number): Promise<any>;
   /** Returns the current FCM token, or null if unavailable. */
   getFCMToken(): Promise<string | null>;
+  /** Requests OS notification permission. Returns true if granted. */
+  requestPermission(): Promise<boolean>;
 }
 
 export enum NotificationActionType {
@@ -361,6 +365,13 @@ export enum NotificationActionType {
 export interface Subject {
   subjectId: string;
   projectId: string;
+}
+
+export interface HealthKitService {
+  /** Requests HealthKit (iOS) / Health Connect (Android) permissions. Returns true if granted. */
+  requestPermission(): Promise<boolean>;
+  /** Whether permissions have been granted. */
+  isAuthorized(): Promise<boolean>;
 }
 
 export interface CacheService {

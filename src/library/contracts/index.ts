@@ -5,6 +5,8 @@ export {
   HeaderSchema,
   TabConfigSchema,
   WidgetRegistryEntrySchema,
+  EnrolmentStepSchema,
+  EnrolmentSchema,
 } from './ManifestSchema';
 export type {
   AppManifest,
@@ -12,6 +14,8 @@ export type {
   HeaderManifest,
   TabManifest,
   WidgetRegistryEntry,
+  EnrolmentStep,
+  EnrolmentManifest,
 } from './ManifestSchema';
 
 export { BlueprintSchema } from './BlueprintSchema';
