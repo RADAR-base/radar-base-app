@@ -71,6 +71,7 @@ export interface ServiceBag {
   subjectConfig: SubjectConfigService;
   audioRecord: AudioRecordService;
   healthKit: HealthKitService;
+  remoteConfig: RemoteConfigService;
 }
 
 // ---------------------------------------------------------------------------
@@ -197,5 +198,6 @@ export function createServices(overrides: ServiceOverrides = {}): ServiceBag {
     data: dataService, eventBus, api: apiService, appServer,
     token, analytics, cache, kafka, config, auth, notifications,
     schedule, questionnaireData, dataPipeline, subjectConfig, audioRecord, healthKit,
+    remoteConfig,
   };
 }

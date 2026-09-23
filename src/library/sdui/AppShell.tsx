@@ -1,11 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, {
+  Easing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { eventBus } from '../../core/EventBus';
 import { useAuth } from '../../core/useAuth';
 import {
   CoreServicesProvider,
   useServicesReady,
   useSigningOut,
+  useInitError,
   useSubjectConfigService,
   type CoreServiceOverrides,
 } from '../../core/CoreServicesContext';
@@ -18,7 +27,13 @@ import { SDUIShell } from './SDUIShell';
 import { LoginScreen } from './LoginScreen';
 import { PostEnrolmentFlow } from './PostEnrolmentFlow';
 import { LoadingScreen } from './LoadingScreen';
-import type { ThemeColorOverrides } from '../../theme/theme';
+import {
+  fontFamily,
+  getColorTokens,
+  layout,
+  type ThemeColorOverrides,
+  type ThemeMode,
+} from '../../theme/theme';
 import type { StorageService, OAuthConfig } from '../../types';
 
 export interface AppShellProps {
@@ -124,6 +139,7 @@ function AppShellInner({
   const subjectConfig = useSubjectConfigService();
   const servicesReady = useServicesReady();
   const signingOut = useSigningOut();
+  const initError = useInitError();
 
   const appName = manifest.appName as string | undefined;
   const description = manifest.description as string | undefined;
@@ -279,7 +295,72 @@ function AppShellInner({
           onHidden={() => setBootLoading(false)}
         />
       )}
+      {initError && <InitErrorToast message={initError} brandColors={theme} />}
     </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Init error toast — slides down from the top, auto-dismisses after 6s.
+// ---------------------------------------------------------------------------
+
+const TOAST_DURATION = 6_000;
+const TOAST_SLIDE_MS = 300;
+
+function InitErrorToast({ message, brandColors }: { message: string; brandColors?: ThemeColorOverrides }) {
+  const insets = useSafeAreaInsets();
+  const deviceScheme = useColorScheme();
+  const mode: ThemeMode = deviceScheme === 'dark' ? 'dark' : 'light';
+  const tokens = getColorTokens(mode, brandColors);
+  const [visible, setVisible] = useState(true);
+  const translateY = useSharedValue(-120);
+
+  useEffect(() => {
+    // Slide in
+    translateY.value = withTiming(0, { duration: TOAST_SLIDE_MS, easing: Easing.out(Easing.cubic) });
+
+    // Auto-dismiss
+    const timer = setTimeout(() => dismiss(), TOAST_DURATION);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const dismiss = () => {
+    translateY.value = withTiming(
+      -120,
+      { duration: TOAST_SLIDE_MS, easing: Easing.in(Easing.cubic) },
+      (finished) => { if (finished) runOnJS(setVisible)(false); },
+    );
+  };
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  if (!visible) return null;
+
+  return (
+    <Animated.View
+      style={[
+        styles.toast,
+        {
+          top: insets.top + 8,
+          backgroundColor: tokens.card.hint.background,
+          borderColor: mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+        },
+        animatedStyle,
+      ]}
+      pointerEvents="box-none"
+    >
+      <Pressable onPress={dismiss} style={styles.toastContent}>
+        <Text style={[styles.toastTitle, { color: tokens.card.hint.text }]}>
+          Connection issue
+        </Text>
+        <Text style={[styles.toastMessage, { color: tokens.card.hint.text }]}>
+          {message}
+        </Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -289,5 +370,32 @@ const styles = StyleSheet.create({
   },
   shellWrapper: {
     flex: 1,
+  },
+  toast: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    borderRadius: layout.radiusCard,
+    borderWidth: 1,
+    overflow: 'hidden',
+    zIndex: 9999,
+    elevation: 24,
+  },
+  toastContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 2,
+  },
+  toastTitle: {
+    fontSize: 14,
+    fontFamily: fontFamily.semiBold,
+    fontWeight: '600',
+    includeFontPadding: false,
+  },
+  toastMessage: {
+    fontSize: 13,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
+    opacity: 0.8,
   },
 });

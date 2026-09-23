@@ -21,6 +21,8 @@ interface CoreServices extends ServiceBag {
   servicesReady: boolean;
   /** True while sign-out cleanup is in progress (tokens cleared, services tearing down). */
   signingOut: boolean;
+  /** Non-null when service init completed with errors (timeout or failure). */
+  initError: string | null;
 }
 
 const CoreServicesContext = createContext<CoreServices | null>(null);
@@ -46,6 +48,7 @@ export function CoreServicesProvider({ children, overrides = {} }: CoreServicesP
 function CoreServicesProviderInner({ children, overrides = {} }: CoreServicesProviderProps) {
   const [servicesReady, setServicesReady] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
 
   // Create all services exactly once so they survive re-renders.
   const servicesRef = useRef<ServiceBag | null>(null);
@@ -56,16 +59,18 @@ function CoreServicesProviderInner({ children, overrides = {} }: CoreServicesPro
 
   // Stable callbacks — avoids re-triggering the lifecycle hook on every render.
   const markReady = useCallback(() => setServicesReady(true), []);
-  const markNotReady = useCallback(() => setServicesReady(false), []);
+  const markNotReady = useCallback(() => { setServicesReady(false); setInitError(null); }, []);
   const markSigningOut = useCallback((active: boolean) => setSigningOut(active), []);
+  const markInitError = useCallback((msg: string) => setInitError(msg), []);
 
   useServicesLifecycle(services, {
     onReady: markReady,
     onNotReady: markNotReady,
     onSigningOut: markSigningOut,
+    onInitError: markInitError,
   });
 
-  const value: CoreServices = { ...services, servicesReady, signingOut };
+  const value: CoreServices = { ...services, servicesReady, signingOut, initError };
 
   return (
     <CoreServicesContext.Provider value={value}>
@@ -104,6 +109,7 @@ export const useDataPipeline = () => useCoreServices().dataPipeline;
 export const useSubjectConfigService = () => useCoreServices().subjectConfig;
 export const useAudioRecordService = () => useCoreServices().audioRecord;
 export const useHealthKitService = () => useCoreServices().healthKit;
+export const useRemoteConfigService = () => useCoreServices().remoteConfig;
 
 /** True once all core services have initialised (or been skipped for unauthenticated users). */
 export function useServicesReady(): boolean {
@@ -113,5 +119,10 @@ export function useServicesReady(): boolean {
 /** True while sign-out cleanup is in progress. */
 export function useSigningOut(): boolean {
   return useCoreServices().signingOut;
+}
+
+/** Non-null when service init completed with errors (timeout or network failure). */
+export function useInitError(): string | null {
+  return useCoreServices().initError;
 }
 

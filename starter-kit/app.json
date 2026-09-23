@@ -10,6 +10,12 @@
     "plugins": [
       "expo-font",
       "expo-audio",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "This app uses the camera to scan QR codes for study enrolment."
+        }
+      ],
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
       [

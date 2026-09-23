@@ -324,6 +324,8 @@ export interface AuthService {
   completeAuthentication(refreshToken: string, baseUrl: string, tokenEndpoint: string, accessToken?: string): Promise<TokenPair>;
   reset(): Promise<void>;
   isAuthenticated(): Promise<boolean>;
+  /** Override the OAuth endpoint at runtime (e.g. from Firebase Remote Config's `platform_url`). */
+  setEndpoint(url: string): void;
 }
 
 export interface AnalyticsService {

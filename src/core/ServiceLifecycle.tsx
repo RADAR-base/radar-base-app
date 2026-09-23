@@ -9,15 +9,19 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { ServiceBag } from './ServiceContainer';
 
+/** Maximum time (ms) to wait for services before proceeding anyway. */
+const INIT_TIMEOUT_MS = 20_000;
+
 export interface ServicesLifecycleCallbacks {
   onReady: () => void;
   onNotReady: () => void;
   onSigningOut: (active: boolean) => void;
+  onInitError?: (message: string) => void;
 }
 
 export function useServicesLifecycle(
   services: ServiceBag,
-  { onReady, onNotReady, onSigningOut }: ServicesLifecycleCallbacks,
+  { onReady, onNotReady, onSigningOut, onInitError }: ServicesLifecycleCallbacks,
 ): void {
   const { auth, eventBus } = services;
   const initedRef = useRef(false);
@@ -38,24 +42,47 @@ export function useServicesLifecycle(
 
     const isAuth = await auth.isAuthenticated();
     if (!isAuth) {
-      onReady();
+      // Don't call onReady() here — the boot loading screen already dismisses
+      // for unauthenticated users via `status === 'unauthenticated'`. Calling
+      // onReady() set servicesReady=true, which raced with the auth handler's
+      // onNotReady() and caused the post-enrolment loading screen to dismiss
+      // before services had finished bootstrapping.
       return;
     }
 
     initedRef.current = true;
 
-    // Wait for the eager config init, then bootstrap auth-dependent services.
-    await eagerPromiseRef.current;
-    await Promise.all([
-      services.appServer.init().catch(() => {}),
-      services.schedule.init()
-        .then(() => services.schedule.fetchSchedule())
-        .catch(() => {}),
-      services.notifications.init().catch(() => {}),
+    // Race the actual init against a timeout so the user is never stuck on a
+    // loading screen indefinitely if a service hangs or the network is down.
+    const doInit = async () => {
+      await eagerPromiseRef.current;
+
+      // AppServer must register the subject BEFORE the schedule can fetch
+      // protocol and tasks — otherwise every request 404s and data loads empty.
+      await services.appServer.init().catch(() => {});
+      await Promise.all([
+        services.schedule.init()
+          .then(() => services.schedule.fetchSchedule())
+          .catch(() => {}),
+        services.notifications.init().catch(() => {}),
+      ]);
+    };
+
+    const timeout = new Promise<'timeout'>((resolve) =>
+      setTimeout(() => resolve('timeout'), INIT_TIMEOUT_MS),
+    );
+
+    const result = await Promise.race([
+      doInit().then(() => 'ok' as const),
+      timeout,
     ]);
 
+    if (result === 'timeout') {
+      onInitError?.('Some services could not be reached. Data may be incomplete.');
+    }
+
     onReady();
-  }, [auth, services, onReady]);
+  }, [auth, services, onReady, onInitError]);
 
   // ---- Mount + auth state transitions ----
 
