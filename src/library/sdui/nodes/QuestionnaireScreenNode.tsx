@@ -1,21 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-  type StyleProp,
-  type TextStyle,
-  type ViewStyle,
-} from 'react-native';
-import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
-import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useCoreServices } from '../../../core/CoreServicesContext';
 import { EVENTS } from '../../../core/EventBus';
 import type { Question, QuestionnaireResult, QuestionTimestamp } from '../../../types';
@@ -23,7 +8,6 @@ import {
   fontFamily,
   tracking,
   getColorTokens,
-  readableTextColor,
   resolveBackground,
   withAlpha,
   type ThemeMode,
@@ -32,6 +16,15 @@ import WellDoneIllustration from '../../../theme/icons/welldoneillustration.svg'
 import type { NodeProps } from '../types';
 import { QuestionRenderer } from './questionnaire/QuestionRenderer';
 import { speechContent } from './questionnaire/speechContent';
+import {
+  CollapsibleHeading,
+  isReplayAllowed,
+  SPEECH_DEFAULT_HEADER,
+  SPEECH_REVIEW_SUBTEXT,
+  SPEECH_REVIEW_SUBTEXT_NO_REPLAY,
+} from './questionnaire/SpeechPanel';
+import { matrixPageTitle, toQuestionPages } from './questionnaire/matrixGroups';
+import { panelBehaviour } from './questionnaire/panelBehaviour';
 import type { SpeechPhase } from './questionnaire/SpeechInput';
 import { evaluateBranchingLogic } from './questionnaire/branchingLogic';
 import { PillButton } from '../PillButton';
@@ -43,83 +36,47 @@ import { StepSlider } from '../StepSlider';
  *  together. Matches `StepSlider`'s own default. */
 const SLIDE_DURATION = 260;
 
-/**
- * Ceiling for a speech question's passage window — around thirteen lines of the 24/30 title type.
- *
- * Only an upper bound: `titleScroll` is `flexShrink: 1`, so the passage already takes just what the
- * recording controls leave over and shrinks below this on a short screen. Raising it therefore only
- * affects screens with room to spare, and can't push the stop button off the page.
- */
-const PASSAGE_MAX_HEIGHT = 400;
+/** The screen's horizontal inset. Applied per panel, not to the body — see `questionsBody`. */
+const PAGE_PADDING = 16;
 
-
-/** Height of the fade at the edge of the scrollable passage. */
-const PASSAGE_FADE_HEIGHT = 28;
 
 /** Gap between a panel's heading block and its input. */
 const PANEL_GAP = 16;
 
 /**
- * Vertical space the footer covers: `PillButton`'s 52pt minimum plus the footer's own top padding.
+ * `PillButton`'s own minimum height, pinned onto both footer halves.
+ *
+ * Without it the row's height is whatever its tallest child happens to be — and the Next half is
+ * animated down to nothing, so its label wraps a character at a time on the way and the button grows
+ * enormously tall. `alignItems: 'center'` then re-centres the row every frame, which is Back bouncing
+ * up and down while Next collapses beside it. A fixed height leaves nothing for the row to re-measure.
+ */
+const FOOTER_BUTTON_HEIGHT = 52;
+
+/**
+ * Vertical space the footer covers: the button height plus the footer's own top padding.
  *
  * The footer is positioned over the page rather than laid out above it, so mounting or dropping it
  * can't resize the panels. Every panel reserves this much instead — whatever screen it is — which is
  * what keeps the layout identical with the footer up or down. Add the bottom inset at the call site.
  */
-const FOOTER_RESERVE = 52 + 16;
+const FOOTER_RESERVE = FOOTER_BUTTON_HEIGHT + 16;
 
 /**
- * Standing instruction above a speech question's passage, used when the study authored no
- * `section_header` for it.
+ * The gap `questionsBody` leaves under the panels, between them and the screen's own bottom.
  *
- * The passage is just the text to be read — on its own it never says what to do with it, so without
- * this the screen opens as a wall of prose above a record button. Studies that write their own
- * `section_header` keep it; this only fills the gap.
+ * Named because the panels' content sits above it, so anything inside one measuring itself against
+ * the footer has to discount it — the footer is placed against the screen's bottom edge, not the
+ * panel's. See `bottomReserve` where it is handed down.
  */
-const SPEECH_DEFAULT_HEADER = 'Read the passage below aloud';
+const BODY_BOTTOM_PAD = 16;
 
-/**
- * Line under the heading on the speech review screen, where the passage used to be.
- *
- * The review screen drops the passage (there's nothing left to read) but keeps the heading, so the
- * participant still knows which task they're in — this says what the screen is now for.
- */
-const SPEECH_REVIEW_SUBTEXT = 'Take a listen. You can re-record if you would like another go';
+/** How the footer arrives: a short fade, lifting this far off its resting place as it comes in. */
+const FOOTER_FADE_MS = 130;
+const FOOTER_RISE = 12;
 
-/**
- * The same line for a study that doesn't allow playback — there's nothing to listen to, so it points
- * at the only two things the screen still offers.
- */
-const SPEECH_REVIEW_SUBTEXT_NO_REPLAY =
-  'Your recording is saved. You can re-record if you would like another go';
-
-/**
- * TESTING: force the no-replay screen on, regardless of what the definition says.
- *
- * `allow_replay_speech` isn't in the published questionnaire definitions yet, so flip this to true to
- * see the no-play-button variant. Leave it false — it's a development switch, not a study setting.
- */
-const FORCE_NO_REPLAY_FOR_TESTING = false;
-
-/**
- * Whether a speech question offers playback of the take just recorded.
- *
- * Absent means allowed: replay is the default, so definitions written before this field existed keep
- * the play button. Only an explicit negative removes it, accepted as a real boolean or as one of the
- * strings REDCap-style definitions use for one ('n', 'no', 'false', '0'), since a JSON definition
- * that came from a spreadsheet rarely carries true booleans.
- */
-function isReplayAllowed(question?: Question): boolean {
-  if (FORCE_NO_REPLAY_FOR_TESTING) return false;
-  const raw = question?.allow_replay_speech;
-  if (raw === undefined || raw === null) return true;
-  if (typeof raw === 'boolean') return raw;
-  const value = String(raw).trim().toLowerCase();
-  // An empty string is "unset" rather than "denied" — a blank spreadsheet cell shouldn't silently
-  // strip the button from every speech question in the study.
-  if (value === '') return true;
-  return !['n', 'no', 'false', '0'].includes(value);
-}
+/** Space between the two footer buttons — a margin on the Next half, so it closes with it. */
+const FOOTER_GAP = 9;
 
 /**
  * Accent used when the manifest sets none — Figma's `color/sky/200`, the fill the radio and
@@ -127,166 +84,6 @@ function isReplayAllowed(question?: Question): boolean {
  */
 const DEFAULT_ACCENT = '#7EC8E8';
 
-/**
- * The read-aloud passage, in a capped scroll region that says so.
- *
- * A scroll view that fits its container looks identical to one that doesn't, so a capped passage
- * reads as simply truncated — there's nothing to suggest dragging it. This fades the content out at
- * whichever edge has more text beyond it: at the bottom until you reach the end, at the top once
- * you've scrolled. Both disappear when there's nothing more that way, so the cue is never a lie.
- *
- * It owns its own scroll state rather than lifting it, because `StepSlider` renders two panels during
- * a transition and shared state would let the outgoing one drive the incoming one's fades.
- */
-function ScrollablePassage({
-  text,
-  textStyle,
-  fadeColor,
-  onHintColor,
-  hintColor,
-  style,
-}: {
-  text?: string;
-  textStyle: StyleProp<TextStyle>;
-  /** Page background — what the text fades into. */
-  fadeColor: string;
-  /** Brand fill for the scroll-hint pill. */
-  hintColor: string;
-  /** Chevron color — whatever reads on `hintColor`. */
-  onHintColor: string;
-  style?: StyleProp<ViewStyle>;
-}) {
-  const [offset, setOffset] = useState(0);
-  const [viewportHeight, setViewportHeight] = useState(0);
-  const [contentHeight, setContentHeight] = useState(0);
-
-  // A pixel of slack, so a fractional layout doesn't leave a fade stranded at a hard end.
-  const canScrollUp = offset > 1;
-  const canScrollDown = offset + viewportHeight < contentHeight - 1;
-
-  // The pill keys off whether the passage scrolls *at all*, not the current position — otherwise it
-  // would vanish on reaching the bottom, and its 9px gap plus height would resize the passage mid-
-  // scroll, nudging the recording controls. The fades still follow the position, since they overlay.
-  const isScrollable = contentHeight > viewportHeight + 1;
-
-  return (
-    <View style={[styles.passageBlock, style]}>
-      <View style={styles.passageWrap}>
-        <ScrollView
-          nestedScrollEnabled
-          showsVerticalScrollIndicator={false}
-          scrollEventThrottle={16}
-          onScroll={(e) => setOffset(e.nativeEvent.contentOffset.y)}
-          onLayout={(e) => setViewportHeight(e.nativeEvent.layout.height)}
-          onContentSizeChange={(_w, h) => setContentHeight(h)}
-        >
-          <Text style={textStyle}>{text}</Text>
-        </ScrollView>
-
-        {canScrollUp ? <PassageFade color={fadeColor} edge="top" /> : null}
-        {canScrollDown ? <PassageFade color={fadeColor} edge="bottom" /> : null}
-      </View>
-
-      {isScrollable ? (
-        // Figma 3828:6300 — a full-width brand pill with a white chevron.
-        <View style={[styles.passageHint, { backgroundColor: hintColor }]}>
-          <Svg width={15} height={8} viewBox="0 0 15 8">
-            <Path
-              d="M14 1.5 L7.5 6.5 L1 1.5"
-              stroke={onHintColor}
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              fill="none"
-            />
-          </Svg>
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-/** One edge fade. Non-interactive, so it never intercepts a drag meant for the passage. */
-function PassageFade({ color, edge }: { color: string; edge: 'top' | 'bottom' }) {
-  const id = `passage-fade-${edge}`;
-  // Opaque against the page at the outer edge, clear where the text continues.
-  const [outer, inner] = edge === 'bottom' ? [0, 1] : [1, 0];
-  return (
-    <Svg
-      pointerEvents="none"
-      width="100%"
-      height={PASSAGE_FADE_HEIGHT}
-      style={edge === 'bottom' ? styles.passageFadeBottom : styles.passageFadeTop}
-    >
-      <Defs>
-        <LinearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor={color} stopOpacity={outer} />
-          <Stop offset="1" stopColor={color} stopOpacity={inner} />
-        </LinearGradient>
-      </Defs>
-      <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id})`} />
-    </Svg>
-  );
-}
-
-/**
- * A speech question's instruction, which folds away once recording starts.
- *
- * The instruction explains how to begin — "press Start, read the text, press Stop" — so by the time
- * the recorder is running it is spent, and on a long one it was what pushed the stop button off the
- * bottom of the screen. Reclaiming its whole height beats squeezing everything else around it.
- *
- * State lives here, per panel, rather than on the screen: `StepSlider` keeps neighbouring questions
- * mounted, so one shared height would be whatever the last question measured — a two-line heading
- * inheriting a seven-line one's, or worse.
- *
- * The measurement is taken *inside* the scroll view, on the content. Measuring the scroll view itself
- * feeds the animated `maxHeight` straight back into what `onLayout` reports, and the block walks
- * itself shut a frame at a time. Scroll content lays out at its natural size whatever the parent is
- * clipped to.
- */
-function CollapsibleHeading({
-  collapsed,
-  text,
-  textStyle,
-}: {
-  collapsed: boolean;
-  text?: string;
-  textStyle: StyleProp<TextStyle>;
-}) {
-  const height = useSharedValue(0);
-  const progress = useSharedValue(collapsed ? 1 : 0);
-
-  useEffect(() => {
-    progress.value = withTiming(collapsed ? 1 : 0, { duration: SLIDE_DURATION });
-  }, [collapsed, progress]);
-
-  const style = useAnimatedStyle(() => {
-    // Nothing measured yet — leave it at its natural size rather than pinning it shut.
-    if (height.value === 0) return {};
-    return {
-      maxHeight: height.value * (1 - progress.value),
-      opacity: 1 - progress.value,
-    };
-  });
-
-  return (
-    <Animated.View style={[styles.headingCollapse, style]}>
-      <View
-        onLayout={(e) => {
-          // Only while open. `maxHeight` above constrains this view too, so measuring mid-fold feeds
-          // the animation straight back into its own target and the block walks itself shut.
-          if (collapsed) return;
-          // Read out here — React recycles the event before an updater would run.
-          const measured = e.nativeEvent.layout.height;
-          if (measured > 0 && Math.abs(measured - height.value) > 1) height.value = measured;
-        }}
-      >
-        <Text style={textStyle}>{text}</Text>
-      </View>
-    </Animated.View>
-  );
-}
 
 /** Intrinsic size of `welldoneillustration.svg`, used to keep its aspect ratio when scaled to fit. */
 const ILLUSTRATION_WIDTH = 323;
@@ -365,8 +162,18 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
     [allQuestions, answers],
   );
 
-  const currentQuestion = visibleQuestions[currentIndex];
-  const total = visibleQuestions.length;
+  /**
+   * The questions batched into pages — what the screen actually steps through.
+   *
+   * All but one field type is a page to itself, exactly as before. A run of binary `matrix-radio`
+   * questions collapses into a single page instead, because the matrix design answers the whole block
+   * on one screen as a deck of cards. `currentIndex` counts pages from here on, not questions.
+   */
+  const pages = useMemo(() => toQuestionPages(visibleQuestions), [visibleQuestions]);
+  const currentPage = pages[currentIndex];
+  /** The page's first question — the whole of it, for every page that isn't a matrix block. */
+  const currentQuestion = currentPage?.[0];
+  const total = pages.length;
   const isFirst = currentIndex === 0;
   const isLast = currentIndex === total - 1;
 
@@ -382,8 +189,9 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
    */
   const isAnswerable = (q?: Question) =>
     q?.field_type !== 'info' && q?.field_type !== 'descriptive';
-  const answerable = visibleQuestions.filter(isAnswerable).length;
-  const answeredSoFar = visibleQuestions.slice(0, currentIndex + 1).filter(isAnswerable).length;
+  // Counted over pages, so a matrix block reads as the one screen it is rather than as its row count.
+  const answerable = pages.filter((page) => isAnswerable(page[0])).length;
+  const answeredSoFar = pages.slice(0, currentIndex + 1).filter((page) => isAnswerable(page[0])).length;
   /**
    * The question number shown in the header.
    *
@@ -413,17 +221,26 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   }, [progress, progressValue]);
   const progressStyle = useAnimatedStyle(() => ({ width: `${progressValue.value * 100}%` }));
 
+  /**
+   * Records one answer by field name.
+   *
+   * Split out from `handleAnswer` because a matrix page answers several fields from a single screen,
+   * so "the question being answered" can't be inferred from the page any more.
+   */
+  const handleAnswerField = useCallback((fieldName: string, value: any) => {
+    setAnswers((prev) => ({ ...prev, [fieldName]: value }));
+    setTimestamps((prev) => ({
+      ...prev,
+      [fieldName]: { startTime: questionStartTime.current, endTime: Date.now() },
+    }));
+  }, []);
+
   const handleAnswer = useCallback(
     (value: any) => {
       if (!currentQuestion?.field_name) return;
-      const fieldName = currentQuestion.field_name;
-      setAnswers((prev) => ({ ...prev, [fieldName]: value }));
-      setTimestamps((prev) => ({
-        ...prev,
-        [fieldName]: { startTime: questionStartTime.current, endTime: Date.now() },
-      }));
+      handleAnswerField(currentQuestion.field_name, value);
     },
-    [currentQuestion],
+    [currentQuestion, handleAnswerField],
   );
 
   const submitResult = useCallback(async () => {
@@ -529,7 +346,11 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   // Required-field gate for the primary button (matches QuestionnaireNode).
   const isInfoType =
     currentQuestion?.field_type === 'info' || currentQuestion?.field_type === 'descriptive';
-  const hasAnswer = currentQuestion?.field_name ? answers[currentQuestion.field_name] != null : false;
+  // A matrix page is answered only once every card in the deck is — one row left face up is an
+  // unanswered question, whichever way the rest went.
+  const hasAnswer = currentPage?.length
+    ? currentPage.every((q) => (q.field_name ? answers[q.field_name] != null : true))
+    : false;
   const isRequired = currentQuestion?.required_field === 'y';
   const canProceed = !isRequired || hasAnswer || isInfoType;
 
@@ -551,7 +372,7 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
     const id = setTimeout(() => setSettledIndex(currentIndex), SLIDE_DURATION);
     return () => clearTimeout(id);
   }, [currentIndex, settledIndex]);
-  const isSpeech = visibleQuestions[settledIndex]?.field_type === 'audio';
+  const isSpeech = pages[settledIndex]?.[0]?.field_type === 'audio';
   // The speech review screen is a new screen of the *same* question, so the whole panel slides — title
   // included. (Sliding only the input left the title to unmount separately, which read as a vertical
   // jump followed by a horizontal one.) The direction follows the journey: forward into the review
@@ -601,6 +422,59 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
     setShowFooter(targetShowFooter);
   }, [targetShowFooter, settledIndex, currentIndex]);
   const showNext = !isSpeech;
+
+  /**
+   * Whether Next may be *pressed*, decided by the page being landed on rather than the settled one.
+   *
+   * `showNext` is deliberately a slide behind, so the footer doesn't resize mid-transition — but that
+   * is a question about drawing, and applying it to input left a real hole: arriving at a speech
+   * question, Next stayed live for the length of the slide, and a tap in that window called `goNext`
+   * and skipped the task entirely. Shrinking the animation would only narrow the window; reading the
+   * arriving page closes it.
+   */
+  const arrivingIsSpeech = pages[currentIndex]?.[0]?.field_type === 'audio';
+  const nextEnabled = canProceed && !arrivingIsSpeech;
+
+  /**
+   * The footer fades and rises into place rather than appearing whole.
+   *
+   * It comes and goes within a speech question — gone while recording, back when the take is done —
+   * and a button that simply materialises under your thumb reads as a glitch rather than as an
+   * invitation. Rising a little as it fades in says it arrived.
+   *
+   * Driven by a shared value on a permanently mounted footer, not by mounting it: `entering`/
+   * `exiting` layout animations strand an invisible touch-blocking overlay on Android, and an
+   * unmounted footer can't animate away at all. It costs nothing to leave up — the footer is
+   * positioned over the page, and every panel reserves `FOOTER_RESERVE` whether it is there or not.
+   */
+  const footerProgress = useSharedValue(showFooter ? 1 : 0);
+  useEffect(() => {
+    footerProgress.value = withTiming(showFooter ? 1 : 0, { duration: FOOTER_FADE_MS });
+  }, [showFooter, footerProgress]);
+  const footerStyle = useAnimatedStyle(() => ({
+    opacity: footerProgress.value,
+    transform: [{ translateY: (1 - footerProgress.value) * FOOTER_RISE }],
+  }));
+
+  /**
+   * Next collapses into Back rather than vanishing from under it.
+   *
+   * A speech question has no Next, so arriving at one used to drop that half outright and Back snapped
+   * from half the row to all of it in a single frame. Growing into the space instead makes the two
+   * read as one control changing shape.
+   *
+   * `flexGrow` and the gap are animated together: the gap is the Next half's own left margin (see
+   * `footer`), so it closes as the button does and Back ends up filling the row exactly.
+   */
+  const nextProgress = useSharedValue(showNext ? 1 : 0);
+  useEffect(() => {
+    nextProgress.value = withTiming(showNext ? 1 : 0, { duration: FOOTER_FADE_MS });
+  }, [showNext, nextProgress]);
+  const nextStyle = useAnimatedStyle(() => ({
+    flexGrow: nextProgress.value,
+    marginLeft: nextProgress.value * FOOTER_GAP,
+    opacity: nextProgress.value,
+  }));
 
   // --- "Well done" completion screen (Figma 3273:1821) ---------------------------------------------
   // Same header, but the count reads "Done" and the bar is full; the questions are replaced by the
@@ -675,9 +549,10 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
         pointerEvents={isComplete ? 'none' : 'auto'}
       >
       {/* A constant box. The footer is drawn over it, so nothing here moves when the footer does. */}
-      <View style={styles.body}>
-        {/* Header: task name + item count, with the progress bar beneath. */}
-        <View style={styles.headerBlock}>
+      <View style={styles.questionsBody}>
+        {/* Header: task name + item count, with the progress bar beneath. Padded itself now that the
+            body isn't — see `questionsBody`. */}
+        <View style={[styles.headerBlock, styles.panelPad]}>
           <View style={styles.countRow}>
             <Text style={[styles.countText, { color: muted }]} numberOfLines={1}>
               {taskName}
@@ -699,11 +574,17 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
             is reused from QuestionRenderer (with its own header suppressed so it isn't shown twice). */}
         <StepSlider index={currentIndex} duration={SLIDE_DURATION} count={total}>
           {(stepIndex) => {
-            const question = visibleQuestions[stepIndex];
+            const page = pages[stepIndex];
+            const question = page?.[0];
             // The slider keeps the neighbouring steps mounted, so this runs for indices either side of
-            // the current one. Branching logic can shorten `visibleQuestions` under us, so a step can
-            // point at nothing.
+            // the current one. Branching logic can shorten `pages` under us, so a step can point at
+            // nothing.
             if (!question) return null;
+            // How this page's container has to behave — the rule lives with the field types it
+            // describes, so the screen asks rather than switching on `field_type` itself.
+            const behaviour = panelBehaviour(page);
+            // A block shares one screen, so its heading is the block's rather than the first row's.
+            const isBlock = page.length > 1;
             // During a transition StepSlider renders both the outgoing and incoming panel. Anything
             // derived from the *current* question has to be scoped to the active one, or the outgoing
             // panel flips its title to match the incoming question and its speech input reports a
@@ -721,15 +602,6 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
               question?.field_type === 'audio' &&
               !!(question.field_name && answers[question.field_name]);
             const isSpeechPanel = question?.field_type === 'audio';
-            // Whether the read-aloud passage is the question's own `field_label` (rendered here, in a
-            // capped scroll region) rather than living in `select_choices_or_calculations`, which
-            // `SpeechInput` draws in its own fixed-height card. Decides both what the title block
-            // renders and whether it's allowed to shrink.
-            // The passage now always goes to `SpeechInput`'s card, wherever the definition put it —
-            // rendering it here instead meant a question whose passage lived in `field_label` drew it
-            // as a bare scrolling title with no card behind it, while the same question authored with
-            // `select_choices_or_calculations` got the designed one.
-            const hasInlinePassage = false;
             // Drives both halves of the review screen: the play button, and which line sits under the
             // heading — a "take a listen" prompt with no way to listen would be a lie.
             const allowReplay = isReplayAllowed(question);
@@ -737,24 +609,25 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
             // note where the header is rendered.
             // A speech question's heading is whichever field isn't carrying the passage — see
             // `speechContent`. Everything else keeps its own label.
-            const questionTitle = isSpeechPanel
-              ? speechContent(question).heading
-              : question?.field_label?.trim() || question?.section_header;
+            // A matrix block's title is the block's own heading, not the first row's label — each row
+            // carries its label on its card, and the heading is the one thing they share.
+            const questionTitle = isBlock
+              ? matrixPageTitle(page)
+              : isSpeechPanel
+                ? speechContent(question).heading
+                : question?.field_label?.trim() || question?.section_header;
             // Speech questions get a standing instruction when the study wrote no header of their
-            // own; every other type shows a header only if one was authored.
-            const sectionHeader =
-              question?.field_type === 'audio'
+            // own; every other type shows a header only if one was authored. A matrix block has
+            // already spent its header on the title above, so it shows none here.
+            const sectionHeader = isBlock
+              ? undefined
+              : question?.field_type === 'audio'
                 ? question.section_header?.trim() || SPEECH_DEFAULT_HEADER
                 : question?.section_header;
-            // A speech question is laid out in a plain View, not a ScrollView.
-            //
-            // That's the difference between the passage shrinking and not: a ScrollView's content
-            // container has no bounded height — `flexGrow` only makes it *at least* the viewport, and
-            // it grows past that to fit its content, so `flexShrink` on the passage never engages and
-            // the recording controls get pushed off the bottom. A View bounded by `flex: 1` gives the
-            // children a fixed height to divide up, so the passage yields and the controls stay put.
-            // The page doesn't need to scroll anyway — only the passage does.
-            const Panel = isSpeechPanel ? View : ScrollView;
+            // Which types need a plain View rather than a ScrollView, and why, is `panelBehaviour`'s
+            // to say — the reasons are about the field types, not about this screen.
+            const isFixedPanel = !behaviour.scrolls;
+            const Panel = isFixedPanel ? View : ScrollView;
             return (
               <Panel
                 style={[
@@ -763,17 +636,27 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                   // The footer is drawn over the page, so this is what keeps its content clear of it —
                   // and reserving it unconditionally is what makes the panel the same size before,
                   // during and after a transition.
-                  isSpeechPanel && { paddingBottom: FOOTER_RESERVE + bottomInset },
+                  // A View panel carries the page inset itself. It doesn't clip, so a card thrown
+                  // sideways still travels out past it to the screen edge.
+                  isFixedPanel && styles.panelPad,
+                  isFixedPanel &&
+                    behaviour.padsFooter && { paddingBottom: FOOTER_RESERVE + bottomInset },
                 ]}
                 contentContainerStyle={
-                  isSpeechPanel
+                  isFixedPanel
                     ? undefined
-                    : [
+                    : // On a ScrollView the inset goes on the content, leaving the scroll frame full
+                      // width — otherwise its own clip would sit inside the padding again.
+                      [
                         styles.scrollContent,
+                        styles.panelPad,
                         { paddingBottom: FOOTER_RESERVE + bottomInset },
                       ]
                 }
                 showsVerticalScrollIndicator={false}
+                // Set even on a View panel, where it is simply ignored — see `panelBehaviour` for
+                // which pages refuse to scroll and why.
+                scrollEnabled={behaviour.scrolls}
               >
                 {!question ? (
                   <Text style={[styles.emptyText, { color: muted }]}>No questions available</Text>
@@ -785,7 +668,7 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                       // height to shrink within. On the review screen there's no passage left to
                       // squeeze, and filling would defeat the panel's `justifyContent: center` —
                       // a body that fills has nothing left to centre.
-                      isSpeechPanel && styles.panelBodyFill,
+                      behaviour.fills && styles.panelBodyFill,
                       isActive && reviewSlideStyle,
                     ]}
                   >
@@ -841,28 +724,7 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                             {sectionHeader}
                           </Text>
                         ) : null}
-                        {hasInlinePassage ? (
-                          // A speech question's `field_label` is a passage to read aloud — far longer
-                          // than a normal question, and long enough to push the record button
-                          // off-screen. Cap just the passage and let it scroll on its own, with edge
-                          // fades marking that there's more; the instructions above it stay put, as
-                          // do the controls below.
-                          //
-                          // Only when there IS one: aRMT speech questions routinely leave `field_label`
-                          // empty and put the passage in `select_choices_or_calculations` (which
-                          // `SpeechInput` draws in its own card) with just a heading in
-                          // `section_header`. Those fall through to the plain title below — rendering
-                          // the empty label here left the whole title block blank, since the heading
-                          // had already been promoted into `questionTitle`.
-                          <ScrollablePassage
-                            style={styles.titleScroll}
-                            fadeColor={pageBg}
-                            hintColor={accent}
-                            onHintColor={readableTextColor(accent, { preferred: brand })}
-                            textStyle={[styles.title, { color: brand }]}
-                            text={question.field_label}
-                          />
-                        ) : isSpeechPanel ? (
+                        {isSpeechPanel ? (
                           // The passage card below is the content here, so the task name reads as a
                           // kicker above it rather than as the page's heading. Same size on idle and
                           // recording as on review, so pressing record doesn't resize it mid-task.
@@ -885,30 +747,54 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                         Otherwise this is a link in the shrink chain: it sits between the bounded panel
                         and the passage card, and RN defaults `flexShrink` to 0, so leaving it unstyled
                         pins it at its natural height and the card below never gets to yield. */}
+                    {/* The last link in the fill chain, for an input that scrolls itself: the panel
+                        is bounded and the body fills it, but RN defaults `flex` to 0, so leaving this
+                        unstyled pins it at its content's height and the scroller inside never gets a
+                        viewport to scroll within. */}
                     <View
                       style={
                         hideTitleHere
                           ? styles.reviewBody
                           : isSpeechPanel
                             ? styles.speechBody
-                            : undefined
+                            : behaviour.fills
+                              ? styles.panelBodyFill
+                              : undefined
                       }
                     >
                       <QuestionRenderer
-                        question={question}
-                        value={question.field_name ? answers[question.field_name] : undefined}
-                        onChange={handleAnswer}
-                        primaryColor={brand}
-                        textColor={tokens.text.primary}
-                        textSecondaryColor={muted}
-                        accentColor={accent}
-                        surfaceColor={tokens.card.background}
-                        hideHeader
-                        mode={mode}
-                        // Lets the speech question's "Continue" card advance the questionnaire itself.
-                        onContinue={goNext}
-                        onPhaseChange={isActive ? handleSpeechPhase : undefined}
-                        allowReplay={allowReplay}
+                          question={question}
+                          value={question.field_name ? answers[question.field_name] : undefined}
+                          onChange={handleAnswer}
+                          primaryColor={brand}
+                          textColor={tokens.text.primary}
+                          textSecondaryColor={muted}
+                          accentColor={accent}
+                          surfaceColor={tokens.card.background}
+                          hideHeader
+                          mode={mode}
+                          // Lets the speech question's "Continue" card advance the questionnaire itself.
+                          onContinue={goNext}
+                          onPhaseChange={isActive ? handleSpeechPhase : undefined}
+                          allowReplay={allowReplay}
+                          // The page, for the one type whose rows share a screen. Everything else gets
+                          // a page of one and never looks at it.
+                          questions={page}
+                          answers={answers}
+                          onAnswer={handleAnswerField}
+                          // The page itself, for an input that fades its ends into it.
+                          backgroundColor={pageBg}
+                          // What an input that scrolls itself has to keep clear at the bottom, since
+                          // its panel no longer does — see `panelBehaviour.padsFooter`.
+                          //
+                          // Measured from the panel's own bottom edge, which is where the input will
+                          // apply it — so the body's gap under the panels comes off, or the footer
+                          // gets counted twice and everything positioned against it lands that much
+                          // too high.
+                          bottomReserve={FOOTER_RESERVE + bottomInset - BODY_BOTTOM_PAD}
+                          // The page inset, for an input whose own clipping would otherwise cut the
+                          // theme's card shadow off at the padded edge.
+                          pageInset={PAGE_PADDING}
                       />
                       {hideTitleHere ? (
                         <>
@@ -932,9 +818,13 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
 
       {/* Footer: Exit (first) / Back (thereafter) + Next / Finish (last). The speech question shows only
           the back/exit half while idle, and no footer at all once recording starts. */}
-      {showFooter && (
-        <View style={[styles.footer, { paddingBottom: bottomInset }]}>
-          <View style={styles.footerButton}>
+      {/* Always mounted, shown by opacity — see `footerStyle`. `pointerEvents` is what actually takes
+          it out of play, so a faded footer can't be pressed on the way out. */}
+      <Animated.View
+        style={[styles.footer, { paddingBottom: bottomInset }, footerStyle]}
+        pointerEvents={showFooter ? 'auto' : 'none'}
+      >
+        <View style={styles.footerButton}>
             <PillButton
               variant="outline"
               label={isFirst ? 'Exit' : 'Back'}
@@ -943,20 +833,25 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
               brandColors={context.theme.brandColors}
             />
           </View>
-          {showNext && (
-            <View style={styles.footerButton}>
-              <PillButton
-                variant="primary"
-                label={isLast ? 'Finish' : 'Next'}
-                onPress={goNext}
-                disabled={!canProceed}
-                mode={mode}
-                brandColors={context.theme.brandColors}
-              />
-            </View>
-          )}
-        </View>
-      )}
+          {/* Kept mounted and collapsed, so Back grows into the space rather than jumping into it —
+              see `nextStyle`. `pointerEvents` takes it out of play while it is closed. */}
+          <Animated.View
+            style={[styles.footerNext, nextStyle]}
+            // Gated on the arriving page, not the settled one — see `nextEnabled`. While the panel is
+            // still sliding onto a speech question this is already closed, so the collapse it is part
+            // way through can't be tapped through.
+            pointerEvents={showNext && nextEnabled ? 'auto' : 'none'}
+          >
+            <PillButton
+              variant="primary"
+              label={isLast ? 'Finish' : 'Next'}
+              onPress={goNext}
+              disabled={!nextEnabled}
+              mode={mode}
+              brandColors={context.theme.brandColors}
+            />
+          </Animated.View>
+        </Animated.View>
       </Animated.View>
 
       {doneScreen}
@@ -977,9 +872,27 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: PAGE_PADDING,
     paddingBottom: 16,
     gap: 16,
+  },
+  /**
+   * The questions view's body — `body` without the horizontal padding.
+   *
+   * `StepSlider`'s viewport clips, and it must: that clip is what hides the parked neighbouring
+   * panels. Padding this container put that clip 16pt inside the screen, so a card thrown sideways was
+   * sliced off there instead of leaving the screen. The padding moves inward instead — onto the header
+   * and onto each panel's own content — which leaves the viewport full width and its clip where it
+   * belongs, at the screen edge.
+   */
+  questionsBody: {
+    flex: 1,
+    paddingBottom: BODY_BOTTOM_PAD,
+    gap: 16,
+  },
+  /** The page inset, applied per panel now rather than to the whole body. */
+  panelPad: {
+    paddingHorizontal: PAGE_PADDING,
   },
   headerBlock: {
     width: '100%',
@@ -1125,54 +1038,6 @@ const styles = StyleSheet.create({
    * and `overflow: hidden` then cut the last line off. The passage card is the thing that gives way
    * here; it scrolls, so losing height costs reading room rather than words.
    */
-  headingCollapse: {
-    flexGrow: 0,
-    flexShrink: 0,
-    overflow: 'hidden',
-  },
-  /**
-   * A speech question's read-aloud passage — the only scrollable thing on the screen.
-   *
-   * It claims no space of its own: `flexGrow: 0` keeps it from expanding past its content, and
-   * `flexShrink: 1` lets it give way to the recording controls, which are laid out at their natural
-   * size first. Whatever is left over is the passage's window, so the controls are always visible and
-   * the page itself never scrolls — no fixed cap needed, since the space decides it.
-   */
-  titleScroll: {
-    flexGrow: 0,
-    flexShrink: 1,
-    maxHeight: PASSAGE_MAX_HEIGHT,
-  },
-  /** The passage and its scroll-hint pill, spaced by the design's 9px. */
-  passageBlock: {
-    gap: 9,
-  },
-  /** Positioning context for the edge fades, which overlay the scroll rather than displacing it. */
-  passageWrap: {
-    position: 'relative',
-    overflow: 'hidden',
-    flexShrink: 1,
-  },
-  passageFadeTop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-  },
-  passageFadeBottom: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
-  /** Scroll-hint pill (Figma 3828:6300): full width, fully rounded, brand-filled. */
-  passageHint: {
-    width: '100%',
-    height: 23.5,
-    borderRadius: 23.5 / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   /** Speech panels fill the viewport, giving the passage a bounded height to flex within. */
   panelBodyFill: {
     flex: 1,
@@ -1211,11 +1076,29 @@ const styles = StyleSheet.create({
     bottom: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 9,
+    // No `gap`: the space between the buttons is a margin on the Next half instead, so it can shrink
+    // away with it. A gap is charged between children whatever their width, which would have left
+    // Back 9pt short of the full row once Next collapsed to nothing.
     paddingHorizontal: 16,
     paddingTop: 16,
   },
   footerButton: {
     flex: 1,
+    height: FOOTER_BUTTON_HEIGHT,
+  },
+  /**
+   * The Next half, which collapses rather than unmounting.
+   *
+   * `flexGrow` is animated, so `flexBasis: 0` and `flexShrink: 1` are spelled out here — together they
+   * are what `flex: 1` means, and the grow half has to be left free for the animation to drive.
+   * `overflow: hidden` keeps the button from spilling out of the shrinking box on its way down.
+   */
+  footerNext: {
+    flexBasis: 0,
+    flexShrink: 1,
+    overflow: 'hidden',
+    // Fixed, for the reason given on `FOOTER_BUTTON_HEIGHT` — this is the half that collapses, so it
+    // is the one whose reflow would otherwise drive the row's height.
+    height: FOOTER_BUTTON_HEIGHT,
   },
 });

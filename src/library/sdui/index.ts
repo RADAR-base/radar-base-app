@@ -105,6 +105,7 @@ export type { SpeechRecording } from './nodes/questionnaire';
 export {
   RadioInput,
   CheckboxInput,
+  MatrixRadioRows,
   RangeInput,
   SliderInput,
   TextQuestionInput,
@@ -112,6 +113,10 @@ export {
   SpeechInput,
   QuestionRenderer,
   evaluateBranchingLogic,
+  toQuestionPages,
+  isMatrixQuestion,
+  panelBehaviour,
+  matrixPageTitle,
 } from './nodes/questionnaire';
 
 // Login / registration / enrolment screens

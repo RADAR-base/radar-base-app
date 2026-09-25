@@ -1,5 +1,8 @@
 export { RadioInput } from './RadioInput';
 export { CheckboxInput } from './CheckboxInput';
+export { MatrixRadioRows } from './MatrixRadioRows';
+export { toQuestionPages, isMatrixQuestion, matrixPageTitle } from './matrixGroups';
+export { panelBehaviour } from './panelBehaviour';
 export { RangeInput } from './RangeInput';
 export { SliderInput } from './SliderInput';
 export { TextQuestionInput } from './TextQuestionInput';

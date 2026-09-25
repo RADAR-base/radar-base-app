@@ -3,6 +3,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import type { Question } from '../../../../types';
 import { RadioInput } from './RadioInput';
 import { CheckboxInput } from './CheckboxInput';
+import { MatrixRadioRows } from './MatrixRadioRows';
+import { isMatrixQuestion } from './matrixGroups';
 import { RangeInput } from './RangeInput';
 import { SliderInput } from './SliderInput';
 import { TextQuestionInput } from './TextQuestionInput';
@@ -33,6 +35,40 @@ interface QuestionRendererProps {
   onPhaseChange?: (phase: SpeechPhase, meta?: { transition?: boolean }) => void;
   /** Speech questions: may the participant play their recording back? Defaults to true. */
   allowReplay?: boolean;
+  /**
+   * The whole page, when it holds more than this one question.
+   *
+   * Only a matrix block ever does: its rows share a screen, so the page is the unit rather than the
+   * question. `question` stays the first row, so every other field type is unaffected — they simply
+   * never set this.
+   */
+  questions?: Question[];
+  /** Block form: answers by field name, since a block writes to several. */
+  answers?: Record<string, unknown>;
+  /** Block form: records one row's answer. Required for a block; `onChange` can't name a field. */
+  onAnswer?: (fieldName: string, value: string) => void;
+  /**
+   * The page behind the input.
+   *
+   * Only the matrix rows read it, to fade their ends into it. It must be the page's actual colour, not
+   * a surface derived from the brand — a near-miss reads as a band across the list rather than as the
+   * list going.
+   */
+  backgroundColor?: string;
+  /**
+   * Space an input that scrolls itself must keep clear at the bottom — the footer's footprint.
+   *
+   * Only the matrix rows read it: their panel stops reserving that space so their scroller can run to
+   * the bottom of the screen, which leaves the reserve theirs to apply as content padding.
+   */
+  bottomReserve?: number;
+  /**
+   * The page's horizontal inset, for an input that needs to reach past it.
+   *
+   * Only the matrix rows read it: their scroller clips, and flush against the padded edge it would cut
+   * the cards' shadows off down one side.
+   */
+  pageInset?: number;
 }
 
 const DEFAULT_YESNO_CHOICES = [
@@ -54,6 +90,12 @@ export function QuestionRenderer({
   onContinue,
   onPhaseChange,
   allowReplay,
+  questions,
+  answers,
+  onAnswer,
+  backgroundColor,
+  bottomReserve,
+  pageInset,
 }: QuestionRendererProps) {
   const isRequired = question.required_field === 'y';
   // Hosts that don't theme their inputs still get something coherent: the brand as the selected fill
@@ -61,8 +103,14 @@ export function QuestionRenderer({
   const radioAccent = accentColor ?? primaryColor;
   const radioSurface = surfaceColor ?? withAlpha(primaryColor, 0.08);
 
+  /**
+   * Whether this page is a matrix block — hoisted out of `renderInput` because the container needs it
+   * too: the block scrolls itself, so it has to be given a height to scroll within.
+   */
+  const isMatrix = isMatrixQuestion(question);
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isMatrix && styles.containerFill]}>
       {!hideHeader && question.section_header ? (
         <Text style={[styles.sectionHeader, { color: textSecondaryColor }]}>
           {question.section_header}
@@ -87,6 +135,18 @@ export function QuestionRenderer({
   );
 
   function renderInput() {
+    /**
+     * A matrix block, before the per-field switch.
+     *
+     * It is the one thing here that isn't a field type rendered on its own: its rows share a screen,
+     * so the unit is the page. A lone row goes through the same component as a block of one, so it
+     * looks the same whether or not it was gathered with neighbours.
+     *
+     * A row only misses this if it offers nothing to choose from or more than the track can fit; see
+     * `MATRIX_ROWS_MAX_CHOICES`. Those fall to the plain radio list in the switch below, which is
+     * honest at any length.
+     */
+
     switch (question.field_type) {
       case 'radio':
         return (
@@ -183,6 +243,35 @@ export function QuestionRenderer({
           />
         );
 
+      case 'matrix-radio': {
+        if (isMatrix && onAnswer) {
+          const page = questions?.length ? questions : [question];
+          return (
+            <MatrixRadioRows
+              questions={page}
+              answers={answers ?? (question.field_name ? { [question.field_name]: value } : {})}
+              onAnswer={onAnswer}
+              accentColor={radioAccent}
+              surfaceColor={radioSurface}
+              textColor={textColor}
+              backgroundColor={backgroundColor ?? radioSurface}
+              bottomReserve={bottomReserve}
+              pageInset={pageInset}
+            />
+          );
+        }
+        return (
+          <RadioInput
+            choices={question.select_choices_or_calculations ?? []}
+            value={value != null ? String(value) : undefined}
+            onChange={onChange}
+            accentColor={radioAccent}
+            surfaceColor={radioSurface}
+            textColor={textColor}
+          />
+        );
+      }
+
       case 'info':
         return (
           <InfoScreen
@@ -201,18 +290,6 @@ export function QuestionRenderer({
               {question.field_label ?? ''}
             </Text>
           </View>
-        );
-
-      case 'matrix-radio':
-        return (
-          <RadioInput
-            choices={question.select_choices_or_calculations ?? []}
-            value={value != null ? String(value) : undefined}
-            onChange={onChange}
-            accentColor={radioAccent}
-            surfaceColor={radioSurface}
-            textColor={textColor}
-          />
         );
 
       default:
@@ -244,6 +321,17 @@ function deriveRange(question: Question) {
 const styles = StyleSheet.create({
   container: {
     marginBottom: 20,
+  },
+  /**
+   * For an input that scrolls itself: take the panel's height rather than the content's.
+   *
+   * The trailing margin goes with it. A container that fills has nothing after it for a margin to
+   * separate it from, and leaving it on holds the input's bottom edge 20pt above the panel's — which
+   * anything positioning itself against that edge, such as the rows' bottom fade, then inherits.
+   */
+  containerFill: {
+    flex: 1,
+    marginBottom: 0,
   },
   sectionHeader: {
     fontSize: 13,
