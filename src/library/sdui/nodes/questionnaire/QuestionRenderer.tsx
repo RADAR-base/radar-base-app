@@ -1,11 +1,12 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import type { Question, QuestionRange } from '../../../../types';
+import type { Question } from '../../../../types';
 import { RadioInput } from './RadioInput';
 import { CheckboxInput } from './CheckboxInput';
 import { ArcSliderInput } from './ArcSliderInput';
-import { parseChoices, questionScale } from './questionScale';
-import { RangeInput } from './RangeInput';
+import { parseChoices } from './questionScale';
+import { MatrixRadioRows } from './MatrixRadioRows';
+import { isMatrixQuestion } from './matrixGroups';
 import { SliderInput } from './SliderInput';
 import { VerticalSliderInput } from './VerticalSliderInput';
 import { ScaleInput } from './ScaleInput';
@@ -28,8 +29,10 @@ interface QuestionRendererProps {
   /** Card surface for unselected options. Falls back to a faint tint of `primaryColor`. */
   surfaceColor?: string;
   /**
-   * The page's own background. The sliders cut their step marks out of the track with it, so it has to
-   * be the colour actually behind them — resolved by the host from the theme and its brand colours.
+   * The page's own background — its actual colour, not a surface derived from the brand.
+   *
+   * The sliders cut their step marks out of the track with it, and the matrix rows fade their ends
+   * into it; for both, a near-miss shows as a band where the page is supposed to be.
    */
   backgroundColor?: string;
   /** Skip the section-header / label / note block and render only the input control — for hosts that
@@ -43,6 +46,33 @@ interface QuestionRendererProps {
   onPhaseChange?: (phase: SpeechPhase, meta?: { transition?: boolean }) => void;
   /** Speech questions: may the participant play their recording back? Defaults to true. */
   allowReplay?: boolean;
+  /**
+   * The whole page, when it holds more than this one question.
+   *
+   * Only a matrix block ever does: its rows share a screen, so the page is the unit rather than the
+   * question. `question` stays the first row, so every other field type is unaffected — they simply
+   * never set this.
+   */
+  questions?: Question[];
+  /** Block form: answers by field name, since a block writes to several. */
+  answers?: Record<string, unknown>;
+  /** Block form: records one row's answer. Required for a block; `onChange` can't name a field. */
+  onAnswer?: (fieldName: string, value: string) => void;
+  /**
+   * Space an input that scrolls itself must keep clear at the bottom — the footer's footprint.
+   *
+   * Two inputs read it. The matrix rows, whose panel stops reserving that space so their scroller can
+   * run to the bottom of the screen; and `slider-vertical`, which sizes itself against the bottom of
+   * the window and so has to know what stands between it and that edge.
+   */
+  bottomReserve?: number;
+  /**
+   * The page's horizontal inset, for an input that needs to reach past it.
+   *
+   * Only the matrix rows read it: their scroller clips, and flush against the padded edge it would cut
+   * the cards' shadows off down one side.
+   */
+  pageInset?: number;
   /** How many times the participant has tried to move on — text inputs surface their errors, and
    *  shake, from here. */
   submitAttempt?: number;
@@ -53,13 +83,6 @@ interface QuestionRendererProps {
    * its own lined up with its card.
    */
   errorMessage?: string | null;
-  /**
-   * What the host keeps below the input — its footer, plus the space between the two.
-   *
-   * Only `slider-vertical` uses it: it sizes itself against the bottom of the window, so it has to
-   * know what stands between it and that edge.
-   */
-  bottomReserve?: number;
 }
 
 const DEFAULT_YESNO_CHOICES = [
@@ -90,28 +113,6 @@ export const SCALE_TYPES = ['range', 'slider', 'slider-vertical', 'slider-scale'
  */
 export const HEIGHT_DRIVEN_TYPES = ['slider-vertical'];
 
-/**
- * A concrete `QuestionRange` for the controls that still require one.
- *
- * `range` is optional on a definition — plenty of questions carry their scale in
- * `select_choices_or_calculations` instead — so it can't be handed straight to a control that needs
- * bounds. `deriveRange` used to paper over that; `questionScale` replaced it, and reading the bounds
- * back off the derived scale keeps both paths going through the same rules, labels included.
- */
-function concreteRange(question: Question): QuestionRange {
-  const scale = questionScale(question.range, question.select_choices_or_calculations);
-  const min = scale.values[0];
-  const max = scale.values[scale.values.length - 1];
-  return {
-    min,
-    max,
-    // `values` is ordered and never empty, so a second entry is the step the scale actually advances
-    // by — and a single-value scale has no gap to describe.
-    step: scale.values.length > 1 ? scale.values[1] - min : 1,
-    labelLeft: scale.minLabel,
-    labelRight: scale.maxLabel,
-  };
-}
 
 export function QuestionRenderer({
   question,
@@ -128,10 +129,14 @@ export function QuestionRenderer({
   onContinue,
   onPhaseChange,
   allowReplay,
+  questions,
+  answers,
+  onAnswer,
+  bottomReserve,
+  pageInset,
   submitAttempt,
   onValidityChange,
   errorMessage,
-  bottomReserve,
 }: QuestionRendererProps) {
   const isRequired = question.required_field === 'y';
   // Hosts that don't theme their inputs still get something coherent: the brand as the selected fill
@@ -139,11 +144,16 @@ export function QuestionRenderer({
   const radioAccent = accentColor ?? primaryColor;
   const radioSurface = surfaceColor ?? withAlpha(primaryColor, 0.08);
 
+  /**
+   * Whether this page is a matrix block — hoisted out of `renderInput` because the container needs it
+   * too: the block scrolls itself, so it has to be given a height to scroll within.
+   */
+  const isMatrix = isMatrixQuestion(question);
   // Pass the height through only where the control needs it — see `HEIGHT_DRIVEN_TYPES`.
   const isScale = HEIGHT_DRIVEN_TYPES.includes(question.field_type ?? '');
 
   return (
-    <View style={[styles.container, isScale && styles.fill]}>
+    <View style={[styles.container, isMatrix && styles.containerFill, isScale && styles.fill]}>
       {!hideHeader && question.section_header ? (
         <Text style={[styles.sectionHeader, { color: textSecondaryColor }]}>
           {question.section_header}
@@ -180,6 +190,18 @@ export function QuestionRenderer({
   );
 
   function renderInput() {
+    /**
+     * A matrix block, before the per-field switch.
+     *
+     * It is the one thing here that isn't a field type rendered on its own: its rows share a screen,
+     * so the unit is the page. A lone row goes through the same component as a block of one, so it
+     * looks the same whether or not it was gathered with neighbours.
+     *
+     * A row only misses this if it offers nothing to choose from or more than the track can fit; see
+     * `MATRIX_ROWS_MAX_CHOICES`. Those fall to the plain radio list in the switch below, which is
+     * honest at any length.
+     */
+
     switch (question.field_type) {
       case 'radio':
         return (
@@ -331,6 +353,35 @@ export function QuestionRenderer({
           />
         );
 
+      case 'matrix-radio': {
+        if (isMatrix && onAnswer) {
+          const page = questions?.length ? questions : [question];
+          return (
+            <MatrixRadioRows
+              questions={page}
+              answers={answers ?? (question.field_name ? { [question.field_name]: value } : {})}
+              onAnswer={onAnswer}
+              accentColor={radioAccent}
+              surfaceColor={radioSurface}
+              textColor={textColor}
+              backgroundColor={backgroundColor ?? radioSurface}
+              bottomReserve={bottomReserve}
+              pageInset={pageInset}
+            />
+          );
+        }
+        return (
+          <RadioInput
+            choices={question.select_choices_or_calculations ?? []}
+            value={value != null ? String(value) : undefined}
+            onChange={onChange}
+            accentColor={radioAccent}
+            surfaceColor={radioSurface}
+            textColor={textColor}
+          />
+        );
+      }
+
       case 'info':
         return (
           <InfoScreen
@@ -351,18 +402,6 @@ export function QuestionRenderer({
           </View>
         );
 
-      case 'matrix-radio':
-        return (
-          <RadioInput
-            choices={parseChoices(question.select_choices_or_calculations)}
-            value={value != null ? String(value) : undefined}
-            onChange={onChange}
-            accentColor={radioAccent}
-            surfaceColor={radioSurface}
-            textColor={textColor}
-          />
-        );
-
       default:
         // Unsupported type — render as text input fallback
         return (
@@ -381,6 +420,17 @@ export function QuestionRenderer({
 const styles = StyleSheet.create({
   container: {
     marginBottom: 20,
+  },
+  /**
+   * For an input that scrolls itself: take the panel's height rather than the content's.
+   *
+   * The trailing margin goes with it. A container that fills has nothing after it for a margin to
+   * separate it from, and leaving it on holds the input's bottom edge 20pt above the panel's — which
+   * anything positioning itself against that edge, such as the rows' bottom fade, then inherits.
+   */
+  containerFill: {
+    flex: 1,
+    marginBottom: 0,
   },
   /** The gap above the message — matched to the text field's own. */
   error: {
