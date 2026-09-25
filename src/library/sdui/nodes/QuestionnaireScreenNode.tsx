@@ -564,9 +564,19 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
     if (Array.isArray(answer)) return answer.length > 0;
     return true;
   })();
-  // REDCap's rule: only an explicit 'y' requires an answer, and a page with nothing to answer is
-  // never required whatever it says.
-  const isRequired = !isInfoType && currentQuestion?.required_field === 'y';
+  /**
+   * Required unless the definition explicitly opts out, and never on a page with nothing to answer.
+   *
+   * The aRMT app's behaviour rather than REDCap's stricter reading: there, a blank or absent
+   * `required_field` still had to be answered, and only an explicit 'n' let a question be skipped.
+   * Definitions are shared between the two apps, so requiring an explicit 'y' here would quietly make
+   * every question optional in questionnaires written against the old rule.
+   *
+   * The `isInfoType` guard matters more under this default than it did under the old one: `info` and
+   * `descriptive` pages have nothing to answer, so without it every one of them would block Next
+   * forever rather than only the few a definition had mistakenly marked required.
+   */
+  const isRequired = !isInfoType && currentQuestion?.required_field !== 'n';
   const canProceed = !isRequired || hasAnswer || isInfoType;
   /** Surfaced only once they've tried to leave — see `submitAttempt`. */
   const requiredError = submitAttempt > 0 && !canProceed ? REQUIRED_MESSAGE : null;
