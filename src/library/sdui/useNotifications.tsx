@@ -72,6 +72,8 @@ function mapServerNotification(dto: ServerNotificationDto): AppNotification {
 interface NotificationsValue {
   notifications: AppNotification[];
   markRead: (id: string) => void;
+  /** Clear every unread card at once — see the implementation for why it isn't `markRead` in a loop. */
+  markAllRead: () => void;
 }
 
 const NotificationsContext = createContext<NotificationsValue | null>(null);
@@ -144,6 +146,47 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     })();
   }, [appServer, subjectConfig]);
 
+  /**
+   * Mark everything currently listed as read — optimistic locally, best-effort on the server.
+   *
+   * Deliberately not `markRead` in a loop. That would read the participant and project out of config
+   * once per notification — twenty reads for a full list of ten — and queue a separate state update
+   * for each. This resolves the config once and sends the calls together, so the cost is one config
+   * read and one render however many are unread.
+   *
+   * The server is told as well as the local list. Without that the rings come back on the next fetch,
+   * which reads as the button not having worked.
+   */
+  const markAllRead = useCallback(() => {
+    let unread: string[] = [];
+    setNotifications((prev) => {
+      unread = prev.filter((n) => !n.read).map((n) => n.id);
+      return unread.length === 0 ? prev : prev.map((n) => (n.read ? n : { ...n, read: true }));
+    });
+
+    (async () => {
+      try {
+        if (unread.length === 0) return;
+        const [subjectId, projectId] = await Promise.all([
+          subjectConfig.getParticipantLogin(),
+          subjectConfig.getProjectName(),
+        ]);
+        if (!subjectId || subjectId === 'anonymous' || !projectId || projectId === 'default') return;
+        // Each call swallows its own failure, so one the server rejects doesn't abandon the rest.
+        // (`Promise.allSettled` would say this more directly, but the TS lib target predates it.)
+        await Promise.all(
+          unread.map((id) =>
+            appServer
+              .updateNotificationState({ projectId, subjectId }, id, 'READ')
+              .catch(() => undefined),
+          ),
+        );
+      } catch {
+        // Best-effort — local state already updated
+      }
+    })();
+  }, [appServer, subjectConfig]);
+
   // Live: task-ready events add notification cards
   useEffect(() => {
     const handler = (payload: { taskId?: string; title?: string }) => {
@@ -170,7 +213,10 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     return () => eventBus.off(EVENTS.TASK_READY, handler);
   }, [eventBus]);
 
-  const value = useMemo(() => ({ notifications, markRead }), [notifications, markRead]);
+  const value = useMemo(
+    () => ({ notifications, markRead, markAllRead }),
+    [notifications, markRead, markAllRead],
+  );
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;
 }
 
@@ -182,7 +228,8 @@ export function useNotifications(): NotificationsValue {
   const ctx = useContext(NotificationsContext);
   const [local] = useState<AppNotification[]>([]);
   const localMarkRead = useCallback((_id: string) => {}, []);
-  return ctx ?? { notifications: local, markRead: localMarkRead };
+  const localMarkAllRead = useCallback(() => {}, []);
+  return ctx ?? { notifications: local, markRead: localMarkRead, markAllRead: localMarkAllRead };
 }
 
 /** Number of unread notifications — drives the header bell's red dot. */
