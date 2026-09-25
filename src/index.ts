@@ -92,6 +92,7 @@ export {
   GraphDataNode,
   RadioInput,
   CheckboxInput,
+  MatrixRadioRows,
   RangeInput,
   SliderInput,
   TextQuestionInput,
