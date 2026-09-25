@@ -106,7 +106,8 @@ export function QuestionRenderer({
             choices={question.select_choices_or_calculations ?? []}
             value={Array.isArray(value) ? value : undefined}
             onChange={onChange}
-            primaryColor={primaryColor}
+            accentColor={radioAccent}
+            surfaceColor={radioSurface}
             textColor={textColor}
           />
         );
