@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Platform, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   interpolateColor,
@@ -8,6 +8,17 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import type { SelectChoice } from '../../../../types';
+import {
+  INDICATOR_BORDER,
+  INDICATOR_SIZE,
+  ON_ACCENT,
+  OPTION_RADIUS,
+  PRESSED_OPACITY,
+  RING_ALPHA,
+  SELECTED_RING,
+  SELECT_MS,
+  optionShadow,
+} from './optionCard';
 import {
   fontFamily,
   layout as layoutTokens,
@@ -26,33 +37,13 @@ interface RadioInputProps {
   textColor: string;
 }
 
-/** Diameter of the radio indicator (Figma 3578:1589), and of the dot inside it when selected. */
-const INDICATOR_SIZE = 24;
-const INDICATOR_DOT_SIZE = 16;
-/** Selected options carry a 4px ring; unselected reserve it transparently so nothing shifts. */
-const SELECTED_RING = 4;
-/** How long an option takes to settle into (or out of) its selected state. */
-const SELECT_MS = 180;
 /**
- * A softer, straight-down version of the app's `cardShadow`.
+ * The dot inside the indicator when selected.
  *
- * The shared one is offset 8px to the *right*, which reaches ~20px past the card. These options are
- * full-width inside a viewport that clips its overflow (the ScrollView and `StepSlider` both do), so
- * that shadow was sliced off at the edges. Dropping the horizontal offset leaves only the blur to
- * spill sideways — a few faint pixels rather than a visible cut — and keeps the pills full width.
- *
- * Android already uses a straight-down shadow, so it matches `cardShadow` there.
+ * The only piece of this card's geometry that is the radio's alone — everything else it shares with
+ * `CheckboxInput`, and lives in `optionCard`.
  */
-const optionShadow = Platform.select({
-  android: { boxShadow: '0px 4px 12px rgba(121, 120, 127, 0.14)', elevation: 0 },
-  default: {
-    shadowColor: '#79787F',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 0,
-  },
-}) as ViewStyle;
+const INDICATOR_DOT_SIZE = 16;
 
 /**
  * Single-choice options as pill cards — Figma 3578:1589.
@@ -70,11 +61,6 @@ export function RadioInput({
   surfaceColor,
   textColor,
 }: RadioInputProps) {
-  // White on the accent fill, per the design. Note this is a deliberate contrast trade: against the
-  // default sky accent it measures 1.86:1, below WCAG AA's 4.5:1 — switch to
-  // `readableTextColor(accentColor, { preferred: '#FFFFFF' })` if that becomes a problem.
-  const onAccent = '#FFFFFF';
-
   return (
     <View style={styles.container}>
       {choices.map((choice) => (
@@ -86,7 +72,6 @@ export function RadioInput({
           accentColor={accentColor}
           surfaceColor={surfaceColor}
           textColor={textColor}
-          onAccent={onAccent}
         />
       ))}
     </View>
@@ -107,7 +92,6 @@ function RadioOption({
   accentColor,
   surfaceColor,
   textColor,
-  onAccent,
 }: {
   label: string;
   selected: boolean;
@@ -115,7 +99,6 @@ function RadioOption({
   accentColor: string;
   surfaceColor: string;
   textColor: string;
-  onAccent: string;
 }) {
   const progress = useSharedValue(selected ? 1 : 0);
   useEffect(() => {
@@ -136,7 +119,7 @@ function RadioOption({
   // running on the UI thread, which can only call other worklets — calling `withAlpha` inside one
   // throws. Plain strings close over into the worklet fine.
   const ringClear = withAlpha(accentColor, 0);
-  const ringVisible = withAlpha(accentColor, 0.5);
+  const ringVisible = withAlpha(accentColor, RING_ALPHA);
   const ringStyle = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(progress.value, [0, 1], [ringClear, ringVisible]),
   }));
@@ -144,16 +127,16 @@ function RadioOption({
     backgroundColor: interpolateColor(progress.value, [0, 1], [surfaceColor, accentColor]),
   }));
   const labelStyle = useAnimatedStyle(() => ({
-    color: interpolateColor(progress.value, [0, 1], [textColor, onAccent]),
+    color: interpolateColor(progress.value, [0, 1], [textColor, ON_ACCENT]),
   }));
   const indicatorStyle = useAnimatedStyle(() => ({
-    borderColor: interpolateColor(progress.value, [0, 1], [textColor, onAccent]),
+    borderColor: interpolateColor(progress.value, [0, 1], [textColor, ON_ACCENT]),
   }));
   // Kept mounted and scaled from nothing, so it grows into place instead of appearing whole.
   const dotStyle = useAnimatedStyle(() => ({
     opacity: progress.value,
     transform: [{ scale: progress.value }],
-    backgroundColor: onAccent,
+    backgroundColor: ON_ACCENT,
   }));
 
   return (
@@ -189,8 +172,7 @@ const styles = StyleSheet.create({
   optionRing: {
     width: '100%',
     padding: SELECTED_RING,
-    // Fully rounded: a radius far larger than the height, as the design's 100 is.
-    borderRadius: 100,
+    borderRadius: OPTION_RADIUS,
   },
   option: {
     width: '100%',
@@ -198,10 +180,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
     padding: layoutTokens.cardPadding,
-    borderRadius: 100,
+    borderRadius: OPTION_RADIUS,
   },
   pressed: {
-    opacity: 0.85,
+    opacity: PRESSED_OPACITY,
   },
   label: {
     // Takes the row so the indicator stays pinned right however long the option runs.
@@ -218,7 +200,7 @@ const styles = StyleSheet.create({
     width: INDICATOR_SIZE,
     height: INDICATOR_SIZE,
     borderRadius: INDICATOR_SIZE / 2,
-    borderWidth: 2,
+    borderWidth: INDICATOR_BORDER,
     alignItems: 'center',
     justifyContent: 'center',
   },
