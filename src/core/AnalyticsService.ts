@@ -1,4 +1,4 @@
-import { AnalyticsService, LoggerService, RemoteConfigService } from '../types';
+import { AnalyticsService, LoggerService, RemoteConfigService, SubjectConfigService } from '../types';
 
 // ---------------------------------------------------------------------------
 // Shared deps
@@ -68,6 +68,25 @@ export class DefaultAnalyticsService implements AnalyticsService {
   /** Hook for subclasses to push the user ID to their backend. */
   protected async syncUserId(_userId: string): Promise<void> {
     // no-op — subclasses override
+  }
+
+  async initUserContext(subjectConfig: SubjectConfigService): Promise<void> {
+    try {
+      const [login, project, enrolmentDate, attributes] = await Promise.all([
+        subjectConfig.getParticipantLogin(),
+        subjectConfig.getProjectName(),
+        subjectConfig.getEnrolmentDate(),
+        subjectConfig.getParticipantAttributes(),
+      ]);
+      await this.setUserProperties({
+        participantLogin: login,
+        projectName: project,
+        enrolmentDate: typeof enrolmentDate === 'string' ? enrolmentDate : enrolmentDate.toISOString(),
+        ...attributes,
+      });
+    } catch (error) {
+      this.logger.log(`Failed to sync user context to analytics: ${error}`);
+    }
   }
 
   async logEvent(eventName: string, parameters: Record<string, any> = {}): Promise<void> {

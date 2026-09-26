@@ -65,6 +65,7 @@ export function useServicesLifecycle(
           .then(() => services.schedule.fetchSchedule())
           .catch(() => {}),
         services.notifications.init().catch(() => {}),
+        services.analytics.initUserContext(services.subjectConfig).catch(() => {}),
       ]);
     };
 

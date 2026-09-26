@@ -330,6 +330,9 @@ export interface AuthService {
 
 export interface AnalyticsService {
   init(): Promise<void>;
+  /** Pull participant identity + attributes from SubjectConfigService and set them as
+   *  analytics user properties. Called once after subject registration during post-auth init. */
+  initUserContext(subjectConfig: SubjectConfigService): Promise<void>;
   logEvent(eventName: string, parameters?: Record<string, any>): Promise<void>;
   setUserProperties(properties: Record<string, any>): Promise<void>;
   setUserId(userId: string): Promise<void>;
