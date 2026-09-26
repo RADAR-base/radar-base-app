@@ -34,6 +34,8 @@ export {
   subjectIdFromAccessToken,
 } from './SubjectConfigService';
 export type { ManagementPortalSubject } from './SubjectConfigService';
+export { syncServiceFactory, DefaultSyncService } from './SyncService';
+export type { SyncServiceDeps } from './SyncService';
 
 // Service container + lifecycle
 export { createServices } from './ServiceContainer';
@@ -52,5 +54,6 @@ export type {
   ScheduleService,
   QuestionnaireDataService,
   DataPipelineService,
+  SyncService,
   Subject,
 } from '../types';

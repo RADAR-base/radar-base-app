@@ -110,6 +110,7 @@ export const useSubjectConfigService = () => useCoreServices().subjectConfig;
 export const useAudioRecordService = () => useCoreServices().audioRecord;
 export const useHealthKitService = () => useCoreServices().healthKit;
 export const useRemoteConfigService = () => useCoreServices().remoteConfig;
+export const useSyncService = () => useCoreServices().sync;
 
 /** True once all core services have initialised (or been skipped for unauthenticated users). */
 export function useServicesReady(): boolean {

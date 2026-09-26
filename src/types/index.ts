@@ -605,6 +605,20 @@ export interface AudioRecordService {
   destroy(): Promise<void>;
 }
 
+export interface SyncResult {
+  success: boolean;
+  partial: boolean;
+  lastSyncedAt: Date;
+  failures: string[];
+}
+
+export interface SyncService {
+  register(name: string, step: () => Promise<void>): void;
+  unregister(name: string): void;
+  sync(): Promise<SyncResult>;
+  getLastSyncedAt(): Date | null;
+}
+
 export interface DataPipelineService {
   /** Convert and cache a single payload for later upload. */
   submit(type: string, payload: any): Promise<void>;

@@ -23,6 +23,7 @@ import {
   remoteConfigServiceFactory,
   audioRecordServiceFactory,
   healthKitServiceFactory,
+  syncServiceFactory,
 } from './index';
 import type {
   DataService,
@@ -46,6 +47,7 @@ import type {
   DataPipelineService,
   AudioRecordService,
   HealthKitService,
+  SyncService,
   OAuthConfig,
 } from '../types';
 
@@ -72,6 +74,7 @@ export interface ServiceBag {
   audioRecord: AudioRecordService;
   healthKit: HealthKitService;
   remoteConfig: RemoteConfigService;
+  sync: SyncService;
 }
 
 // ---------------------------------------------------------------------------
@@ -185,6 +188,11 @@ export function createServices(overrides: ServiceOverrides = {}): ServiceBag {
   const audioRecord = overrides.audioRecord ?? audioRecordServiceFactory({ logger });
   const healthKit = overrides.healthKit ?? healthKitServiceFactory({ logger });
 
+  const sync = syncServiceFactory({ storage, logger });
+  // Register default sync steps — additional steps can be added via sync.register() at any time.
+  sync.register('cache', () => dataPipeline.flush().then(() => {}));
+  sync.register('schedule', () => schedule.fetchSchedule());
+
   // Wire the API layer's auth token provider so authenticated requests work automatically.
   apiService.setAuthTokenProvider(async () => {
     try {
@@ -198,6 +206,6 @@ export function createServices(overrides: ServiceOverrides = {}): ServiceBag {
     data: dataService, eventBus, api: apiService, appServer,
     token, analytics, cache, kafka, config, auth, notifications,
     schedule, questionnaireData, dataPipeline, subjectConfig, audioRecord, healthKit,
-    remoteConfig,
+    remoteConfig, sync,
   };
 }
