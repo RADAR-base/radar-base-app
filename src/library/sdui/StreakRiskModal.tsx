@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: layout.cardPadding * 1.5,
   },
   card: {
     // Rounder than the app's cards: `radiusCard` is drawn for a card in a list, and at this size it
@@ -192,7 +192,9 @@ const styles = StyleSheet.create({
     borderRadius: layout.radiusCard * 2,
     padding: layout.cardPadding,
     alignItems: 'center',
-    gap: 12,
+    // The same 9pt Figma uses between rows everywhere else, so the prompt is spaced like the cards
+    // it is talking about rather than to its own rhythm.
+    gap: layout.gap,
   },
   badge: {
     width: BADGE_SIZE,
@@ -200,7 +202,6 @@ const styles = StyleSheet.create({
     borderRadius: BADGE_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
   },
   streakCount: {
     fontSize: 14,
@@ -227,7 +228,9 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
   cta: {
-    marginTop: 4,
+    // Its own breathing room above the buttons — the card's gap is for text rows, and an action sits
+    // apart from what it is answering.
+    marginTop: layout.gap,
     minHeight: 52,
     alignSelf: 'stretch',
     borderRadius: 100,
@@ -243,7 +246,7 @@ const styles = StyleSheet.create({
   },
   dismiss: {
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: layout.gap,
   },
   dismissText: {
     fontSize: 15,
