@@ -34,6 +34,8 @@ import { useSlideOverlay } from './useSlideOverlay';
 import { TabHeaderContext } from './TabHeaderContext';
 import { TabActiveContext } from './TabActiveContext';
 import { PageHeader } from './PageHeader';
+import { StreakRiskModal } from './StreakRiskModal';
+import { useStreakRisk } from './useStreakRisk';
 import { NotificationsProvider } from './useNotifications';
 import { TaskInstructionsScreen } from './TaskInstructionsScreen';
 import type { TaskCardType } from './nodes/card/TaskCardNode';
@@ -225,9 +227,34 @@ export function SDUIShell(props: SDUIShellProps) {
           context={context}
         />
         <TaskInstructionsHost context={context} />
+        {/* Last, so it sits over the overlays: a prompt that opened while a task was being read
+            would otherwise be drawn underneath the thing it is asking about. */}
+        <StreakRiskHost context={context} />
       </View>
       </NotificationsProvider>
     </CoreServicesProvider>
+  );
+}
+
+/* ─── Streak prompt ───────────────────────────────────────────────────── */
+
+/**
+ * Hosts the "Don't lose your streak" prompt.
+ *
+ * A component rather than a hook call in the shell body: `useStreakRisk` subscribes to schedule
+ * events, and putting that in `SDUIShell` would re-render the whole tree — every tab and overlay —
+ * each time the schedule refreshes, which is every fifteen minutes.
+ */
+function StreakRiskHost({ context }: { context: SDUIContext }) {
+  const { visible, dismiss, streak } = useStreakRisk();
+  return (
+    <StreakRiskModal
+      visible={visible}
+      onClose={dismiss}
+      streak={streak}
+      mode={context.colorScheme ?? 'light'}
+      brandColors={context.theme.brandColors}
+    />
   );
 }
 

@@ -137,6 +137,8 @@ export type { GradientMeshBackgroundProps } from './GradientMeshBackground';
 export { WelcomeCard } from './WelcomeCard';
 export type { WelcomeCardProps } from './WelcomeCard';
 export { StudyNameModal } from './StudyNameModal';
+export { StreakRiskModal } from './StreakRiskModal';
+export { useStreakRisk } from './useStreakRisk';
 export type { StudyNameModalProps } from './StudyNameModal';
 export { RegistrationFlow } from './RegistrationFlow';
 export type { RegistrationFlowProps } from './RegistrationFlow';
