@@ -1,5 +1,13 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import Animated, {
+  interpolate,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import {
   cardShadow,
   fontFamily,
@@ -40,6 +48,19 @@ export interface StreakRiskModalProps {
 /** The flame the streak cards already use, so the prompt is recognisably about the same thing. */
 const FLAME = '\u{1F525}';
 
+/**
+ * How the card arrives, and how it leaves.
+ *
+ * A spring in, so it overshoots a hair and settles — that slight bounce is what reads as a *pop*
+ * rather than a fade. Lightly damped for the same reason; damp it much harder and it simply glides.
+ * Out is a plain, quicker timing: a dismissal that springs feels like it is arguing with you.
+ */
+const POP_IN = { damping: 13, stiffness: 190, mass: 0.7 } as const;
+const POP_OUT_MS = 140;
+
+/** How small the card starts. Much under this reads as flying in from far away rather than popping. */
+const POP_FROM = 0.88;
+
 export function StreakRiskModal({
   visible,
   onClose,
@@ -62,15 +83,50 @@ export function StreakRiskModal({
   const text = tokens.text.primary;
   const muted = withAlpha(tokens.text.primary, 0.6);
 
+  /**
+   * Kept mounted a moment past `visible` so the exit can play.
+   *
+   * `Modal`'s own `animationType` is off: it would cross-fade the whole surface underneath whatever
+   * the card is doing, and the two never agree on timing. Driven by hand instead — and manually
+   * rather than with `entering`/`exiting`, which strand an invisible touch-blocking overlay over the
+   * screen on Android once a full-bleed view has animated out.
+   */
+  const [mounted, setMounted] = useState(visible);
+  const progress = useSharedValue(visible ? 1 : 0);
+  const wasVisible = useRef(visible);
+
+  useEffect(() => {
+    if (visible === wasVisible.current) return;
+    wasVisible.current = visible;
+    if (visible) {
+      setMounted(true);
+      progress.value = withSpring(1, POP_IN);
+      return;
+    }
+    progress.value = withTiming(0, { duration: POP_OUT_MS }, finished => {
+      // Only on a clean finish: an interrupted exit means it is being shown again, and unmounting
+      // then would pull the card out from under the entry that just started.
+      if (finished) runOnJS(setMounted)(false);
+    });
+  }, [visible, progress]);
+
+  const backdropStyle = useAnimatedStyle(() => ({ opacity: progress.value }));
+  const cardStyle = useAnimatedStyle(() => ({
+    opacity: progress.value,
+    transform: [{ scale: interpolate(progress.value, [0, 1], [POP_FROM, 1]) }],
+  }));
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={mounted} transparent animationType="none" onRequestClose={onClose}>
       {/* The backdrop dismisses, as the app's other modal does — but the card swallows the press, so
           tapping inside it doesn't close the thing you're reading. */}
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable
-          style={[styles.card, { backgroundColor: surface }, cardShadow]}
-          onPress={() => {}}
-        >
+      <Animated.View style={[styles.backdropFill, backdropStyle]}>
+        <Pressable style={styles.backdrop} onPress={onClose}>
+          <Animated.View style={cardStyle}>
+          <Pressable
+            style={[styles.card, { backgroundColor: surface }, cardShadow]}
+            onPress={() => {}}
+          >
           {streak > 0 && (
             <View style={[styles.streakPill, { backgroundColor: withAlpha(primary, 0.1) }]}>
               <Text style={styles.streakFlame}>{FLAME}</Text>
@@ -97,16 +153,23 @@ export function StreakRiskModal({
           <Pressable accessibilityRole="button" style={styles.dismiss} onPress={onClose}>
             <Text style={[styles.dismissText, { color: muted }]}>{dismissLabel}</Text>
           </Pressable>
+          </Pressable>
+          </Animated.View>
         </Pressable>
-      </Pressable>
+      </Animated.View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
+  /** The dimming itself, which fades as one piece with the card. */
+  backdropFill: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  },
+  /** The press target and the centring, inside the fade so neither is affected by it. */
+  backdrop: {
+    flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
   },
