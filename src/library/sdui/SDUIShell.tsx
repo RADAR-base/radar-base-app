@@ -34,7 +34,7 @@ import { useSlideOverlay } from './useSlideOverlay';
 import { TabHeaderContext } from './TabHeaderContext';
 import { TabActiveContext } from './TabActiveContext';
 import { PageHeader } from './PageHeader';
-import { StreakRiskModal } from './StreakRiskModal';
+import { StreakModal } from './StreakModal';
 import { useStreakRisk } from './useStreakRisk';
 import { NotificationsProvider } from './useNotifications';
 import { TaskInstructionsScreen } from './TaskInstructionsScreen';
@@ -246,12 +246,11 @@ export function SDUIShell(props: SDUIShellProps) {
  * each time the schedule refreshes, which is every fifteen minutes.
  */
 function StreakRiskHost({ context }: { context: SDUIContext }) {
-  const { visible, dismiss, streak } = useStreakRisk();
+  const { visible, dismiss } = useStreakRisk();
   return (
-    <StreakRiskModal
+    <StreakModal
       visible={visible}
       onClose={dismiss}
-      streak={streak}
       mode={context.colorScheme ?? 'light'}
       brandColors={context.theme.brandColors}
     />
