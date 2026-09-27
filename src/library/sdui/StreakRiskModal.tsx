@@ -8,6 +8,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import FireIcon from '../../theme/icons/fire.svg';
 import {
   cardShadow,
   fontFamily,
@@ -45,8 +46,16 @@ export interface StreakRiskModalProps {
   brandColors?: ThemeColorOverrides;
 }
 
-/** The flame the streak cards already use, so the prompt is recognisably about the same thing. */
-const FLAME = '\u{1F525}';
+/**
+ * The badge from the streak stat card, at the size a modal wants.
+ *
+ * The same `fire.svg` and the same `card.engagement` colours the card pairs it with, so the prompt is
+ * recognisably about the thing on the dashboard. Larger than the card's 36pt badge — it is the first
+ * thing on the page here rather than a corner mark — with the icon scaled by the same ratio so the
+ * flame sits in its circle exactly as it does there.
+ */
+const BADGE_SIZE = 56;
+const BADGE_ICON = { width: 22, height: 31 };
 
 /**
  * How the card arrives, and how it leaves.
@@ -80,8 +89,11 @@ export function StreakRiskModal({
   const primary = tokens.button.background;
   const onPrimary = tokens.button.text;
   const surface = tokens.card.background;
-  const text = tokens.text.primary;
   const muted = withAlpha(tokens.text.primary, 0.6);
+  // The badge's two colours travel together and swap between themes — see `card.engagement` in the
+  // theme. Taking both from there is what keeps the flame legible on its circle in dark mode.
+  const badgeFill = tokens.card.engagement.streakBadge;
+  const badgeInk = tokens.card.engagement.streakIcon;
 
   /**
    * Kept mounted a moment past `visible` so the exit can play.
@@ -127,16 +139,17 @@ export function StreakRiskModal({
             style={[styles.card, { backgroundColor: surface }, cardShadow]}
             onPress={() => {}}
           >
+          <View style={[styles.badge, { backgroundColor: badgeFill }]}>
+            <FireIcon width={BADGE_ICON.width} height={BADGE_ICON.height} color={badgeInk} />
+          </View>
+
           {streak > 0 && (
-            <View style={[styles.streakPill, { backgroundColor: withAlpha(primary, 0.1) }]}>
-              <Text style={styles.streakFlame}>{FLAME}</Text>
-              <Text style={[styles.streakCount, { color: primary }]}>
-                {streak} {streak === 1 ? 'day' : 'days'}
-              </Text>
-            </View>
+            <Text style={[styles.streakCount, { color: muted }]}>
+              {streak} {streak === 1 ? 'day' : 'days'} in a row
+            </Text>
           )}
 
-          <Text style={[styles.title, { color: text }]}>{title}</Text>
+          <Text style={[styles.title, { color: primary }]}>{title}</Text>
           <Text style={[styles.description, { color: muted }]}>{description}</Text>
 
           <Pressable
@@ -174,24 +187,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   card: {
-    borderRadius: layout.radiusCard,
+    // Rounder than the app's cards: `radiusCard` is drawn for a card in a list, and at this size it
+    // reads as a sharp-cornered sheet. A dialog that pops is softer than the surfaces behind it.
+    borderRadius: layout.radiusCard * 2,
     padding: layout.cardPadding,
+    alignItems: 'center',
     gap: 12,
   },
-  streakPill: {
-    flexDirection: 'row',
+  badge: {
+    width: BADGE_SIZE,
+    height: BADGE_SIZE,
+    borderRadius: BADGE_SIZE / 2,
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 100,
-  },
-  streakFlame: {
-    fontSize: 16,
+    justifyContent: 'center',
+    marginBottom: 4,
   },
   streakCount: {
     fontSize: 14,
+    textAlign: 'center',
     fontFamily: fontFamily.semiBold,
     fontWeight: '600',
     letterSpacing: tracking.semiBold,
@@ -200,6 +213,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     lineHeight: 28,
+    textAlign: 'center',
     fontFamily: fontFamily.bold,
     fontWeight: '700',
     letterSpacing: tracking.bold,
@@ -208,12 +222,14 @@ const styles = StyleSheet.create({
   description: {
     fontSize: 15,
     lineHeight: 22,
+    textAlign: 'center',
     fontFamily: fontFamily.regular,
     includeFontPadding: false,
   },
   cta: {
     marginTop: 4,
     minHeight: 52,
+    alignSelf: 'stretch',
     borderRadius: 100,
     alignItems: 'center',
     justifyContent: 'center',
