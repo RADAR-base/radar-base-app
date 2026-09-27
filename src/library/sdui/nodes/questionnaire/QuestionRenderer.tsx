@@ -364,6 +364,7 @@ export function QuestionRenderer({
               accentColor={radioAccent}
               surfaceColor={radioSurface}
               textColor={textColor}
+              primaryColor={primaryColor}
               backgroundColor={backgroundColor ?? radioSurface}
               bottomReserve={bottomReserve}
               pageInset={pageInset}

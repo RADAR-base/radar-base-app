@@ -44,8 +44,10 @@ interface MatrixRadioRowsProps {
   onAnswer: (fieldName: string, value: string) => void;
   /** Fill for the chosen segment (the manifest accent), and the tick on an answered card. */
   accentColor: string;
-  /** The card surface each row is drawn on. */
+  /** The surface the *options* keep — the card is tinted away from it. See `CARD_TINT`. */
   surfaceColor: string;
+  /** The brand, tinted over the page to make the card's fill — the info screen's card, exactly. */
+  primaryColor: string;
   /** The ink on that surface — each row's question. */
   textColor: string;
   /**
@@ -147,9 +149,15 @@ const CARD_BORDER = 2;
  * `CARD_TINT` shades the card away from the theme's surface, which the *options* keep — the reverse
  * of how a card is usually built. It is what makes the options read as controls resting on the card
  * rather than as a bar cut into it, which is the whole difference between this and a segmented strip.
+ *
+ * The shade is the brand over the page, at `InfoScreen`'s own alpha, so a block reads as the same kind
+ * of surface as the text passage a participant met two questions earlier. Taken as an opaque mix
+ * rather than laid on translucent for the reason above — and because `mix` parses a colour's alpha
+ * and then discards it, so a translucent card would hand `edgeAnswered` a fully-saturated brand to
+ * blend from and the ring would come out far louder than the card it sits on.
  */
 const EDGE_ANSWERED = 0.35;
-const CARD_TINT = 0.06;
+const CARD_TINT = 0.1;
 
 /** How long a segment takes to fill, and an edge to change what it is saying. */
 const SELECT_MS = 180;
@@ -249,6 +257,7 @@ export function MatrixRadioRows({
   accentColor,
   surfaceColor,
   textColor,
+  primaryColor,
   backgroundColor,
   bottomReserve = 0,
   pageInset = 0,
@@ -382,6 +391,8 @@ export function MatrixRadioRows({
               accentColor={accentColor}
               surfaceColor={surfaceColor}
               textColor={textColor}
+              primaryColor={primaryColor}
+              backgroundColor={backgroundColor}
               onLayout={(event: LayoutChangeEvent) => {
                 const { y, height } = event.nativeEvent.layout;
                 cards.current[key] = { y, height };
@@ -446,6 +457,8 @@ function MatrixRow({
   accentColor,
   surfaceColor,
   textColor,
+  primaryColor,
+  backgroundColor,
   onLayout,
 }: {
   question: Question;
@@ -456,6 +469,9 @@ function MatrixRow({
   accentColor: string;
   surfaceColor: string;
   textColor: string;
+  /** The brand, and the page under it — together they are the card's fill. See `CARD_TINT`. */
+  primaryColor: string;
+  backgroundColor: string;
   onLayout: (event: LayoutChangeEvent) => void;
 }) {
   const choices = question.select_choices_or_calculations ?? [];
@@ -464,8 +480,9 @@ function MatrixRow({
   // Every endpoint resolved here, on the JS thread. `useAnimatedStyle` bodies are worklets and can
   // only call other worklets, so `mix` cannot be called inside one; plain strings close over fine.
   //
-  // The card is the shaded one and the options keep the theme's surface — see `CARD_TINT`.
-  const cardColor = mix(surfaceColor, textColor, CARD_TINT);
+  // The card is the shaded one and the options keep the theme's surface — see `CARD_TINT`. Mixed from
+  // the *page* rather than from the surface, because that is what the info screen's card tints over.
+  const cardColor = mix(backgroundColor, primaryColor, CARD_TINT);
   const optionColor = surfaceColor;
   // The card's own colour, so an untouched card shows no edge while still reserving the width.
   const edgePlain = cardColor;
