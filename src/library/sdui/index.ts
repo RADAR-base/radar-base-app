@@ -137,7 +137,7 @@ export type { GradientMeshBackgroundProps } from './GradientMeshBackground';
 export { WelcomeCard } from './WelcomeCard';
 export type { WelcomeCardProps } from './WelcomeCard';
 export { StudyNameModal } from './StudyNameModal';
-export { StreakRiskModal } from './StreakRiskModal';
+export { StreakModal } from './StreakModal';
 export { AppChromeReadyProvider, useAppChromeReady } from './AppChromeReady';
 export { useStreakRisk } from './useStreakRisk';
 export type { StudyNameModalProps } from './StudyNameModal';
