@@ -29,13 +29,11 @@ import {
  * what saves it. If the rule ever changes so that a miss ends the streak outright, this copy has to
  * change with it — it would be promising something the app no longer honours.
  */
-export interface StreakRiskModalProps {
+export interface StreakModalProps {
   visible: boolean;
   onClose: () => void;
   /** The primary action — "Complete a task". Dismisses if unset. */
   onAction?: () => void;
-  /** The streak at stake. Shown only when greater than zero. */
-  streak?: number;
   title?: string;
   description?: string;
   ctaLabel?: string;
@@ -50,12 +48,12 @@ export interface StreakRiskModalProps {
  * The badge from the streak stat card, at the size a modal wants.
  *
  * The same `fire.svg` and the same `card.engagement` colours the card pairs it with, so the prompt is
- * recognisably about the thing on the dashboard. Larger than the card's 36pt badge — it is the first
- * thing on the page here rather than a corner mark — with the icon scaled by the same ratio so the
- * flame sits in its circle exactly as it does there.
+ * recognisably about the thing on the dashboard. Much larger than the card's 36pt badge — here it
+ * carries the whole page rather than marking a corner — with the icon scaled by the card's own ratio
+ * (14:36 across, 20:36 down) so the flame sits in its circle exactly as it does there.
  */
-const BADGE_SIZE = 56;
-const BADGE_ICON = { width: 22, height: 31 };
+const BADGE_SIZE = 80;
+const BADGE_ICON = { width: 31, height: 44 };
 
 /**
  * How the card arrives, and how it leaves.
@@ -70,18 +68,17 @@ const POP_OUT_MS = 140;
 /** How small the card starts. Much under this reads as flying in from far away rather than popping. */
 const POP_FROM = 0.88;
 
-export function StreakRiskModal({
+export function StreakModal({
   visible,
   onClose,
   onAction,
-  streak = 0,
   title = "Don't Lose your streak",
-  description = 'Looks like you missed a task from yesterday. Complete a task today to retain the streak?',
+  description = 'Looks like you missed a task from yesterday. Complete a task today to keep your streak going',
   ctaLabel = 'Complete a task',
   dismissLabel = 'Not now',
   mode,
   brandColors,
-}: StreakRiskModalProps) {
+}: StreakModalProps) {
   const deviceScheme = useColorScheme();
   const resolvedMode: ThemeMode = mode ?? (deviceScheme === 'dark' ? 'dark' : 'light');
   const tokens = getColorTokens(resolvedMode, brandColors);
@@ -143,12 +140,6 @@ export function StreakRiskModal({
             <FireIcon width={BADGE_ICON.width} height={BADGE_ICON.height} color={badgeInk} />
           </View>
 
-          {streak > 0 && (
-            <Text style={[styles.streakCount, { color: muted }]}>
-              {streak} {streak === 1 ? 'day' : 'days'} in a row
-            </Text>
-          )}
-
           <Text style={[styles.title, { color: primary }]}>{title}</Text>
           <Text style={[styles.description, { color: muted }]}>{description}</Text>
 
@@ -202,14 +193,6 @@ const styles = StyleSheet.create({
     borderRadius: BADGE_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  streakCount: {
-    fontSize: 14,
-    textAlign: 'center',
-    fontFamily: fontFamily.semiBold,
-    fontWeight: '600',
-    letterSpacing: tracking.semiBold,
-    includeFontPadding: false,
   },
   title: {
     fontSize: 22,
