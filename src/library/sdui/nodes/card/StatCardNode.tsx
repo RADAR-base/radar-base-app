@@ -7,7 +7,7 @@ import CalendarIcon from '../../../../theme/icons/calendar.svg';
 import FireIcon from '../../../../theme/icons/fire.svg';
 import MedalIcon from '../../../../theme/icons/medal.svg';
 import { tracking, fontFamily, getColorTokens, layout as layoutTokens, cardShadow } from '../../../../theme/theme';
-import { useLocalMetric } from '../../useLocalMetric';
+import { useLocalMetric, type LocalMetricName } from '../../useLocalMetric';
 import type { NodeProps } from '../../types';
 
 type EngagementTokenKey =
@@ -71,6 +71,19 @@ const ICON_TOKEN: Record<StatCardType, EngagementTokenKey> = {
 };
 
 /**
+ * The local metric each stat type means, for a blueprint that doesn't name one.
+ *
+ * `checkIn` has none: there is no app-computed check-in count, so those cards keep taking their
+ * number from the blueprint's own `value` as they always have.
+ */
+const DEFAULT_METRIC: Record<StatCardType, LocalMetricName | ''> = {
+  checkIn: '',
+  activeDays: 'active_days',
+  currentStreak: 'current_streak',
+  longestStreak: 'longest_streak',
+};
+
+/**
  * Engagement stat card — matches the Figma `Stats` component set (node 1980:1637),
  * which exposes a `statsType` variant (checkIn / activeDays / currentStreak /
  * longestStreak) and a `size` variant (large / small). Both are config-selectable via
@@ -93,7 +106,13 @@ export function StatCardNode({ node, context }: NodeProps) {
   const fillWidth = node.fillWidth === true;
   // A local metric (e.g. `metric: "task_completed"`) drives the value from app data (the task
   // schedule); otherwise fall back to the static `value` from the blueprint.
-  const metric = typeof node.metric === 'string' ? node.metric : '';
+  //
+  // Defaulted from `statsType` when the blueprint names none: a card that says it shows the current
+  // streak has already said which number it wants, and having to repeat it in `metric` is a quiet
+  // trap — miss it and the card renders a confident `0` forever rather than failing. A blueprint that
+  // does set `metric` still wins, so a study can point a stat card at something else.
+  const metric =
+    typeof node.metric === 'string' && node.metric ? node.metric : DEFAULT_METRIC[statsType];
   const local = useLocalMetric(metric);
   const value = local
     ? local.value

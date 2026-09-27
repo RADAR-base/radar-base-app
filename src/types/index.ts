@@ -556,6 +556,10 @@ export interface ScheduleService {
   markTaskOpened(taskId: string): Promise<void>;
   /** Distinct calendar days the user has completed ≥1 task — drives the "Active days" metric. */
   getActiveDaysCount(): number;
+  /** Consecutive active days ending today; today counts as unbroken until the day is out. */
+  getCurrentStreak(): number;
+  /** The longest run of consecutive active days on record. */
+  getLongestStreak(): number;
   destroy(): void;
 }
 
