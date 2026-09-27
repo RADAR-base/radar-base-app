@@ -31,6 +31,7 @@ import { SDUIShell } from './SDUIShell';
 import { LoginScreen } from './LoginScreen';
 import { PostEnrolmentFlow } from './PostEnrolmentFlow';
 import { LoadingScreen } from './LoadingScreen';
+import { AppChromeReadyProvider } from './AppChromeReady';
 import { ConfirmModal } from './ConfirmModal';
 import {
   fontFamily,
@@ -359,7 +360,12 @@ function AppShellInner({
     }
   }
 
+  // Every loading surface this shell can raise. The streak prompt, and anything else that greets the
+  // participant on arrival, waits for all of them — see `AppChromeReady`.
+  const chromeReady = !bootLoading && !postEnrolmentLoading && servicesReady;
+
   return (
+    <AppChromeReadyProvider ready={chromeReady}>
     <View style={styles.root}>
       {content}
       {bootLoading && (
@@ -383,6 +389,7 @@ function AppShellInner({
         />
       )}
     </View>
+    </AppChromeReadyProvider>
   );
 }
 

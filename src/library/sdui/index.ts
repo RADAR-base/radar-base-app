@@ -134,6 +134,7 @@ export { WelcomeCard } from './WelcomeCard';
 export type { WelcomeCardProps } from './WelcomeCard';
 export { StudyNameModal } from './StudyNameModal';
 export { StreakRiskModal } from './StreakRiskModal';
+export { AppChromeReadyProvider, useAppChromeReady } from './AppChromeReady';
 export { useStreakRisk } from './useStreakRisk';
 export type { StudyNameModalProps } from './StudyNameModal';
 export { RegistrationFlow } from './RegistrationFlow';

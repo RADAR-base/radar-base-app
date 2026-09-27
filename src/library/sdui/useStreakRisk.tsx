@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { useCoreServices } from '../../core/CoreServicesContext';
+import { useAppChromeReady } from './AppChromeReady';
 import { EVENTS } from '../../core/EventBus';
 import type { StreakRisk } from '../../types';
 
@@ -9,9 +10,14 @@ const NO_RISK: StreakRisk = { atRisk: false, streak: 0, missedDay: null };
 /**
  * Whether to show the "Don't lose your streak" prompt, and a way to close it.
  *
- * Asked on mount and whenever the app comes back to the foreground, since that is what "opens the
- * app" means for a process the OS keeps alive — checking only on mount would show it once and then
- * never again for a participant who never fully quits.
+ * Asked once the app's loading chrome has gone, and again whenever the app comes back to the
+ * foreground — that is what "opens the app" means for a process the OS keeps alive, and checking only
+ * on mount would show it once and then never again for a participant who never fully quits.
+ *
+ * Waiting for the chrome matters: `AppShell` mounts the shell *underneath* its loading screen, so a
+ * prompt raised on mount opens behind it and is already sitting there, unannounced, when the screen
+ * fades. The claim is spent when the prompt is shown, so this has to gate the check itself rather
+ * than merely hide the result — otherwise the day is used up on a prompt nobody saw.
  *
  * Shown at most once a day, via `claimStreakPrompt`. A participant who dismisses it has been told;
  * repeating the warning every time they switch back from another app would be nagging rather than
@@ -19,10 +25,12 @@ const NO_RISK: StreakRisk = { atRisk: false, streak: 0, missedDay: null };
  */
 export function useStreakRisk() {
   const { schedule, eventBus } = useCoreServices();
+  const chromeReady = useAppChromeReady();
   const [risk, setRisk] = useState<StreakRisk>(NO_RISK);
   const [visible, setVisible] = useState(false);
 
   const check = useCallback(async () => {
+    if (!chromeReady) return;
     const current = schedule.getStreakRisk();
     setRisk(current);
     if (!current.atRisk) {
@@ -32,7 +40,7 @@ export function useStreakRisk() {
     // The schedule owns the once-a-day gate: it already persists day-keyed facts, and a claim that
     // records as it answers can't be checked and then forgotten.
     if (await schedule.claimStreakPrompt()) setVisible(true);
-  }, [schedule]);
+  }, [schedule, chromeReady]);
 
   // On mount, and again whenever the schedule settles a day — the risk only appears once yesterday
   // has a verdict, which can land after this first runs.
