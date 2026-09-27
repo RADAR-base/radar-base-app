@@ -11,3 +11,4 @@ export { SpeechInput } from './SpeechInput';
 export type { SpeechRecording } from './SpeechInput';
 export { QuestionRenderer } from './QuestionRenderer';
 export { evaluateBranchingLogic } from './branchingLogic';
+export { blocksProgress, NON_BLOCKING_TYPES } from './questionGate';

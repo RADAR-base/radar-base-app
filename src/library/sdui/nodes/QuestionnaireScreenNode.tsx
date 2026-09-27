@@ -34,6 +34,7 @@ import { TaskCompletionScreen } from './questionnaire/TaskCompletionScreen';
 import { REQUIRED_MESSAGE } from './questionnaire/QuestionError';
 import type { SpeechPhase } from './questionnaire/SpeechInput';
 import { evaluateBranchingLogic } from './questionnaire/branchingLogic';
+import { blocksProgress } from './questionnaire/questionGate';
 import { PillButton } from '../PillButton';
 import { useTopInset } from '../useTopInset';
 import { useBottomInset } from '../useBottomInset';
@@ -520,8 +521,6 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   // the page arriving from the right *and* growing from the middle at the same time.
 
   // Required-field gate for the primary button (matches QuestionnaireNode).
-  const isInfoType =
-    currentQuestion?.field_type === 'info' || currentQuestion?.field_type === 'descriptive';
   /**
    * Whether this question has been answered at all.
    *
@@ -538,19 +537,20 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
     return true;
   })();
   /**
-   * Required unless the definition explicitly opts out, and never on a page with nothing to answer.
+   * Required unless the definition explicitly opts out, and never on a page nothing can be owed on.
    *
    * The aRMT app's behaviour rather than REDCap's stricter reading: there, a blank or absent
    * `required_field` still had to be answered, and only an explicit 'n' let a question be skipped.
    * Definitions are shared between the two apps, so requiring an explicit 'y' here would quietly make
    * every question optional in questionnaires written against the old rule.
    *
-   * The `isInfoType` guard matters more under this default than it did under the old one: `info` and
-   * `descriptive` pages have nothing to answer, so without it every one of them would block Next
-   * forever rather than only the few a definition had mistakenly marked required.
+   * `blocksProgress` matters more under this default than the `isInfoType` check it replaces did
+   * under the old one: a blank `required_field` now reads as required, so without it every text page
+   * — and every scale this branch adds — would block Next rather than only the few a definition had
+   * mistakenly marked required.
    */
-  const isRequired = !isInfoType && currentQuestion?.required_field !== 'n';
-  const canProceed = !isRequired || hasAnswer || isInfoType;
+  const isRequired = blocksProgress(currentQuestion) && currentQuestion?.required_field !== 'n';
+  const canProceed = !isRequired || hasAnswer;
   /** Surfaced only once they've tried to leave — see `submitAttempt`. */
   const requiredError = submitAttempt > 0 && !canProceed ? REQUIRED_MESSAGE : null;
 
