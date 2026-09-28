@@ -97,7 +97,6 @@ export {
   InboxItemListCoordinatorNode,
   InboxItemListNode,
   NavbarNode,
-  QuestionnaireNode,
   QuestionnaireScreenNode,
   RelativeActivityTodayNode,
   SectionNode,
