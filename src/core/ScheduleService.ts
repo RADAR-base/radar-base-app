@@ -1,5 +1,7 @@
 import { AppState, type NativeEventSubscription } from 'react-native';
 import type {
+  DayVerdict,
+  StreakRisk,
   ScheduleService,
   Task,
   TaskState,
@@ -15,6 +17,8 @@ export const STORAGE_KEYS = {
   INSTANCES: '@radarbase/schedule_instances',
   OPENED: '@radarbase/schedule_opened_tasks',
   ACTIVE_DAYS: '@radarbase/schedule_active_days',
+  DAY_VERDICTS: '@radarbase/schedule_day_verdicts',
+  STREAK_PROMPT: '@radarbase/schedule_streak_prompt_day',
   NOTIFIED_READY: '@radarbase/schedule_notified_ready',
 };
 
@@ -37,6 +41,17 @@ export abstract class ScheduleServiceBase implements ScheduleService {
   private initialized = false;
   private openedTaskIds = new Set<string>();
   private activeDays = new Set<string>();
+  /**
+   * What each past day came to, by day key — the streak's only memory.
+   *
+   * Recorded as days settle rather than derived on demand, because it cannot be derived later:
+   * `mergeWithServer` replaces the task list with exactly what the server returned, so a task the
+   * server stops sending is gone from `this.tasks` and with it any record of what was *scheduled*
+   * that day. A verdict, once written, is permanent.
+   */
+  private dayVerdicts = new Map<string, DayVerdict>();
+  /** The day the streak prompt was last shown, so it can be shown once a day — see `claimStreakPrompt`. */
+  private streakPromptDay: string | null = null;
   private notifiedReadyIds = new Set<string>();
 
   constructor(
@@ -54,18 +69,29 @@ export abstract class ScheduleServiceBase implements ScheduleService {
     if (this.initialized) return;
     this.initialized = true;
 
-    const [savedTasks, savedOpened, savedActiveDays, savedNotifiedReady] =
+    const [
+      savedTasks,
+      savedOpened,
+      savedActiveDays,
+      savedNotifiedReady,
+      savedVerdicts,
+      savedPromptDay,
+    ] =
       await Promise.all([
         this.storage.get<Task[]>(STORAGE_KEYS.INSTANCES),
         this.storage.get<string[]>(STORAGE_KEYS.OPENED),
         this.storage.get<string[]>(STORAGE_KEYS.ACTIVE_DAYS),
         this.storage.get<string[]>(STORAGE_KEYS.NOTIFIED_READY),
+        this.storage.get<Record<string, DayVerdict>>(STORAGE_KEYS.DAY_VERDICTS),
+        this.storage.get<string>(STORAGE_KEYS.STREAK_PROMPT),
       ]);
 
     if (savedTasks) this.tasks = savedTasks;
     if (savedOpened) this.openedTaskIds = new Set(savedOpened);
     if (savedActiveDays) this.activeDays = new Set(savedActiveDays);
     if (savedNotifiedReady) this.notifiedReadyIds = new Set(savedNotifiedReady);
+    if (savedVerdicts) this.dayVerdicts = new Map(Object.entries(savedVerdicts));
+    if (savedPromptDay) this.streakPromptDay = savedPromptDay;
 
     const restoredCompleted = (savedTasks ?? []).filter(
       (t) => t.state === 'completed' || t.state === 'skipped',
@@ -111,6 +137,8 @@ export abstract class ScheduleServiceBase implements ScheduleService {
     this.tasks = [];
     this.openedTaskIds.clear();
     this.activeDays.clear();
+    this.dayVerdicts.clear();
+    this.streakPromptDay = null;
     this.notifiedReadyIds.clear();
   }
 
@@ -161,6 +189,141 @@ export abstract class ScheduleServiceBase implements ScheduleService {
   }
 
   // ---------------------------------------------------------------------------
+  // Streaks
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Record a verdict for every day that has reached one, and return whether anything changed.
+   *
+   * A day is **complete** the moment every task scheduled for it has been completed — no need to wait
+   * for midnight, since there is nothing left to do and the participant should see the counter move.
+   * It is **missed** only once every one of its tasks has reached a terminal state and at least one
+   * was not completed. Until then it is *pending*: a task whose completion window runs past midnight
+   * keeps its day open, because someone who still has time to act has not missed anything yet.
+   *
+   * Runs on every schedule change. A verdict is never revised — the first answer a day gives is the
+   * one that sticks, which is what keeps the streak stable as the server's task window rolls forward.
+   */
+  private async settleDays(): Promise<boolean> {
+    const now = Date.now();
+    const byDay = new Map<string, Task[]>();
+    for (const task of this.tasks) {
+      const key = dayKey(new Date(task.timestamp));
+      const list = byDay.get(key);
+      if (list) list.push(task);
+      else byDay.set(key, [task]);
+    }
+
+    let changed = false;
+    for (const [key, tasks] of byDay) {
+      if (this.dayVerdicts.has(key)) continue;
+
+      if (tasks.every(t => t.state === 'completed')) {
+        this.dayVerdicts.set(key, 'complete');
+        changed = true;
+        continue;
+      }
+      // Anything still open — not terminal, and its window has not run out — leaves the day pending.
+      const settled = tasks.every(
+        t => isTerminal(t.state) || t.timestamp + t.completionWindow <= now,
+      );
+      if (settled) {
+        this.dayVerdicts.set(key, 'missed');
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      await this.storage.set(
+        STORAGE_KEYS.DAY_VERDICTS,
+        Object.fromEntries(this.dayVerdicts),
+      );
+    }
+    return changed;
+  }
+
+  /** Judged days, oldest first. Days with no tasks — and days still pending — simply aren't in it. */
+  private judgedDays(): { date: Date; verdict: DayVerdict }[] {
+    return [...this.dayVerdicts.entries()]
+      .map(([key, verdict]) => ({ date: dayKeyToDate(key), verdict }))
+      .filter((d): d is { date: Date; verdict: DayVerdict } => d.date !== null)
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
+  }
+
+  /**
+   * Consecutive complete days, counting back from the most recent.
+   *
+   * One missed day is forgiven: it does not count toward the streak, but it does not end it either.
+   * Two missed days in a row do. A day with no tasks scheduled is not judged at all and is simply
+   * passed over, so a study that only schedules on weekdays doesn't reset every Saturday.
+   */
+  getCurrentStreak(): number {
+    const days = this.judgedDays();
+    let streak = 0;
+    for (let i = days.length - 1; i >= 0; i -= 1) {
+      if (days[i].verdict === 'complete') {
+        streak += 1;
+        continue;
+      }
+      // A missed day, forgiven — unless the day judged before it was missed too.
+      if (i > 0 && days[i - 1].verdict === 'missed') break;
+      if (i === 0) break;
+    }
+    return streak;
+  }
+
+  /** The longest such run on record, under the same one-miss-forgiven rule. */
+  getLongestStreak(): number {
+    const days = this.judgedDays();
+    let longest = 0;
+    let run = 0;
+    for (let i = 0; i < days.length; i += 1) {
+      if (days[i].verdict === 'complete') {
+        run += 1;
+        if (run > longest) longest = run;
+        continue;
+      }
+      // Two missed in a row ends the run; a single one is carried through without counting.
+      if (i + 1 < days.length && days[i + 1].verdict === 'missed') run = 0;
+      else if (i + 1 >= days.length) run = 0;
+    }
+    return longest;
+  }
+
+  /**
+   * Whether a streak is one missed day from being lost — what the "Don't lose your streak" prompt asks.
+   *
+   * True when the most recently judged day was missed and there is a streak left to save. Today being
+   * already complete clears it: there is nothing to warn about once the day's tasks are done.
+   */
+  getStreakRisk(): StreakRisk {
+    const days = this.judgedDays();
+    const last = days[days.length - 1];
+    const today = dayKey(new Date());
+    const streak = this.getCurrentStreak();
+    const atRisk =
+      streak > 0 && last != null && last.verdict === 'missed' && this.dayVerdicts.get(today) !== 'complete';
+    return { atRisk, streak, missedDay: atRisk && last ? dayKey(last.date) : null };
+  }
+
+  /**
+   * Take today's one showing of the streak prompt: true the first time it is asked on a given day,
+   * false every time after.
+   *
+   * A claim rather than a question plus a setter, so a caller can't check and forget to record it —
+   * and so two screens asking at once can't both decide to show it. The day is spent on being shown,
+   * not on being acted upon: someone who dismisses the prompt has already been told.
+   */
+  async claimStreakPrompt(): Promise<boolean> {
+    const key = dayKey(new Date());
+    if (this.streakPromptDay === key) return false;
+    this.streakPromptDay = key;
+    await this.storage.set(STORAGE_KEYS.STREAK_PROMPT, key);
+    return true;
+  }
+
+
+  // ---------------------------------------------------------------------------
   // Task state mutations
   // ---------------------------------------------------------------------------
 
@@ -186,12 +349,15 @@ export abstract class ScheduleServiceBase implements ScheduleService {
     task.timeCompleted = Date.now();
     task.stateChangedAt = new Date().toISOString();
 
-    const now = new Date();
-    const dayKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
-    if (!this.activeDays.has(dayKey)) {
-      this.activeDays.add(dayKey);
+    const today = dayKey(new Date());
+    if (!this.activeDays.has(today)) {
+      this.activeDays.add(today);
       await this.storage.set(STORAGE_KEYS.ACTIVE_DAYS, [...this.activeDays]);
     }
+
+    // Before the event: a card reading the streak off `SCHEDULE_UPDATED` must see the day already
+    // settled, or completing the day's last task leaves the counter a beat behind.
+    await this.settleDays();
 
     await this.persist();
     this.bus.emit(EVENTS.TASK_COMPLETED, { taskId, name: task.name });
@@ -267,8 +433,11 @@ export abstract class ScheduleServiceBase implements ScheduleService {
       await this.storage.set(STORAGE_KEYS.NOTIFIED_READY, [...this.notifiedReadyIds]);
     }
 
-    if (changed) {
-      await this.persist();
+    // After the state pass, not before: a task that just expired is what settles its day as missed.
+    const settled = await this.settleDays();
+
+    if (changed || settled) {
+      if (changed) await this.persist();
       this.bus.emit(EVENTS.SCHEDULE_UPDATED, { reason: 'states_refreshed' });
     }
   }
@@ -364,6 +533,47 @@ function endOfDay(date: Date): Date {
   const d = new Date(date);
   d.setHours(23, 59, 59, 999);
   return d;
+}
+
+/**
+ * States a task can no longer move out of.
+ *
+ * `skipped` counts as terminal but *not* as completed, so a skipped task marks its day missed. That
+ * is a policy choice rather than a fact about the data: a study that treats skipping as a legitimate
+ * answer should add it to the completed side of `settleDays` instead.
+ */
+function isTerminal(state: TaskState): boolean {
+  return state === 'completed' || state === 'skipped' || state === 'expired';
+}
+
+/**
+ * The key a day is recorded under in `activeDays`.
+ *
+ * Local calendar fields, not a UTC timestamp: a participant who completes a task at 11pm has been
+ * active *that* day as they experienced it, and a day-boundary drawn in UTC would file it under
+ * tomorrow for anyone east of Greenwich.
+ *
+ * Deliberately the format already on disk — `2026-9-27`, no zero padding — so keys written by every
+ * previous version still match. It is the reason the streak walk compares parsed dates rather than
+ * strings: as text, `2026-9-1` sorts after `2026-10-1`.
+ */
+function dayKey(date: Date): string {
+  return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+}
+
+/** A day key back to local midnight, or `null` if the stored string isn't one. */
+function dayKeyToDate(key: string): Date | null {
+  const parts = key.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) return null;
+  const [year, month, day] = parts;
+  const date = new Date(year, month - 1, day);
+  // `new Date(2027, 1, 29)` rolls over to 1 March rather than failing, so a key naming a day that
+  // doesn't exist comes back as a real date a day or two off. Checking the fields survived the trip
+  // is what catches that — and unlike re-serialising the key and comparing strings, it still accepts
+  // a zero-padded variant, which no version of this app writes but which costs nothing to tolerate.
+  const intact =
+    date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+  return intact ? date : null;
 }
 
 function formatTime(epochMs: number): string {
