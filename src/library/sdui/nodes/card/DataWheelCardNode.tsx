@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Svg, { Circle } from 'react-native-svg';
+import { useSharedValue } from 'react-native-reanimated';
 import ArrowRightIcon from '../../../../theme/icons/arrowright.svg';
 import { tracking, fontFamily, getColorTokens, layout as layoutTokens, cardShadow } from '../../../../theme/theme';
+import { ProgressRing, RING_SIZE, RING_STROKE } from '../../ProgressRing';
 import { useDashboardData } from '../../useDashboardData';
 import { isLocalMetric, useLocalMetric } from '../../useLocalMetric';
 import type { DashboardWidgetConfig } from '../../../../types';
@@ -10,11 +11,6 @@ import type { NodeProps } from '../../types';
 
 export type DataWheelSize = 'small' | 'large';
 type WheelState = 'bad' | 'neutral' | 'good';
-
-const RING_SIZE = 142;
-const RING_STROKE = 18;
-const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
 /**
  * <34% filled → red ("bad"); 34–66% → amber ("neutral"); >66% → green ("good"), per the
@@ -95,33 +91,16 @@ export function DataWheelCardNode({ node, context }: NodeProps) {
 
   const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
   const ringColor = tokens.dataWheel[wheelState];
-  const dashOffset = RING_CIRCUMFERENCE * (1 - percent / 100);
+  // The ring takes a shared value so it can be animated; this card's figure is static, so it is
+  // simply assigned. See `TaskCompletionScreen` for the animated case.
+  const ringProgress = useSharedValue(percent / 100);
+  useEffect(() => {
+    ringProgress.value = percent / 100;
+  }, [percent, ringProgress]);
 
   const wheel = (
     <View style={styles.ringWrapper}>
-      <Svg width={RING_SIZE} height={RING_SIZE} viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}>
-        <Circle
-          cx={RING_SIZE / 2}
-          cy={RING_SIZE / 2}
-          r={RING_RADIUS}
-          stroke={ringColor}
-          strokeWidth={RING_STROKE}
-          strokeOpacity={0.25}
-          fill="none"
-        />
-        <Circle
-          cx={RING_SIZE / 2}
-          cy={RING_SIZE / 2}
-          r={RING_RADIUS}
-          stroke={ringColor}
-          strokeWidth={RING_STROKE}
-          strokeDasharray={`${RING_CIRCUMFERENCE} ${RING_CIRCUMFERENCE}`}
-          strokeDashoffset={dashOffset}
-          strokeLinecap="round"
-          fill="none"
-          transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
-        />
-      </Svg>
+      <ProgressRing progress={ringProgress} color={ringColor} />
       <View style={styles.ringValueWrapper}>
         <Text
           style={[styles.ringValue, { color: tokens.text.primary }]}

@@ -36,7 +36,6 @@ import { TabActiveContext } from './TabActiveContext';
 import { PageHeader } from './PageHeader';
 import { NotificationsProvider } from './useNotifications';
 import { TaskInstructionsScreen } from './TaskInstructionsScreen';
-import { TaskCompletionScreen } from './TaskCompletionScreen';
 import type { TaskCardType } from './nodes/card/TaskCardNode';
 import {
   fontFamily,
@@ -333,7 +332,9 @@ export interface TaskInstructionsPayload {
 function TaskInstructionsHost({ context }: { context: SDUIContext }) {
   const { schedule, eventBus } = useCoreServices();
   const [payload, setPayload] = useState<TaskInstructionsPayload | null>(null);
-  const [phase, setPhase] = useState<'instructions' | 'questionnaire' | 'completed'>('instructions');
+  // No 'completed' phase: the questionnaire node shows its own completion screen and stays mounted
+  // until dismissed — see the QUESTIONNAIRE_COMPLETED effect below.
+  const [phase, setPhase] = useState<'instructions' | 'questionnaire'>('instructions');
   // The instructions outlive the phase change by the length of the push — see `start`.
   const [showInstructions, setShowInstructions] = useState(true);
   const { width } = useWindowDimensions();
@@ -401,26 +402,24 @@ function TaskInstructionsHost({ context }: { context: SDUIContext }) {
     });
   };
 
-  // Listen for questionnaire completion → mark task complete, show completion screen
+  /**
+   * Mark the task complete on submission — and leave the questionnaire where it is.
+   *
+   * `QuestionnaireScreenNode` draws its own "Well done" screen (Figma 3273:1821) and slides it in as
+   * the questions push out, keeping its header and progress bar continuous across the transition. It
+   * stays up until its Home / Calendar buttons dismiss it via `QUESTIONNAIRE_EXIT`.
+   *
+   * Swapping the overlay for a separate completion screen here used to race that: both were driven by
+   * this one event, so the node began its slide and was unmounted from under itself a moment later.
+   */
   useEffect(() => {
     if (phase !== 'questionnaire' || !payload) return;
     const handler = () => {
       void schedule.completeTask(payload.taskId).catch(() => {});
-      setPhase('completed');
     };
     eventBus.on(EVENTS.QUESTIONNAIRE_COMPLETED, handler);
     return () => eventBus.off(EVENTS.QUESTIONNAIRE_COMPLETED, handler);
   }, [phase, payload, schedule, eventBus]);
-
-  const handleHome = useCallback(() => {
-    overlay.close();
-    context.dispatch({ type: 'Navigate', tabId: 'home' });
-  }, [overlay, context]);
-
-  const handleCalendar = useCallback(() => {
-    overlay.close();
-    context.dispatch({ type: 'Navigate', tabId: 'calendar' });
-  }, [overlay, context]);
 
   if (!payload && !overlay.visible) return null;
 
@@ -473,16 +472,6 @@ function TaskInstructionsHost({ context }: { context: SDUIContext }) {
             context={context}
           />
         </Animated.View>
-      )}
-      {payload && phase === 'completed' && (
-        <TaskCompletionScreen
-          taskName={payload.taskName}
-          message={payload.endText}
-          onHome={handleHome}
-          onCalendar={handleCalendar}
-          mode={context.colorScheme ?? 'light'}
-          brandColors={context.theme.brandColors}
-        />
       )}
     </Animated.View>
   );
