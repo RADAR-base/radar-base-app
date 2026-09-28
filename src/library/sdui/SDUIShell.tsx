@@ -36,6 +36,7 @@ import { TabActiveContext } from './TabActiveContext';
 import { PageHeader } from './PageHeader';
 import { StreakModal } from './StreakModal';
 import { useStreakRisk } from './useStreakRisk';
+import { useAppChromeReady } from './AppChromeReady';
 import { NotificationsProvider } from './useNotifications';
 import { TaskInstructionsScreen } from './TaskInstructionsScreen';
 import type { TaskCardType } from './nodes/card/TaskCardNode';
@@ -245,12 +246,28 @@ export function SDUIShell(props: SDUIShellProps) {
  * events, and putting that in `SDUIShell` would re-render the whole tree — every tab and overlay —
  * each time the schedule refreshes, which is every fifteen minutes.
  */
+/**
+ * DEMO ONLY — flip to `true` to show the streak prompt on every launch, whatever the schedule says.
+ *
+ * Exists on `demo/combined` so the prompt can be looked at without contriving a missed day. It must
+ * not reach `feat/streaks`: with this on, the prompt appears for participants who have no streak and
+ * have missed nothing. Closing it returns to the real behaviour for the rest of the session.
+ */
+const DEMO_PREVIEW_STREAK_PROMPT = false;
+
 function StreakRiskHost({ context }: { context: SDUIContext }) {
   const { visible, dismiss } = useStreakRisk();
+  const [preview, setPreview] = React.useState(DEMO_PREVIEW_STREAK_PROMPT);
+  // The preview waits for the loading screen too — forcing it past that gate is what made the prompt
+  // appear to ignore the wait, opening underneath the screen the moment the shell mounted.
+  const chromeReady = useAppChromeReady();
   return (
     <StreakModal
-      visible={visible}
-      onClose={dismiss}
+      visible={(preview && chromeReady) || visible}
+      onClose={() => {
+        setPreview(false);
+        dismiss();
+      }}
       mode={context.colorScheme ?? 'light'}
       brandColors={context.theme.brandColors}
     />
