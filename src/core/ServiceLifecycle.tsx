@@ -22,7 +22,8 @@ export interface ServicesLifecycleCallbacks {
 export function useServicesLifecycle(
   services: ServiceBag,
   { onReady, onNotReady, onSigningOut, onInitError }: ServicesLifecycleCallbacks,
-): void {
+  /** Returns a trigger for a caller that knows authentication has just finished — see the bottom. */
+): () => void {
   const { auth, eventBus } = services;
   const initedRef = useRef(false);
 
@@ -126,4 +127,21 @@ export function useServicesLifecycle(
       services.schedule.destroy();
     };
   }, [initServices, services, eventBus, onReady, onNotReady, onSigningOut]);
+
+  /**
+   * Bring services up now, for a caller that knows authentication has just finished.
+   *
+   * On a first enrolment the `auth.state_changed` handler above is the *only* route to ready: the
+   * mount-time attempt returns early because the participant wasn't signed in yet, and deliberately
+   * doesn't report ready. So a single missed event — fired before this effect subscribed, or an
+   * `isAuthenticated()` that hasn't seen the token land — leaves `servicesReady` false with nothing
+   * to retry it, and the participant waits on the loading screen until they restart the app. On the
+   * next launch the mount-time attempt succeeds, which is exactly why their tasks appear the second
+   * time and not the first.
+   *
+   * Safe to call repeatedly: `initServices` returns immediately once it has run.
+   */
+  return useCallback(() => {
+    initServices().catch(() => onReady());
+  }, [initServices, onReady]);
 }
