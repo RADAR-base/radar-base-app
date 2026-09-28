@@ -707,6 +707,27 @@ export const taskStatusColors = {
 } as const;
 
 /**
+ * Per-type colors for the notification cards (`NotificationListNode`), from Figma `NotificationType`
+ * (node 3548:10398), plus the ring that marks one unread.
+ *
+ * Fixed brand colors rather than mode-dependent tokens, and not brand-overridable — the same choice
+ * `taskStatusColors` above makes, and for the same reason: these say what *kind* of notification this
+ * is, so a study repainting its accent must not repaint a warning into an info. Each type states one
+ * color; the badge behind the glyph is that color at a low opacity, derived at the render site so a
+ * single value drives both and the tint adapts to a light or dark card for free.
+ *
+ * `unreadRing` is translucent on purpose: it sits on the card's own fill, so it tints rather than
+ * replaces, and reads on either mode's surface.
+ */
+export const notificationColors = {
+  default: '#1D3557', //  navy
+  warning: '#C0312D', //  red
+  expired: '#854F0B', //  amber
+  info: '#0F6E56', //     green
+  unreadRing: 'rgba(232, 72, 85, 0.6)',
+} as const;
+
+/**
  * Geometry + fixed colors for the calendar day-timeline rail (`CalendarTaskView`). `grey` is the
  * not-ready line/ring (reads in both themes); the "reached" color is the theme navy in light mode and
  * `calendarChrome` below in dark mode, so the rail matches the day selector above it.
