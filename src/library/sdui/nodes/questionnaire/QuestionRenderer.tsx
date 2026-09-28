@@ -341,6 +341,7 @@ export function QuestionRenderer({
             backgroundColor={backgroundColor}
             primaryColor={primaryColor}
             textColor={textColor}
+            onScrollLock={onScrollLock}
           />
         );
 

@@ -24,6 +24,16 @@ interface ArcSliderInputProps {
   choices?: SelectChoice[];
   value: number | undefined;
   onChange: (value: number) => void;
+  /**
+   * Asked to hold the page still for the duration of a drag, and to let it go again.
+   *
+   * This is the one scale whose panel still scrolls — `SCALE_TYPES` in `panelBehaviour` lists the
+   * other four, so they get a panel that refuses to move, but an arc page does not. Claiming the
+   * gesture is not enough on its own: `onShouldBlockNativeResponder` is Android-only, and on iOS the
+   * enclosing `ScrollView` can cancel the touches out from under the JS responder, which arrives as
+   * `onPanResponderTerminate` rather than as anything this can refuse.
+   */
+  onScrollLock?: (locked: boolean) => void;
   primaryColor: string;
   textColor: string;
   /** Manifest accent — the arc and the handle. Falls back to `primaryColor`. */
@@ -110,6 +120,7 @@ export function ArcSliderInput({
   choices,
   value,
   onChange,
+  onScrollLock,
   primaryColor,
   textColor,
   accentColor,
@@ -130,6 +141,8 @@ export function ArcSliderInput({
    * mounted. Tapping worked because that path is an ordinary function in render, which is why the
    * two disagreed.
    */
+  const onScrollLockRef = useRef(onScrollLock);
+  onScrollLockRef.current = onScrollLock;
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
@@ -258,6 +271,10 @@ export function ArcSliderInput({
     }
   }
 
+  // A page turn or submit mid-drag unmounts this with no release to fire, which would strand the
+  // page locked. Safe to call when nothing is locked.
+  useEffect(() => () => onScrollLockRef.current?.(false), []);
+
   const panResponder = useMemo(
     () =>
       PanResponder.create({
@@ -272,6 +289,7 @@ export function ArcSliderInput({
         onPanResponderTerminationRequest: () => false,
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: e => {
+          onScrollLockRef.current?.(true);
           dragging.current = true;
           setPressed(true);
           setDragged(true);
@@ -282,6 +300,7 @@ export function ArcSliderInput({
           setFromTouch(e.nativeEvent.locationX, e.nativeEvent.locationY);
         },
         onPanResponderRelease: () => {
+          onScrollLockRef.current?.(false);
           dragging.current = false;
           setPressed(false);
           press.value = withTiming(0, { duration: PRESS_MS });
@@ -301,6 +320,8 @@ export function ArcSliderInput({
           onChangeRef.current(valuesRef.current[final]);
         },
         onPanResponderTerminate: () => {
+          // Released here too, or a cancelled gesture leaves the page locked for good.
+          onScrollLockRef.current?.(false);
           dragging.current = false;
           setPressed(false);
           press.value = withTiming(0, { duration: PRESS_MS });
