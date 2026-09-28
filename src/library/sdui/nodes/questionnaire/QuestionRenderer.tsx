@@ -2,6 +2,8 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { Question, QuestionRange } from '../../../../types';
 import { RadioInput } from './RadioInput';
+import { LikertSliderInput } from './LikertSliderInput';
+import { matchLikertScale } from './likertScale';
 import { CheckboxInput } from './CheckboxInput';
 import { ArcSliderInput } from './ArcSliderInput';
 import { parseChoices, questionScale } from './questionScale';
@@ -48,6 +50,13 @@ interface QuestionRendererProps {
   submitAttempt?: number;
   /** Reports whether the current answer would pass, so the screen knows to hold them here. */
   onValidityChange?: (valid: boolean) => void;
+  /**
+   * Lets an input hold its panel still while it is being dragged.
+   *
+   * Only a control that takes a drag inside a scrolling page needs it — see `LikertSliderInput`,
+   * where a vertical flick would otherwise scroll the page instead of moving the handle.
+   */
+  onScrollLock?: (locked: boolean) => void;
   /**
    * Why this question was refused. Rendered under the input for every type except `text`, which draws
    * its own lined up with its card.
@@ -130,6 +139,7 @@ export function QuestionRenderer({
   allowReplay,
   submitAttempt,
   onValidityChange,
+  onScrollLock,
   errorMessage,
   bottomReserve,
 }: QuestionRendererProps) {
@@ -181,10 +191,31 @@ export function QuestionRenderer({
 
   function renderInput() {
     switch (question.field_type) {
-      case 'radio':
+      case 'radio': {
+        const radioChoices = parseChoices(question.select_choices_or_calculations);
+        // An ordered run of degrees is a scale, and reads better as one — see `matchLikertScale`,
+        // which decides that from the labels because the definitions carry no field saying so.
+        // Anything it doesn't recognise stays the list it has always been.
+        const likert = matchLikertScale(radioChoices);
+        if (likert) {
+          return (
+            <LikertSliderInput
+              choices={radioChoices}
+              value={value != null ? String(value) : undefined}
+              onChange={onChange}
+              primaryColor={primaryColor}
+              textColor={textColor}
+              accentColor={radioAccent}
+              surfaceColor={radioSurface}
+              backgroundColor={backgroundColor}
+              positiveEnd={likert.positiveEnd}
+              onScrollLock={onScrollLock}
+            />
+          );
+        }
         return (
           <RadioInput
-            choices={parseChoices(question.select_choices_or_calculations)}
+            choices={radioChoices}
             value={value != null ? String(value) : undefined}
             onChange={onChange}
             accentColor={radioAccent}
@@ -192,6 +223,7 @@ export function QuestionRenderer({
             textColor={textColor}
           />
         );
+      }
 
       case 'checkbox':
         return (

@@ -425,6 +425,17 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
     answerValid.current = valid;
   }, []);
 
+  /**
+   * Held still while an input inside the panel is being dragged.
+   *
+   * Claiming the gesture isn't enough on its own: `onShouldBlockNativeResponder` is Android-only, and
+   * on iOS the enclosing `ScrollView` is a native view whose own pan recogniser can cancel the touches
+   * out from under the JS responder. Turning the scroller off for the length of the gesture is the
+   * only thing that reliably stops the page moving under the finger.
+   */
+  const [scrollLocked, setScrollLocked] = useState(false);
+  const handleScrollLock = useCallback((locked: boolean) => setScrollLocked(locked), []);
+
   const goNext = useCallback(() => {
     // Hold them here and show why, rather than carrying a bad answer forward.
     if (!canProceed || !answerValid.current) {
@@ -771,7 +782,9 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                  * point or two — and the page sliding under a finger that meant to move the handle
                  * is worse than the drift. `false` on a plain `View` panel is simply ignored.
                  */
-                scrollEnabled={!isScalePanel}
+                // `&& !scrollLocked`: an input dragging inside this panel holds it still for the
+                // length of the gesture — see `handleScrollLock`.
+                scrollEnabled={!isScalePanel && !scrollLocked}
               >
                 {!question ? (
                   <Text style={[styles.emptyText, { color: muted }]}>No questions available</Text>
@@ -915,6 +928,9 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                           // would overwrite the answer this screen is actually gating on.
                           submitAttempt={isActive ? submitAttempt : 0}
                           onValidityChange={isActive ? handleValidityChange : undefined}
+                          // Only the active panel: a parked neighbour has no business freezing the
+                          // page the participant is actually looking at.
+                          onScrollLock={isActive ? handleScrollLock : undefined}
                           errorMessage={isActive ? requiredError : null}
                         // What stands between the input and the bottom of the screen, for an input that
                         // sizes itself against it. The footer is drawn over the page rather than laid
