@@ -66,12 +66,20 @@ export function PostEnrolmentFlow({ onDone, enrolment, brandColors }: PostEnrolm
   }, [privacyPolicyUrl]);
 
   const handleEnableNotifications = useCallback(async () => {
-    await notifications.requestPermission();
+    try {
+      await notifications.requestPermission();
+    } catch {
+      // Permission denied or unavailable — continue regardless.
+    }
     flow.next();
   }, [notifications, flow]);
 
   const handleConnectHealth = useCallback(async () => {
-    await healthKit.requestPermission();
+    try {
+      await healthKit.requestPermission();
+    } catch {
+      // Permission denied or unavailable — continue regardless.
+    }
   }, [healthKit]);
 
   // Whether to advance or finish depends on the step's position in the list.

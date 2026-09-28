@@ -49,7 +49,7 @@
     },
     "android": {
       "edgeToEdgeEnabled": true,
-      "package": "org.radarbase.starter-app",
+      "package": "org.radarbase.starter_app",
       "googleServicesFile": "./google-services.json",
       "intentFilters": [
         {
