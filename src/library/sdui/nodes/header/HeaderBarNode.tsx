@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   Easing,
+  cancelAnimation,
   useAnimatedStyle,
   useSharedValue,
+  withRepeat,
   withTiming,
 } from 'react-native-reanimated';
 import SyncIcon from '../../../../theme/icons/sync.svg';
@@ -74,16 +76,23 @@ export function HeaderBarNode({ node, context }: NodeProps) {
   const handleSync = async () => {
     if (syncing) return;
     setSyncing(true);
-    // Spin continuously until sync completes.
-    syncSpin.value = withTiming(syncSpin.value - 360, {
-      duration: 600,
-      easing: Easing.inOut(Easing.ease),
-    });
+    // Turns for as long as the refresh takes, rather than once for a fixed 600ms: a sync that ran
+    // longer than the animation left a still icon above a label saying it was refreshing. `-1`
+    // repeats until cancelled, and linear easing keeps every turn the same speed so the loop has no
+    // visible seam where it restarts.
+    syncSpin.value = withRepeat(
+      withTiming(syncSpin.value - 360, { duration: 900, easing: Easing.linear }),
+      -1,
+    );
     try {
       const result = await syncService.sync();
       setLastSyncedAt(result.lastSyncedAt);
     } finally {
       setSyncing(false);
+      // Stopped, then eased to a whole turn so the icon comes to rest upright rather than at
+      // whatever angle the loop happened to be passing through.
+      cancelAnimation(syncSpin);
+      syncSpin.value = withTiming(Math.round(syncSpin.value / 360) * 360, { duration: 200 });
     }
     dispatch(typeof node.syncEventName === 'string' ? node.syncEventName : 'HeaderSync');
   };
@@ -95,18 +104,26 @@ export function HeaderBarNode({ node, context }: NodeProps) {
       {showActions && (
         <View style={styles.actions}>
           {showLastSynced && (
-            <Text style={[styles.lastSynced, { color: textColor }]}>{lastSyncedText}</Text>
-          )}
-          {showLastSynced && (
+            /* The label and the ↻ are one control, not two things that happen to sit together: the
+               label is what tells you the data might be stale, so it should be the thing you can
+               press about it. One target also means one accessibility announcement, rather than a
+               button a screen reader reaches only after reading the time out separately. */
             <TouchableOpacity
               accessibilityRole="button"
-              accessibilityLabel="Sync now"
+              accessibilityLabel={syncing ? 'Refreshing' : `${lastSyncedText}. Refresh now`}
+              accessibilityState={{ busy: syncing }}
               onPress={handleSync}
-              style={[styles.iconButton, { backgroundColor: buttonBg }]}
+              disabled={syncing}
+              style={styles.syncPair}
             >
-              <Animated.View style={syncSpinStyle}>
-                <SyncIcon width={20} height={20} color={buttonIconColor} />
-              </Animated.View>
+              <Text style={[styles.lastSynced, { color: textColor }]}>
+                {syncing ? 'Refreshing…' : lastSyncedText}
+              </Text>
+              <View style={[styles.iconButton, { backgroundColor: buttonBg }]}>
+                <Animated.View style={syncSpinStyle}>
+                  <SyncIcon width={20} height={20} color={buttonIconColor} />
+                </Animated.View>
+              </View>
             </TouchableOpacity>
           )}
           {showNotifications && (
@@ -170,12 +187,20 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: headerLayout.gap,
   },
+  /** The label and its button, as one target — see the call site. */
+  syncPair: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    // The header's own spacing. These two used to be siblings in `actions`, which supplies this gap
+    // between every child; folding them into one control put them inside it, so the gap has to be
+    // stated here or they end up hard against each other.
+    gap: headerLayout.gap,
+  },
   lastSynced: {
     fontSize: headerLayout.captionFontSize,
     fontFamily: fontFamily.regular,
     includeFontPadding: false,
     letterSpacing: tracking.regular,
-    marginRight: 2,
   },
   iconButton: {
     width: 36,
