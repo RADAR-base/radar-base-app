@@ -568,6 +568,8 @@ export interface QuestionnaireDataService {
   getQuestions(assessmentName: string): Promise<Question[]>;
   /** Submit completed questionnaire result. */
   submitResult(result: QuestionnaireResult): Promise<void>;
+  /** Re-fetch every definition, ignoring what is cached — the header's refresh runs this. */
+  refresh(): Promise<void>;
   /** Clear in-memory definitions and persisted cache. Called on sign-out. */
   clear(): Promise<void>;
 }
