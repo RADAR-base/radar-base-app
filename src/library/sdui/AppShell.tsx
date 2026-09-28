@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -309,6 +309,26 @@ function AppShellInner({
   // Boot loading overlay
   const [bootLoading, setBootLoading] = useState(true);
 
+  // Stable identities: `LoadingScreen` starts its exit once and a fresh callback each render used to
+  // restart it — see the `onHiddenRef` note there. The ref makes that safe; these keep the churn out.
+  const endPostEnrolmentLoading = useCallback(() => setPostEnrolmentLoading(false), []);
+  const endBootLoading = useCallback(() => setBootLoading(false), []);
+
+  /**
+   * Enrolment is done: show the hand-off loader, and make sure services are actually coming up.
+   *
+   * The lifecycle's only other route to ready after a first enrolment is catching one
+   * `auth.state_changed` event, and if that is missed nothing retries it — the participant waits on
+   * this loader until they restart the app, and their tasks appear only on the second launch. Asking
+   * here is deterministic, because this runs exactly when authentication has finished, and it costs
+   * nothing when services are already up.
+   */
+  const finishEnrolment = useCallback(() => {
+    setEnteredApp(true);
+    setPostEnrolmentLoading(true);
+    coreServices.ensureServicesReady();
+  }, [coreServices]);
+
   let content: React.ReactNode = null;
   if (signOutLoading) {
     // Sign-out loading — visible while services tear down, then animates off.
@@ -329,7 +349,7 @@ function AppShellInner({
     if (sawAuthFlow.current && !enteredApp) {
       content = (
         <PostEnrolmentFlow
-          onDone={() => { setEnteredApp(true); setPostEnrolmentLoading(true); }}
+          onDone={finishEnrolment}
           enrolment={enrolmentBlock as any}
           brandColors={theme}
         />
@@ -341,7 +361,7 @@ function AppShellInner({
         <LoadingScreen
           brandColors={theme}
           ready={servicesReady}
-          onHidden={() => setPostEnrolmentLoading(false)}
+          onHidden={endPostEnrolmentLoading}
         />
       );
     } else {
@@ -366,7 +386,7 @@ function AppShellInner({
         <LoadingScreen
           brandColors={theme}
           ready={!signingOut && status !== 'unknown' && (status === 'unauthenticated' || status === 'authenticating' || servicesReady)}
-          onHidden={() => setBootLoading(false)}
+          onHidden={endBootLoading}
         />
       )}
       {initError && <InitErrorToast message={initError} brandColors={theme} />}
