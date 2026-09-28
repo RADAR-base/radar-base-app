@@ -13,6 +13,7 @@ export function SectionNode({ node, context, render }: NodeProps) {
   const showSeeAll = node.showSeeAll === true;
   const layout = node.layout === 'horizontal' ? 'horizontal' : 'vertical';
   const theme = context.theme;
+  const customGap = typeof node.gap === 'number' ? node.gap : undefined;
 
   const children = asNodeArray(node.children);
 
@@ -56,7 +57,9 @@ export function SectionNode({ node, context, render }: NodeProps) {
           {render(children)}
         </ScrollView>
       ) : (
-        <View style={styles.verticalContent}>{render(children)}</View>
+        <View style={[styles.verticalContent, customGap != null && { gap: customGap }]}>
+          {render(children)}
+        </View>
       )}
     </View>
   );

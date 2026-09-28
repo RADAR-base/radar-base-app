@@ -61,18 +61,20 @@ export class DefaultSyncService implements SyncService {
       return { success: true, partial: false, lastSyncedAt: now, failures: [] };
     }
 
-    const results = await Promise.allSettled(
+    const settled = await Promise.all(
       entries.map(([name, step]) =>
-        step().catch((err) => {
-          this.logger.log(`[SyncService] step "${name}" failed: ${err}`);
-          throw err;
-        }),
+        step()
+          .then(() => true as const)
+          .catch((err) => {
+            this.logger.log(`[SyncService] step "${name}" failed: ${err}`);
+            return false as const;
+          }),
       ),
     );
 
     const failures: string[] = [];
-    results.forEach((r, i) => {
-      if (r.status === 'rejected') failures.push(entries[i][0]);
+    settled.forEach((ok, i) => {
+      if (!ok) failures.push(entries[i][0]);
     });
 
     const now = new Date();

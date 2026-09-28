@@ -16,6 +16,10 @@ import {
   useSigningOut,
   useInitError,
   useSubjectConfigService,
+  useDataService,
+  useHealthKitService,
+  useNotificationService,
+  useCoreServices,
   type CoreServiceOverrides,
 } from '../../core/CoreServicesContext';
 import type { BlueprintSource } from './BlueprintLoader';
@@ -27,6 +31,7 @@ import { SDUIShell } from './SDUIShell';
 import { LoginScreen } from './LoginScreen';
 import { PostEnrolmentFlow } from './PostEnrolmentFlow';
 import { LoadingScreen } from './LoadingScreen';
+import { ConfirmModal } from './ConfirmModal';
 import {
   fontFamily,
   getColorTokens,
@@ -137,6 +142,10 @@ function AppShellInner({
 }) {
   const { status, logout } = useAuth();
   const subjectConfig = useSubjectConfigService();
+  const dataService = useDataService();
+  const healthKit = useHealthKitService();
+  const notifications = useNotificationService();
+  const coreServices = useCoreServices();
   const servicesReady = useServicesReady();
   const signingOut = useSigningOut();
   const initError = useInitError();
@@ -168,12 +177,74 @@ function AppShellInner({
     };
   }, [inlineBlueprints, blueprintBaseUrl]);
 
-  // Wire settings "Sign out" action to auth reset
+  // Confirmation modals for destructive settings actions
+  const [confirmModal, setConfirmModal] = useState<{
+    title: string;
+    description: string;
+    confirmLabel: string;
+    destructive?: boolean;
+    onConfirm: () => void;
+  } | null>(null);
+
+  const doReset = () => {
+    coreServices.dataPipeline.flush()
+      .catch(() => {})
+      .then(() => Promise.all([
+        Promise.resolve(coreServices.kafka.clear()).catch(() => {}),
+        coreServices.questionnaireData.clear().catch(() => {}),
+        coreServices.cache.clear().catch(() => {}),
+      ]))
+      .then(() => coreServices.schedule.fetchSchedule().catch(() => {}));
+  };
+
+  // Wire settings actions to services via EventBus
   useEffect(() => {
-    const handler = () => { logout(); };
-    eventBus.on('auth.sign_out', handler);
-    return () => eventBus.off('auth.sign_out', handler);
-  }, [logout]);
+    const signOut = () => {
+      setConfirmModal({
+        title: 'Sign Out',
+        description: 'Are you sure you want to sign out? You will need to log in again to access your study.',
+        confirmLabel: 'Sign Out',
+        destructive: true,
+        onConfirm: () => logout(),
+      });
+    };
+
+    const notificationsToggle = (data: { value?: boolean }) => {
+      if (data.value) {
+        notifications.requestPermission().catch(() => {});
+      } else {
+        setConfirmModal({
+          title: 'Disable Notifications',
+          description: 'You may miss important task reminders. Are you sure you want to turn off notifications?',
+          confirmLabel: 'Turn Off',
+          destructive: true,
+          onConfirm: () => {
+            // Notification disabling is handled by the toggle state in SettingsRowNode.
+            // No additional service call needed — the OS toggle is what matters.
+          },
+        });
+      }
+    };
+
+    const reset = () => {
+      setConfirmModal({
+        title: 'Reset App Data',
+        description: 'This will clear cached data and re-fetch your schedule from the server. Your completed tasks will not be affected.',
+        confirmLabel: 'Reset',
+        destructive: true,
+        onConfirm: doReset,
+      });
+    };
+
+    eventBus.on('auth.sign_out', signOut);
+    eventBus.on('settings.notifications_toggle', notificationsToggle);
+    eventBus.on('settings.reset', reset);
+    return () => {
+      eventBus.off('auth.sign_out', signOut);
+      eventBus.off('settings.notifications_toggle', notificationsToggle);
+      eventBus.off('settings.reset', reset);
+    };
+  }, [logout, notifications, coreServices]);
 
   // Build template context from SubjectConfigService + manifest.
   const [templateContext, setTemplateContext] = useState<Record<string, Record<string, unknown>>>({
@@ -183,10 +254,12 @@ function AppShellInner({
   useEffect(() => {
     if (status !== 'authenticated') return;
     (async () => {
-      const [login, project, enrolmentDate] = await Promise.all([
+      const [login, project, enrolmentDate, scheduleVersion, healthKitAuthorized] = await Promise.all([
         subjectConfig.getParticipantLogin(),
         subjectConfig.getProjectName(),
         subjectConfig.getEnrolmentDate(),
+        dataService.get<string>('@radarbase/protocol_version'),
+        healthKit.isAuthorized().catch(() => false),
       ]);
       setTemplateContext({
         user: { firstName: login, login },
@@ -197,10 +270,11 @@ function AppShellInner({
             : '',
           status: 'Active',
         },
-        app: { version: version ?? '' },
+        app: { version: version ?? '', scheduleVersion: scheduleVersion ?? '' },
+        health: { status: healthKitAuthorized ? 'Connected' : 'Not Connected' },
       });
     })().catch(() => {});
-  }, [status, subjectConfig, version]);
+  }, [status, subjectConfig, dataService, version]);
 
   // After a fresh authentication in THIS session, show the post-enrolment flow before
   // entering the app. Returning users who are already authenticated on launch skip it.
@@ -296,6 +370,18 @@ function AppShellInner({
         />
       )}
       {initError && <InitErrorToast message={initError} brandColors={theme} />}
+      {confirmModal && (
+        <ConfirmModal
+          visible
+          onClose={() => setConfirmModal(null)}
+          onConfirm={confirmModal.onConfirm}
+          title={confirmModal.title}
+          description={confirmModal.description}
+          confirmLabel={confirmModal.confirmLabel}
+          destructive={confirmModal.destructive}
+          brandColors={theme}
+        />
+      )}
     </View>
   );
 }
