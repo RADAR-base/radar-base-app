@@ -40,7 +40,6 @@
     }
   ],
   "secondaryViews": {
-    "daily_questionnaire": "views/secondary/questionnaire.json",
     "inbox_history": "views/secondary/inbox-history.json"
   },
   "widgetsRegistry": [
