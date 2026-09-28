@@ -27,6 +27,7 @@ import {
 // The same ink the radio and checkbox put on a chosen option, and for the same reason — one white,
 // documented once, rather than three that happen to agree today.
 import { ON_ACCENT } from './optionCard';
+import { plainLabel, richLabel } from './richLabel';
 import {
   cardShadow,
   fontFamily,
@@ -625,7 +626,7 @@ function Segment({
     <Pressable
       accessibilityRole="radio"
       accessibilityState={{ checked: selected }}
-      accessibilityLabel={label}
+      accessibilityLabel={plainLabel(label)}
       onPress={onPress}
       onPressIn={() => {
         setPressing(true);
@@ -656,7 +657,7 @@ function Segment({
           />
           <Animated.View style={[styles.segment, fillStyle]}>
             <Animated.Text style={[styles.segmentLabel, labelStyle]} numberOfLines={1}>
-              {label}
+              {richLabel(label)}
             </Animated.Text>
           </Animated.View>
         </View>

@@ -27,6 +27,7 @@ import {
   SPEECH_REVIEW_SUBTEXT_NO_REPLAY,
 } from './questionnaire/SpeechPanel';
 import { matrixPageTitle, toQuestionPages } from './questionnaire/matrixGroups';
+import { richLabel } from './questionnaire/richLabel';
 import { panelBehaviour } from './questionnaire/panelBehaviour';
 import { REQUIRED_MESSAGE } from './questionnaire/QuestionError';
 import type { SpeechPhase } from './questionnaire/SpeechInput';
@@ -712,7 +713,7 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                       >
                         {/* Same pairing as an `info` screen: the task name is the small grey kicker
                             and the line telling you what to do is the heading. */}
-                        <Text style={[styles.sectionHeader, { color: muted }]}>{questionTitle}</Text>
+                        <Text style={[styles.sectionHeader, { color: muted }]}>{richLabel(questionTitle)}</Text>
                         <Text style={[styles.title, { color: brand }]}>
                           {allowReplay ? SPEECH_REVIEW_SUBTEXT : SPEECH_REVIEW_SUBTEXT_NO_REPLAY}
                         </Text>
@@ -740,7 +741,7 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                             into the title instead. */}
                         {sectionHeader && questionTitle !== sectionHeader ? (
                           <Text style={[styles.sectionHeader, { color: muted }]}>
-                            {sectionHeader}
+                            {richLabel(sectionHeader)}
                           </Text>
                         ) : null}
                         {isSpeechPanel ? (
@@ -751,11 +752,11 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                           // Folds away once recording starts — see `CollapsibleHeading`.
                           <CollapsibleHeading
                             collapsed={isActive && speechPhase === 'recording'}
-                            text={questionTitle || ''}
+                            text={richLabel(questionTitle) ?? ''}
                             textStyle={[styles.sectionHeader, { color: muted }]}
                           />
                         ) : (
-                          <Text style={[styles.title, { color: brand }]}>{questionTitle}</Text>
+                          <Text style={[styles.title, { color: brand }]}>{richLabel(questionTitle)}</Text>
                         )}
                       </View>
                     )}

@@ -10,6 +10,7 @@ import Animated, {
 
 import type { QuestionRange, SelectChoice } from '../../../../types';
 import { questionScale } from './questionScale';
+import { richLabel } from './richLabel';
 import { useStepHaptics } from '../../useStepHaptics';
 import { DragHint } from './DragHint';
 import SliderHandleIcon from '../../../../theme/icons/sliderhandle.svg';
@@ -421,7 +422,7 @@ export function SliderInput({
           {current}
         </Animated.Text>
         <Text style={[styles.currentLabel, { color: stepLabelColor }]} numberOfLines={1}>
-          {scale.stepLabels?.[index] ?? ' '}
+          {richLabel(scale.stepLabels?.[index]) ?? ' '}
         </Text>
       </View>
 
@@ -480,9 +481,9 @@ export function SliderInput({
         </View>
 
         <View style={styles.endLabels}>
-          <Text style={[styles.endLabel, { color: endLabelColor }]}>{minLabel ?? values[0]}</Text>
+          <Text style={[styles.endLabel, { color: endLabelColor }]}>{richLabel(minLabel) ?? values[0]}</Text>
           <Text style={[styles.endLabel, { color: endLabelColor }]}>
-            {maxLabel ?? values[steps - 1]}
+            {richLabel(maxLabel) ?? values[steps - 1]}
           </Text>
         </View>
 

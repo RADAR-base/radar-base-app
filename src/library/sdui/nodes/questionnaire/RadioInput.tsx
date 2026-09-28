@@ -8,6 +8,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import type { SelectChoice } from '../../../../types';
+import { richLabel } from './richLabel';
 import {
   INDICATOR_BORDER,
   INDICATOR_SIZE,
@@ -150,7 +151,7 @@ function RadioOption({
           grow the row and shunt the list. */}
       <Animated.View style={[styles.optionRing, ringStyle]}>
         <Animated.View style={[styles.option, optionShadow, fillStyle]}>
-          <Animated.Text style={[styles.label, labelStyle]}>{label}</Animated.Text>
+          <Animated.Text style={[styles.label, labelStyle]}>{richLabel(label)}</Animated.Text>
 
           <Animated.View style={[styles.indicator, indicatorStyle]}>
             <Animated.View style={[styles.indicatorDot, dotStyle]} />

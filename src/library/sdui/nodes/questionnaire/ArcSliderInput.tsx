@@ -12,6 +12,7 @@ import Svg, { Line, Path } from 'react-native-svg';
 
 import type { QuestionRange, SelectChoice } from '../../../../types';
 import { questionScale } from './questionScale';
+import { richLabel } from './richLabel';
 import { useStepHaptics } from '../../useStepHaptics';
 import { DragHint } from './DragHint';
 import SliderHandleIcon from '../../../../theme/icons/sliderhandle.svg';
@@ -469,7 +470,7 @@ export function ArcSliderInput({
             {current}
           </Animated.Text>
           <Text style={[styles.currentLabel, { color: stepLabelColor }]} numberOfLines={1}>
-            {scale.stepLabels?.[index] ?? ' '}
+            {richLabel(scale.stepLabels?.[index]) ?? ' '}
           </Text>
 
           {/* The arc reads the angle from its centre, so the whole area is draggable — not just the
@@ -501,10 +502,10 @@ export function ArcSliderInput({
 
       <View style={styles.endLabels}>
         <Text style={[styles.endLabel, { color: endLabelColor }]}>
-          {scale.minLabel ?? values[0]}
+          {richLabel(scale.minLabel) ?? values[0]}
         </Text>
         <Text style={[styles.endLabel, { color: endLabelColor }]}>
-          {scale.maxLabel ?? values[steps - 1]}
+          {richLabel(scale.maxLabel) ?? values[steps - 1]}
         </Text>
       </View>
     </View>

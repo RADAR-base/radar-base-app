@@ -21,6 +21,7 @@ import Animated, {
 
 import type { QuestionRange, SelectChoice } from '../../../../types';
 import { questionScale } from './questionScale';
+import { richLabel } from './richLabel';
 import { useStepHaptics } from '../../useStepHaptics';
 import { DragHint } from './DragHint';
 import { GooChip } from './GooChip';
@@ -540,7 +541,7 @@ export function ScaleInput({
           {values[index]}
         </Animated.Text>
         <Text style={[styles.caption, { color: stepLabelColor }]} numberOfLines={2}>
-          {scale.stepLabels?.[index] ?? ' '}
+          {richLabel(scale.stepLabels?.[index]) ?? ' '}
         </Text>
       </View>
 
@@ -605,10 +606,10 @@ export function ScaleInput({
 
         <View style={styles.endLabels}>
           <Text style={[styles.endLabel, { color: endLabelColor }]} numberOfLines={1}>
-            {scale.minLabel ?? values[0]}
+            {richLabel(scale.minLabel) ?? values[0]}
           </Text>
           <Text style={[styles.endLabel, { color: endLabelColor }]} numberOfLines={1}>
-            {scale.maxLabel ?? values[steps - 1]}
+            {richLabel(scale.maxLabel) ?? values[steps - 1]}
           </Text>
         </View>
 

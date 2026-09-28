@@ -8,6 +8,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import type { SelectChoice } from '../../../../types';
+import { richLabel } from './richLabel';
 import CheckIcon from '../../../../theme/icons/check.svg';
 import {
   INDICATOR_BORDER,
@@ -213,7 +214,7 @@ function Chip({
             </Animated.View>
           </Animated.View>
 
-          <Animated.Text style={[styles.label, labelStyle]}>{label}</Animated.Text>
+          <Animated.Text style={[styles.label, labelStyle]}>{richLabel(label)}</Animated.Text>
         </Animated.View>
       </Animated.View>
     </Pressable>

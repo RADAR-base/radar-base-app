@@ -90,7 +90,8 @@ export function CollapsibleHeading({
   textStyle,
 }: {
   collapsed: boolean;
-  text?: string;
+  /** Rendered as given — the caller runs it through `richLabel`, so it may carry styled runs. */
+  text?: React.ReactNode;
   textStyle: StyleProp<TextStyle>;
 }) {
   const height = useSharedValue(0);

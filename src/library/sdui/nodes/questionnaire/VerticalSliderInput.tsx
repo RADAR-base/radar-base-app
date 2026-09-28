@@ -13,6 +13,7 @@ import Animated, {
 
 import type { QuestionRange, SelectChoice } from '../../../../types';
 import { questionScale } from './questionScale';
+import { richLabel } from './richLabel';
 import { useStepHaptics } from '../../useStepHaptics';
 import { DragHint } from './DragHint';
 import { useBottomInset } from '../../useBottomInset';
@@ -692,7 +693,7 @@ export function VerticalSliderInput({
               </Animated.View>
 
               <Text style={[styles.subtext, { color: stepLabelColor }]} numberOfLines={2}>
-                {scale.stepLabels?.[index] ?? ' '}
+                {richLabel(scale.stepLabels?.[index]) ?? ' '}
               </Text>
 
               <StepArrow
@@ -717,7 +718,7 @@ export function VerticalSliderInput({
 
             <View style={styles.sliderColumn}>
               <Text style={[styles.endLabel, { color: endLabelColor }]} numberOfLines={1}>
-                {scale.maxLabel ?? values[steps - 1]}
+                {richLabel(scale.maxLabel) ?? values[steps - 1]}
               </Text>
 
               <View style={[styles.trackArea, { height: trackLength }]}>
@@ -767,7 +768,7 @@ export function VerticalSliderInput({
               </View>
 
               <Text style={[styles.endLabel, { color: endLabelColor }]} numberOfLines={1}>
-                {scale.minLabel ?? values[0]}
+                {richLabel(scale.minLabel) ?? values[0]}
               </Text>
             </View>
           </>
