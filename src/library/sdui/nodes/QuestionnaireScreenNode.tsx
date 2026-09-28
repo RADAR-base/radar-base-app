@@ -347,6 +347,8 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
    * out from under the JS responder. Turning the scroller off for the length of the gesture is the
    * only thing that reliably stops the page moving under the finger.
    */
+  const [scrollLocked, setScrollLocked] = useState(false);
+  const handleScrollLock = useCallback((locked: boolean) => setScrollLocked(locked), []);
 
   const goNext = useCallback(() => {
     // Hold them here and show why, rather than carrying a bad answer forward.
@@ -771,8 +773,10 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                 scrollEventThrottle={16}
                 showsVerticalScrollIndicator={false}
                 // Set even on a View panel, where it is simply ignored — see `panelBehaviour`
-                // for which pages refuse to scroll and why.
-                scrollEnabled={behaviour.scrollEnabled}
+                  // for which pages refuse to scroll and why. `&& !scrollLocked`: an input dragging
+                  // inside this panel holds it still for the length of the gesture — see
+                  // `handleScrollLock`.
+                  scrollEnabled={behaviour.scrollEnabled && !scrollLocked}
               >
                 {!question ? (
                   <Text style={[styles.emptyText, { color: muted }]}>No questions available</Text>
@@ -920,6 +924,7 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                           onValidityChange={isActive ? handleValidityChange : undefined}
                           // Only the active panel: a parked neighbour has no business freezing the
                           // page the participant is actually looking at.
+                          onScrollLock={isActive ? handleScrollLock : undefined}
                           // Only the text field draws this itself, lined up with its own card. Every
                           // other type gets the screen's pinned row below.
                           errorMessage={isActive ? requiredError : null}
