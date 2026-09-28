@@ -410,9 +410,9 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
    * every question optional in questionnaires written against the old rule.
    *
    * `blocksProgress` matters more under this default than the `isInfoType` check it replaces did
-   * under the old one: a blank `required_field` now reads as required, so without it every text page
-   * — and every scale this branch adds — would block Next rather than only the few a definition had
-   * mistakenly marked required.
+   * under the old one: a blank `required_field` now reads as required, so without it every page with
+   * nothing on it to answer would block Next, rather than only the few a definition had mistakenly
+   * marked required. Sliders are *not* among those — see `NON_BLOCKING_TYPES`.
    */
   const isRequired = blocksProgress(currentQuestion) && currentQuestion?.required_field !== 'n';
   const canProceed = !isRequired || hasAnswer;

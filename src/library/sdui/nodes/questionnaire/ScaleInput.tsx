@@ -185,6 +185,19 @@ export function ScaleInput({
   /** A tick per step crossed, however the value was moved. */
   const tick = useStepHaptics();
 
+  /**
+   * The live `onChange`, read through a ref.
+   *
+   * The gesture handlers below are built once — `PanResponder.create` sits in a `useMemo` with no
+   * dependencies, because everything else they touch is already a ref. `onChange` was the exception:
+   * it closes over the host's current question, so the handlers kept calling the *first* render's
+   * version and a dragged answer was recorded against whichever question was on screen when this
+   * mounted. Tapping worked because that path is an ordinary function in render, which is why the
+   * two disagreed.
+   */
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
   // `range` when the definition bounds the scale, its choices when they enumerate it — see
   // `questionScale` for why the definitions need both readings.
   const scale = useMemo(() => questionScale(range, choices), [range, choices]);
@@ -350,7 +363,7 @@ export function ScaleInput({
     setIndex(next);
     settledFor.current = `${next}:${pitch}:${chip}`;
     settle(next, true);
-    onChange(valuesRef.current[next]);
+    onChangeRef.current(valuesRef.current[next]);
   };
 
   const panResponder = useMemo(
@@ -393,12 +406,17 @@ export function ScaleInput({
           }
           settledFor.current = `${final}:${pitchRef.current}:${chipRef.current}`;
           settle(final, true);
-          onChange(valuesRef.current[final]);
+          onChangeRef.current(valuesRef.current[final]);
         },
         onPanResponderTerminate: () => {
           dragging.current = false;
           press.value = withTiming(0, { duration: PRESS_MS });
           settle(indexRef.current, true);
+          // Record what the handle is showing. A terminated gesture still leaves it settled on a
+          // step — the participant sees an answer — so returning without reporting it is what left
+          // the value on screen and nothing in `answers`, and a required question refusing to move
+          // on from a slider that plainly looked answered.
+          onChangeRef.current(valuesRef.current[indexRef.current]);
         },
       }),
     // Handlers read live values through refs, so they never need rebuilding.
