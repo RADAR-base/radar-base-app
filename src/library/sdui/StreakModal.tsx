@@ -14,6 +14,7 @@ import {
   fontFamily,
   getColorTokens,
   layout,
+  readableTextColor,
   tracking,
   withAlpha,
   type ThemeColorOverrides,
@@ -84,9 +85,24 @@ export function StreakModal({
   const tokens = getColorTokens(resolvedMode, brandColors);
 
   const primary = tokens.button.background;
-  const onPrimary = tokens.button.text;
   const surface = tokens.card.background;
   const muted = withAlpha(tokens.text.primary, 0.6);
+
+  /**
+   * Both of these are checked against what they actually sit on, rather than trusted.
+   *
+   * `button.text` is not a label colour for a filled button — in the light theme it is `gray800`
+   * against a `navy750` fill, which is 1.10:1 and simply cannot be read. And the title takes the
+   * brand, which is fine on a white card and 1.94:1 on the dark theme's near-black one. Neither is a
+   * wrong token; they are tokens being asked a question they don't answer.
+   *
+   * `readableTextColor` keeps the designer's colour wherever it clears AA and flips to a readable
+   * light or dark only where it doesn't — the same correction `withReadableText` already applies to
+   * the header and navbar, for the same reason. It also covers a manifest brand this file has never
+   * seen, which is the case that can't be checked by eye.
+   */
+  const onPrimary = readableTextColor(primary, { preferred: tokens.button.text });
+  const titleColor = readableTextColor(surface, { preferred: primary });
   // The badge's two colours travel together and swap between themes — see `card.engagement` in the
   // theme. Taking both from there is what keeps the flame legible on its circle in dark mode.
   const badgeFill = tokens.card.engagement.streakBadge;
@@ -140,7 +156,7 @@ export function StreakModal({
             <FireIcon width={BADGE_ICON.width} height={BADGE_ICON.height} color={badgeInk} />
           </View>
 
-          <Text style={[styles.title, { color: primary }]}>{title}</Text>
+          <Text style={[styles.title, { color: titleColor }]}>{title}</Text>
           <Text style={[styles.description, { color: muted }]}>{description}</Text>
 
           <Pressable
