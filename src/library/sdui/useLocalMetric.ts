@@ -27,7 +27,11 @@ export function isLocalMetric(metric: string): metric is LocalMetricName {
  * resolution. Live-updates with the schedule via `SCHEDULE_UPDATED`.
  *
  * Known metrics:
- *   - `task_completed`  → today's completed-task count; `target` = total tasks scheduled today.
+ *   - `task_completed`  → completed tasks; `target` = those plus everything still completable. Across
+ *                         every day, not just today: a participant who clears today still has the week
+ *                         ahead, and a wheel reading "3 of 3" on a full schedule overstates how far
+ *                         along they are. A task expired unfinished is counted in neither, so the ring
+ *                         can always be filled.
  *   - `active_days`     → distinct calendar days the user has completed ≥1 task (a running count, no target).
  *   - `current_streak`  → consecutive active days ending today (a running count, no target).
  *   - `longest_streak`  → the longest such run on record (a running count, no target).
@@ -52,16 +56,9 @@ export function useLocalMetric(metric: string): LocalMetric | null {
 
   const load = useCallback(async () => {
     if (wantsTasks) {
-      try {
-        const instances = await schedule.getTasksForDate(new Date());
-        const tasks = instances.map((i) => schedule.toTaskView(i));
-        setTaskCounts({
-          completed: tasks.filter((t) => t.status === 'completed').length,
-          total: tasks.length,
-        });
-      } catch {
-        setTaskCounts({ completed: 0, total: 0 });
-      }
+      // Every open task, not just today's — see `getOpenTaskCounts`. Synchronous, so there is nothing
+      // to fail: the counts come off the schedule already in memory.
+      setTaskCounts(schedule.getOpenTaskCounts());
     } else if (wantsDayHistory) {
       // All three off one pass: they read the same `activeDays` set, and a card showing a streak
       // beside the active-day count that disagreed with it would be the obvious bug.

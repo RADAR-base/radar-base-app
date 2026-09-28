@@ -571,6 +571,8 @@ export interface ScheduleService {
   markTaskOpened(taskId: string): Promise<void>;
   /** Distinct calendar days the user has completed ≥1 task — drives the "Active days" metric. */
   getActiveDaysCount(): number;
+  /** Completed vs every task still open, across all days — expired ones counted in neither. */
+  getOpenTaskCounts(): { completed: number; total: number };
   /** Consecutive days on which every scheduled task was completed; one missed day is forgiven. */
   getCurrentStreak(): number;
   /** The longest such run on record. */

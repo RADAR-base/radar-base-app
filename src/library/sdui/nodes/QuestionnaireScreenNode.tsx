@@ -39,6 +39,15 @@ import { useBottomInset } from '../useBottomInset';
 import { useLocalMetric } from '../useLocalMetric';
 import { StepSlider } from '../StepSlider';
 
+/**
+ * What an explainer is worth on the progress bar, against 1 for a page with something to answer.
+ *
+ * Low enough that a run of preamble can't look like real progress, high enough that the bar still
+ * visibly moves when one is dismissed. Raise it if explainers start feeling unacknowledged; lower it
+ * if a task that opens with several still looks half-done before it begins.
+ */
+const INFO_PAGE_WEIGHT = 0.25;
+
 /** Page-transition duration (ms). Shared by the question slide and the progress bar so they move
  *  together. Matches `StepSlider`'s own default. */
 const SLIDE_DURATION = 260;
@@ -206,14 +215,21 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
     ? answeredSoFar
     : Math.min(answeredSoFar + 1, answerable);
   /**
-   * Position through *every* page, info screens included — unlike the count above.
+   * Position through every page, info screens included — but weighted, unlike the count above.
    *
-   * The two answer different questions. The counter says how much there is to do, so an explainer
+   * The two answer different questions. The counter says how much there is to *do*, so an explainer
    * shouldn't inflate it. The bar says how far through the task you are, and an explainer is a page
-   * you still have to get past — leaving it out froze the bar on those pages, which read as the app
-   * having missed the tap.
+   * you still have to get past — leaving it out froze the bar there, which read as a missed tap.
+   *
+   * Counting them equally had the opposite fault: a speech task opening with three explainers showed
+   * three quarters of the bar filled before the participant had done anything at all. A fraction of a
+   * step keeps the bar moving on every page without letting the preamble claim progress the task
+   * itself has yet to earn.
    */
-  const progress = total > 0 ? (currentIndex + 1) / total : 0;
+  const pageWeight = (page: Question[]) => (isAnswerable(page[0]) ? 1 : INFO_PAGE_WEIGHT);
+  const walked = pages.slice(0, currentIndex + 1).reduce((sum, p) => sum + pageWeight(p), 0);
+  const wholeTask = pages.reduce((sum, p) => sum + pageWeight(p), 0);
+  const progress = wholeTask > 0 ? walked / wholeTask : 0;
 
   // The bar eases to its new position in step with the page slide, instead of snapping. Driven by a
   // manual shared value (not a layout animation) — see the note on entering/exiting stranding an
@@ -367,14 +383,18 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   const { width } = useWindowDimensions();
 
   /**
-   * Today's completed tasks and today's total, for the ring on the completion screen.
+   * Completed tasks against everything still open, for the ring on the completion screen.
+   *
+   * Across all days rather than today alone, matching the dashboard's wheel: a participant who
+   * clears today still has the week ahead, and a ring that reads "3 of 3" on a full schedule
+   * overstates how far along they are.
    *
    * Read here rather than in that screen so it stays presentational, and because this hook tracks
    * `SCHEDULE_UPDATED` — the host marks the task complete off the submission event, which lands a
    * moment *after* the screen appears. The task just finished therefore arrives as an update rather
    * than being there on mount, and the ring animates to whatever has settled by the time it runs.
    */
-  const todaysTasks = useLocalMetric('task_completed');
+  const openTasks = useLocalMetric('task_completed');
 
   // Completion is no longer a horizontal push. `TaskCompletionScreen` opens its own background
   // out of the centre of the screen and covers the questions where they stand, so there is nothing to
@@ -542,8 +562,8 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
       endText={endText}
       onHome={() => finishTo(homeTabId)}
       onCalendar={() => finishTo(calendarTabId)}
-      tasksCompleted={todaysTasks?.value ?? 0}
-      tasksTotal={todaysTasks?.target ?? 0}
+      tasksCompleted={openTasks?.value ?? 0}
+      tasksTotal={openTasks?.target ?? 0}
       brandColor={brand}
       backgroundColor={pageBg}
       mode={mode}

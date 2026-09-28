@@ -188,6 +188,28 @@ export abstract class ScheduleServiceBase implements ScheduleService {
     return this.activeDays.size;
   }
 
+  /**
+   * Completed against everything still worth doing — whatever day it falls on.
+   *
+   * The day-scoped count answers "what is left today", which goes quiet the moment today is clear
+   * even when the week ahead is full. This answers "what is left at all": every task whose window is
+   * still open, plus the ones already done, so the ring fills as the participant works through them.
+   *
+   * Tasks whose window has closed unfinished are left out of both numbers. Counting them would mean
+   * a ring that can never fill, which reads as the participant being permanently behind on work they
+   * can no longer do anything about.
+   */
+  getOpenTaskCounts(): { completed: number; total: number } {
+    const now = Date.now();
+    let completed = 0;
+    let open = 0;
+    for (const task of this.tasks) {
+      if (task.state === 'completed') completed += 1;
+      else if (!isTerminal(task.state) && task.timestamp + task.completionWindow > now) open += 1;
+    }
+    return { completed, total: completed + open };
+  }
+
   // ---------------------------------------------------------------------------
   // Streaks
   // ---------------------------------------------------------------------------
