@@ -7,11 +7,14 @@ import {
   type LayoutChangeEvent,
 } from 'react-native';
 import Animated, {
+  Extrapolation,
+  interpolate,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
   withSpring,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated';
 
 import type { SelectChoice } from '../../../../types';
@@ -19,7 +22,6 @@ import {
   cardShadow,
   fontFamily,
   mix,
-  readableTextColor,
   tracking,
   withAlpha,
 } from '../../../../theme/theme';
@@ -112,6 +114,18 @@ const TICK_ALPHA = 0.25;
 
 /** How far an unselected face is knocked back toward the track, so the chosen one carries the row. */
 const UNSELECTED_MIX = 0.45;
+
+/**
+ * How close the handle gets before a face on the track gives way to it.
+ *
+ * Measured from the handle's centre to the face's, so it follows where the handle actually *is*
+ * rather than which step is selected. Those differ: the index turns over under hysteresis while the
+ * handle is still travelling, so keying the face off the index made it vanish well before anything
+ * covered it. It now fades across the last stretch of approach — gone by the time the handle has
+ * swallowed it, still there while the handle is a step away.
+ */
+const FACE_HIDDEN_AT = (HANDLE_SIZE - FACE_SIZE) / 2;
+const FACE_SHOWN_AT = HANDLE_SIZE / 2;
 
 /** How the handle travels, and how the press reads — matched to `ScaleInput`'s own. */
 const LAND_SPRING = { damping: 14, stiffness: 110, mass: 0.9 } as const;
@@ -360,15 +374,18 @@ export function LikertSliderInput({
 
   const answered = selected >= 0;
   /**
-   * The face inside the handle, checked against the step it is sitting on rather than assumed white.
+   * The face inside the handle: the card surface the control is sitting on.
    *
-   * The ramp runs red through amber to green, and white on the amber steps is under 2:1 — the face
-   * all but disappears at the middle of every scale. This keeps white where it reads and flips to
-   * near-black where it doesn't.
+   * The same on every step — it was contrast-checked against the step underneath, which flipped it
+   * between white and near-black along the ramp. Correct by the numbers, but it read as the worst
+   * face being a different *kind* of thing rather than the same face in a different colour.
+   *
+   * Taken from `surfaceColor` rather than pinned to white, so it follows the theme: `card.background`
+   * resolves to near-white in light mode and near-black in dark, and carries any brand tint with it.
+   * That keeps the face reading as a hole cut in the surface on either ground, which a fixed white
+   * could only manage on one. Falls back to the page, then to white, for a host that names neither.
    */
-  const handleInk = answered
-    ? readableTextColor(colors[selected], { preferred: '#FFFFFF' })
-    : '#FFFFFF';
+  const handleInk = surfaceColor ?? backgroundColor ?? '#FFFFFF';
   /**
    * Before an answer, the middle face in a flat grey — not the first step's.
    *
@@ -441,22 +458,20 @@ export function LikertSliderInput({
             );
           })}
 
-          {choices.map((choice, i) => {
-            const Face = faces[i];
-            // The chosen step is drawn by the handle instead, which is larger and sits over it.
-            if (i === selected) return null;
-            return (
-              <View key={choice.code} style={[styles.slot, { left: centerOf(i, width) - FACE_SIZE / 2 }]}>
-                <Face
-                  width={FACE_SIZE}
-                  height={FACE_SIZE}
-                  // Knocked toward the track rather than faded: a translucent face would show the
-                  // track's own colour through its eyes and mouth, which reads as a smudge.
-                  color={mix(colors[i], track, UNSELECTED_MIX)}
-                />
-              </View>
-            );
-          })}
+          {/* Every face is drawn, the chosen one included — `FaceSlot` fades it out as the handle
+              arrives over it, so nothing pops out of existence a step early. */}
+          {choices.map((choice, i) => (
+            <FaceSlot
+              key={choice.code}
+              Face={faces[i]}
+              centre={centerOf(i, width)}
+              // Knocked toward the track rather than faded: a translucent face would show the
+              // track's own colour through its eyes and mouth, which reads as a smudge.
+              color={mix(colors[i], track, UNSELECTED_MIX)}
+              handleX={handleX}
+              covered={answered && width > 0}
+            />
+          ))}
 
           {/* Only once there is an answer. An empty handle parked on the first step covers that
               step's face and reads as though it were already chosen — which is the opposite of
@@ -479,6 +494,42 @@ export function LikertSliderInput({
         </View>
       </View>
     </View>
+  );
+}
+
+/**
+ * One face on the track, fading out as the handle covers it.
+ *
+ * Its own component because each slot needs its own `useAnimatedStyle`, and a hook can't be called
+ * from inside a map. The fade runs on the UI thread off the handle's shared value, so it follows the
+ * spring rather than waiting for a render.
+ */
+function FaceSlot({
+  Face,
+  centre,
+  color,
+  handleX,
+  covered,
+}: {
+  Face: React.ComponentType<{ width: number; height: number; color: string }>;
+  centre: number;
+  color: string;
+  handleX: SharedValue<number>;
+  /** False before there is an answer, when no handle is drawn and every face stays up. */
+  covered: boolean;
+}) {
+  const style = useAnimatedStyle(() => {
+    if (!covered) return { opacity: 1 };
+    const distance = Math.abs(handleX.value + HANDLE_SIZE / 2 - centre);
+    return {
+      opacity: interpolate(distance, [FACE_HIDDEN_AT, FACE_SHOWN_AT], [0, 1], Extrapolation.CLAMP),
+    };
+  });
+
+  return (
+    <Animated.View style={[styles.slot, { left: centre - FACE_SIZE / 2 }, style]}>
+      <Face width={FACE_SIZE} height={FACE_SIZE} color={color} />
+    </Animated.View>
   );
 }
 

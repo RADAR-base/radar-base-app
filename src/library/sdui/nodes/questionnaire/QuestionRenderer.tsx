@@ -1,13 +1,12 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import type { Question, QuestionRange } from '../../../../types';
+import type { Question } from '../../../../types';
 import { RadioInput } from './RadioInput';
 import { LikertSliderInput } from './LikertSliderInput';
 import { matchLikertScale } from './likertScale';
 import { CheckboxInput } from './CheckboxInput';
 import { ArcSliderInput } from './ArcSliderInput';
-import { parseChoices, questionScale } from './questionScale';
-import { RangeInput } from './RangeInput';
+import { parseChoices } from './questionScale';
 import { SliderInput } from './SliderInput';
 import { VerticalSliderInput } from './VerticalSliderInput';
 import { ScaleInput } from './ScaleInput';
@@ -99,28 +98,6 @@ export const SCALE_TYPES = ['range', 'slider', 'slider-vertical', 'slider-scale'
  */
 export const HEIGHT_DRIVEN_TYPES = ['slider-vertical'];
 
-/**
- * A concrete `QuestionRange` for the controls that still require one.
- *
- * `range` is optional on a definition — plenty of questions carry their scale in
- * `select_choices_or_calculations` instead — so it can't be handed straight to a control that needs
- * bounds. `deriveRange` used to paper over that; `questionScale` replaced it, and reading the bounds
- * back off the derived scale keeps both paths going through the same rules, labels included.
- */
-function concreteRange(question: Question): QuestionRange {
-  const scale = questionScale(question.range, question.select_choices_or_calculations);
-  const min = scale.values[0];
-  const max = scale.values[scale.values.length - 1];
-  return {
-    min,
-    max,
-    // `values` is ordered and never empty, so a second entry is the step the scale actually advances
-    // by — and a single-value scale has no gap to describe.
-    step: scale.values.length > 1 ? scale.values[1] - min : 1,
-    labelLeft: scale.minLabel,
-    labelRight: scale.maxLabel,
-  };
-}
 
 export function QuestionRenderer({
   question,
@@ -192,30 +169,9 @@ export function QuestionRenderer({
   function renderInput() {
     switch (question.field_type) {
       case 'radio': {
-        const radioChoices = parseChoices(question.select_choices_or_calculations);
-        // An ordered run of degrees is a scale, and reads better as one — see `matchLikertScale`,
-        // which decides that from the labels because the definitions carry no field saying so.
-        // Anything it doesn't recognise stays the list it has always been.
-        const likert = matchLikertScale(radioChoices);
-        if (likert) {
-          return (
-            <LikertSliderInput
-              choices={radioChoices}
-              value={value != null ? String(value) : undefined}
-              onChange={onChange}
-              primaryColor={primaryColor}
-              textColor={textColor}
-              accentColor={radioAccent}
-              surfaceColor={radioSurface}
-              backgroundColor={backgroundColor}
-              positiveEnd={likert.positiveEnd}
-              onScrollLock={onScrollLock}
-            />
-          );
-        }
         return (
           <RadioInput
-            choices={radioChoices}
+            choices={parseChoices(question.select_choices_or_calculations)}
             value={value != null ? String(value) : undefined}
             onChange={onChange}
             accentColor={radioAccent}
@@ -224,6 +180,25 @@ export function QuestionRenderer({
           />
         );
       }
+
+      case 'likert-emoji': {
+        const likert = matchLikertScale(parseChoices(question.select_choices_or_calculations));
+        return (
+          <LikertSliderInput
+            choices={parseChoices(question.select_choices_or_calculations)}
+            value={value != null ? String(value) : undefined}
+            onChange={onChange}
+            primaryColor={primaryColor}
+            textColor={textColor}
+            accentColor={radioAccent}
+            surfaceColor={radioSurface}
+            backgroundColor={backgroundColor}
+            positiveEnd={likert?.positiveEnd ?? 'last'}
+            onScrollLock={onScrollLock}
+          />
+        );
+      }
+
 
       case 'checkbox':
         return (
