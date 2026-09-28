@@ -192,6 +192,9 @@ export function createServices(overrides: ServiceOverrides = {}): ServiceBag {
   // Register default sync steps — additional steps can be added via sync.register() at any time.
   sync.register('cache', () => dataPipeline.flush().then(() => {}));
   sync.register('schedule', () => schedule.fetchSchedule());
+  // Questionnaire text, not just the schedule: a definition is fetched once and then kept, so
+  // without this a study's correction never reaches a participant who already has the old copy.
+  sync.register('questionnaires', () => questionnaireData.refresh());
 
   // Wire the API layer's auth token provider so authenticated requests work automatically.
   apiService.setAuthTokenProvider(async () => {
