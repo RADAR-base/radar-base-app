@@ -1,12 +1,25 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, {
+  Easing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { eventBus } from '../../core/EventBus';
 import { useAuth } from '../../core/useAuth';
 import {
   CoreServicesProvider,
   useServicesReady,
   useSigningOut,
+  useInitError,
   useSubjectConfigService,
+  useDataService,
+  useHealthKitService,
+  useNotificationService,
+  useCoreServices,
   type CoreServiceOverrides,
 } from '../../core/CoreServicesContext';
 import type { BlueprintSource } from './BlueprintLoader';
@@ -18,7 +31,14 @@ import { SDUIShell } from './SDUIShell';
 import { LoginScreen } from './LoginScreen';
 import { PostEnrolmentFlow } from './PostEnrolmentFlow';
 import { LoadingScreen } from './LoadingScreen';
-import type { ThemeColorOverrides } from '../../theme/theme';
+import { ConfirmModal } from './ConfirmModal';
+import {
+  fontFamily,
+  getColorTokens,
+  layout,
+  type ThemeColorOverrides,
+  type ThemeMode,
+} from '../../theme/theme';
 import type { StorageService, OAuthConfig } from '../../types';
 
 export interface AppShellProps {
@@ -122,14 +142,20 @@ function AppShellInner({
 }) {
   const { status, logout } = useAuth();
   const subjectConfig = useSubjectConfigService();
+  const dataService = useDataService();
+  const healthKit = useHealthKitService();
+  const notifications = useNotificationService();
+  const coreServices = useCoreServices();
   const servicesReady = useServicesReady();
   const signingOut = useSigningOut();
+  const initError = useInitError();
 
   const appName = manifest.appName as string | undefined;
   const description = manifest.description as string | undefined;
   const version = manifest.version as string | undefined;
   const themeBlock = manifest.theme as Record<string, unknown> | undefined;
   const theme = (themeBlock?.brandColors as ThemeColorOverrides | undefined) ?? themeBlock as ThemeColorOverrides | undefined;
+  const enrolmentBlock = manifest.enrolment as Record<string, unknown> | undefined;
   const loginBlock = manifest.login as Record<string, unknown> | undefined;
   const showSignUp = loginBlock?.showSignUp !== false;
   const blueprintBaseUrl = manifest.blueprintBaseUrl as string | undefined;
@@ -151,12 +177,74 @@ function AppShellInner({
     };
   }, [inlineBlueprints, blueprintBaseUrl]);
 
-  // Wire settings "Sign out" action to auth reset
+  // Confirmation modals for destructive settings actions
+  const [confirmModal, setConfirmModal] = useState<{
+    title: string;
+    description: string;
+    confirmLabel: string;
+    destructive?: boolean;
+    onConfirm: () => void;
+  } | null>(null);
+
+  const doReset = () => {
+    coreServices.dataPipeline.flush()
+      .catch(() => {})
+      .then(() => Promise.all([
+        Promise.resolve(coreServices.kafka.clear()).catch(() => {}),
+        coreServices.questionnaireData.clear().catch(() => {}),
+        coreServices.cache.clear().catch(() => {}),
+      ]))
+      .then(() => coreServices.schedule.fetchSchedule().catch(() => {}));
+  };
+
+  // Wire settings actions to services via EventBus
   useEffect(() => {
-    const handler = () => { logout(); };
-    eventBus.on('auth.sign_out', handler);
-    return () => eventBus.off('auth.sign_out', handler);
-  }, [logout]);
+    const signOut = () => {
+      setConfirmModal({
+        title: 'Sign Out',
+        description: 'Are you sure you want to sign out? You will need to log in again to access your study.',
+        confirmLabel: 'Sign Out',
+        destructive: true,
+        onConfirm: () => logout(),
+      });
+    };
+
+    const notificationsToggle = (data: { value?: boolean }) => {
+      if (data.value) {
+        notifications.requestPermission().catch(() => {});
+      } else {
+        setConfirmModal({
+          title: 'Disable Notifications',
+          description: 'You may miss important task reminders. Are you sure you want to turn off notifications?',
+          confirmLabel: 'Turn Off',
+          destructive: true,
+          onConfirm: () => {
+            // Notification disabling is handled by the toggle state in SettingsRowNode.
+            // No additional service call needed — the OS toggle is what matters.
+          },
+        });
+      }
+    };
+
+    const reset = () => {
+      setConfirmModal({
+        title: 'Reset App Data',
+        description: 'This will clear cached data and re-fetch your schedule from the server. Your completed tasks will not be affected.',
+        confirmLabel: 'Reset',
+        destructive: true,
+        onConfirm: doReset,
+      });
+    };
+
+    eventBus.on('auth.sign_out', signOut);
+    eventBus.on('settings.notifications_toggle', notificationsToggle);
+    eventBus.on('settings.reset', reset);
+    return () => {
+      eventBus.off('auth.sign_out', signOut);
+      eventBus.off('settings.notifications_toggle', notificationsToggle);
+      eventBus.off('settings.reset', reset);
+    };
+  }, [logout, notifications, coreServices]);
 
   // Build template context from SubjectConfigService + manifest.
   const [templateContext, setTemplateContext] = useState<Record<string, Record<string, unknown>>>({
@@ -166,10 +254,12 @@ function AppShellInner({
   useEffect(() => {
     if (status !== 'authenticated') return;
     (async () => {
-      const [login, project, enrolmentDate] = await Promise.all([
+      const [login, project, enrolmentDate, scheduleVersion, healthKitAuthorized] = await Promise.all([
         subjectConfig.getParticipantLogin(),
         subjectConfig.getProjectName(),
         subjectConfig.getEnrolmentDate(),
+        dataService.get<string>('@radarbase/protocol_version'),
+        healthKit.isAuthorized().catch(() => false),
       ]);
       setTemplateContext({
         user: { firstName: login, login },
@@ -180,10 +270,11 @@ function AppShellInner({
             : '',
           status: 'Active',
         },
-        app: { version: version ?? '' },
+        app: { version: version ?? '', scheduleVersion: scheduleVersion ?? '' },
+        health: { status: healthKitAuthorized ? 'Connected' : 'Not Connected' },
       });
     })().catch(() => {});
-  }, [status, subjectConfig, version]);
+  }, [status, subjectConfig, dataService, version]);
 
   // After a fresh authentication in THIS session, show the post-enrolment flow before
   // entering the app. Returning users who are already authenticated on launch skip it.
@@ -239,6 +330,7 @@ function AppShellInner({
       content = (
         <PostEnrolmentFlow
           onDone={() => { setEnteredApp(true); setPostEnrolmentLoading(true); }}
+          enrolment={enrolmentBlock as any}
           brandColors={theme}
         />
       );
@@ -277,7 +369,84 @@ function AppShellInner({
           onHidden={() => setBootLoading(false)}
         />
       )}
+      {initError && <InitErrorToast message={initError} brandColors={theme} />}
+      {confirmModal && (
+        <ConfirmModal
+          visible
+          onClose={() => setConfirmModal(null)}
+          onConfirm={confirmModal.onConfirm}
+          title={confirmModal.title}
+          description={confirmModal.description}
+          confirmLabel={confirmModal.confirmLabel}
+          destructive={confirmModal.destructive}
+          brandColors={theme}
+        />
+      )}
     </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Init error toast — slides down from the top, auto-dismisses after 6s.
+// ---------------------------------------------------------------------------
+
+const TOAST_DURATION = 6_000;
+const TOAST_SLIDE_MS = 300;
+
+function InitErrorToast({ message, brandColors }: { message: string; brandColors?: ThemeColorOverrides }) {
+  const insets = useSafeAreaInsets();
+  const deviceScheme = useColorScheme();
+  const mode: ThemeMode = deviceScheme === 'dark' ? 'dark' : 'light';
+  const tokens = getColorTokens(mode, brandColors);
+  const [visible, setVisible] = useState(true);
+  const translateY = useSharedValue(-120);
+
+  useEffect(() => {
+    // Slide in
+    translateY.value = withTiming(0, { duration: TOAST_SLIDE_MS, easing: Easing.out(Easing.cubic) });
+
+    // Auto-dismiss
+    const timer = setTimeout(() => dismiss(), TOAST_DURATION);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const dismiss = () => {
+    translateY.value = withTiming(
+      -120,
+      { duration: TOAST_SLIDE_MS, easing: Easing.in(Easing.cubic) },
+      (finished) => { if (finished) runOnJS(setVisible)(false); },
+    );
+  };
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  if (!visible) return null;
+
+  return (
+    <Animated.View
+      style={[
+        styles.toast,
+        {
+          top: insets.top + 8,
+          backgroundColor: tokens.card.hint.background,
+          borderColor: mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+        },
+        animatedStyle,
+      ]}
+      pointerEvents="box-none"
+    >
+      <Pressable onPress={dismiss} style={styles.toastContent}>
+        <Text style={[styles.toastTitle, { color: tokens.card.hint.text }]}>
+          Connection issue
+        </Text>
+        <Text style={[styles.toastMessage, { color: tokens.card.hint.text }]}>
+          {message}
+        </Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -287,5 +456,32 @@ const styles = StyleSheet.create({
   },
   shellWrapper: {
     flex: 1,
+  },
+  toast: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    borderRadius: layout.radiusCard,
+    borderWidth: 1,
+    overflow: 'hidden',
+    zIndex: 9999,
+    elevation: 24,
+  },
+  toastContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 2,
+  },
+  toastTitle: {
+    fontSize: 14,
+    fontFamily: fontFamily.semiBold,
+    fontWeight: '600',
+    includeFontPadding: false,
+  },
+  toastMessage: {
+    fontSize: 13,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
+    opacity: 0.8,
   },
 });

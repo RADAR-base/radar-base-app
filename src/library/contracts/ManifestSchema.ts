@@ -70,6 +70,19 @@ export const WidgetRegistryEntrySchema = z.object({
   module: z.string(),
 });
 
+export const EnrolmentStepSchema = z
+  .object({
+    type: z.string(),
+  })
+  .passthrough();
+
+export const EnrolmentSchema = z
+  .object({
+    privacyPolicyUrl: z.string().optional(),
+    steps: z.array(EnrolmentStepSchema).optional(),
+  })
+  .passthrough();
+
 export const ManifestSchema = z
   .object({
     appName: z.string(),
@@ -95,6 +108,7 @@ export const ManifestSchema = z
       })
       .passthrough()
       .optional(),
+    enrolment: EnrolmentSchema.optional(),
     login: z
       .object({
         /** Show the "Sign Up" button on the welcome card. Defaults to `true`. */
@@ -120,4 +134,6 @@ export type ThemeManifest = z.infer<typeof ThemeSchema>;
 export type HeaderManifest = z.infer<typeof HeaderSchema>;
 export type TabManifest = z.infer<typeof TabConfigSchema>;
 export type WidgetRegistryEntry = z.infer<typeof WidgetRegistryEntrySchema>;
+export type EnrolmentStep = z.infer<typeof EnrolmentStepSchema>;
+export type EnrolmentManifest = z.infer<typeof EnrolmentSchema>;
 export type AppManifest = z.infer<typeof ManifestSchema>;

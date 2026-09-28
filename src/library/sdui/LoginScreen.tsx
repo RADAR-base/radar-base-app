@@ -18,6 +18,7 @@ import {
   type ThemeMode,
 } from '../../theme/theme';
 import { useAuth } from '../../core/useAuth';
+import { useAuthService, useAnalyticsService, useRemoteConfigService } from '../../core/CoreServicesContext';
 import { useSlideOverlay } from './useSlideOverlay';
 
 import { GradientMeshBackground } from './GradientMeshBackground';
@@ -43,6 +44,9 @@ export function LoginScreen({
   showSignUp,
 }: LoginScreenProps) {
   const { status, error, startLogin, clearError, cancelLogin } = useAuth();
+  const authService = useAuthService();
+  const analyticsService = useAnalyticsService();
+  const remoteConfigService = useRemoteConfigService();
   const isAuthenticating = status === 'authenticating';
   const insets = useSafeAreaInsets();
   const [signUpOpen, setSignUpOpen] = useState(false);
@@ -66,12 +70,21 @@ export function LoginScreen({
   const meshTertiary = dark ? resolveBackground(themeObj, 'dark') : background;
   const meshFallback = dark ? resolveBackground(themeObj, 'dark') : '#482fc4';
 
-  const onPressLogin = async () => {
+  const onQrCodeScanned = async (data: string) => {
     if (error) clearError();
     try {
-      await startLogin();
+      // The QR code contains JSON with { url, refresh_token } (Ory format)
+      // or a URL string with query params (Management Portal format).
+      // AuthService.authenticate() handles both.
+      let credentials: string | Record<string, any>;
+      try {
+        credentials = JSON.parse(data);
+      } catch {
+        credentials = data;
+      }
+      await authService.authenticate(credentials);
     } catch {
-      // useAuth already mirrors the error into state via EventBus; nothing more to do here.
+      // Error state is emitted by AuthService via EventBus.
     }
   };
 
@@ -115,9 +128,24 @@ export function LoginScreen({
       <StudyNameModal
         visible={loginIdOpen}
         onClose={() => setLoginIdOpen(false)}
-        onSubmit={() => {
+        onSubmit={async (studyName) => {
           setLoginIdOpen(false);
-          void onPressLogin();
+          if (error) clearError();
+          try {
+            // 1. Set study code as Firebase Analytics user property
+            await analyticsService.setUserProperties({ studyCode: studyName });
+            // 2. Fetch remote config (may contain study-specific platform_url)
+            const remoteConfig = await remoteConfigService.forceFetch();
+            // 3. Resolve platform URL — remote config overrides manifest default
+            const platformUrl = remoteConfig.getOrDefault('platform_url', '');
+            if (platformUrl) {
+              authService.setEndpoint(platformUrl);
+            }
+            // 4. Start OAuth login flow
+            await startLogin();
+          } catch {
+            // Errors are emitted via EventBus and mirrored into useAuth state.
+          }
         }}
         title="Enter Study ID"
         description={`We'll take you to the right login portal, where you can sign in with your email and password.`}
@@ -131,6 +159,7 @@ export function LoginScreen({
           <RegistrationFlow
             onExit={enrolment.close}
             onEnterLoginDetails={() => setLoginIdOpen(true)}
+            onQrCodeScanned={onQrCodeScanned}
             onResetLogin={cancelLogin}
             isAuthenticating={isAuthenticating}
             brandColors={brandColors}

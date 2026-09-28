@@ -55,11 +55,17 @@ export function useAuth(): UseAuthResult {
     };
 
     const sub = Linking.addEventListener('url', handle);
-    Linking.getInitialURL()
-      .then(url => { if (url) handle({ url }); })
-      .catch(() => { });
+    // Delay getInitialURL slightly on cold start — the deep link arrives before
+    // services (storage) are fully initialised, causing the OAuth state lookup
+    // to miss.  The live `addEventListener` above will still catch it if the app
+    // was already running; this path only matters for cold-launch deep links.
+    const timer = setTimeout(() => {
+      Linking.getInitialURL()
+        .then(url => { if (url) handle({ url }); })
+        .catch(() => { });
+    }, 300);
 
-    return () => sub.remove();
+    return () => { sub.remove(); clearTimeout(timer); };
   }, [auth]);
 
   const startLogin = useCallback(async () => {

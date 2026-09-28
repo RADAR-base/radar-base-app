@@ -100,6 +100,7 @@ export {
   TextNode,
   ViewNode,
   GraphDataNode,
+  HealthKitNode,
 } from './nodes';
 
 // Questionnaire sub-components (for custom questionnaire UIs)

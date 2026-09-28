@@ -46,6 +46,7 @@ export function ViewNode({ node, context, render }: NodeProps) {
     : undefined;
 
   const children = asNodeArray(node.children);
+  const customGap = typeof node.gap === 'number' ? node.gap : undefined;
 
   return (
     <ScrollLockContext.Provider value={scrollLock}>
@@ -79,7 +80,9 @@ export function ViewNode({ node, context, render }: NodeProps) {
             <HeaderTextNode node={header.textNode} context={context} render={render} />
           </View>
         )}
-        <View style={styles.body}>{render(children)}</View>
+        <View style={[styles.body, customGap != null && { gap: customGap }]}>
+          {render(children)}
+        </View>
       </ScrollView>
     </ScrollLockContext.Provider>
   );

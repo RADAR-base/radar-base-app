@@ -20,19 +20,51 @@
     "notificationsViewPath": "views/secondary/notifications.json"
   },
   "tabs": [
-    { "id": "tab_home", "label": "Home", "icon": "home", "viewPath": "views/home.json" },
-    { "id": "tab_calendar", "label": "Calendar", "icon": "calendar", "viewPath": "views/calendar.json" },
-    { "id": "tab_profile", "label": "Profile", "icon": "person", "viewPath": "views/profile.json" }
+    {
+      "id": "tab_home",
+      "label": "Home",
+      "icon": "home",
+      "viewPath": "views/home.json"
+    },
+    {
+      "id": "tab_calendar",
+      "label": "Calendar",
+      "icon": "calendar",
+      "viewPath": "views/calendar.json"
+    },
+    {
+      "id": "tab_profile",
+      "label": "Profile",
+      "icon": "person",
+      "viewPath": "views/profile.json"
+    }
   ],
   "secondaryViews": {
     "daily_questionnaire": "views/secondary/questionnaire.json",
     "inbox_history": "views/secondary/inbox-history.json"
   },
   "widgetsRegistry": [
-    { "type": "CustomDemoNode", "module": "./CustomDemoNode" }
+    {
+      "type": "CustomDemoNode",
+      "module": "./CustomDemoNode"
+    }
   ],
   "roles": {
     "participant": "views/home.json"
+  },
+  "enrolment": {
+    "privacyPolicyUrl": "https://radar-base.org/active-app-armt-privacy-policy/",
+    "steps": [
+      {
+        "type": "enrolment_complete"
+      },
+      {
+        "type": "notifications"
+      },
+      {
+        "type": "connect_health"
+      }
+    ]
   },
   "auth": {
     "clientId": "aRMT",

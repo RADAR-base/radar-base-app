@@ -22,6 +22,8 @@ import {
   dataPipelineFactory,
   remoteConfigServiceFactory,
   audioRecordServiceFactory,
+  healthKitServiceFactory,
+  syncServiceFactory,
 } from './index';
 import type {
   DataService,
@@ -44,6 +46,8 @@ import type {
   QuestionnaireDataService,
   DataPipelineService,
   AudioRecordService,
+  HealthKitService,
+  SyncService,
   OAuthConfig,
 } from '../types';
 
@@ -68,6 +72,9 @@ export interface ServiceBag {
   dataPipeline: DataPipelineService;
   subjectConfig: SubjectConfigService;
   audioRecord: AudioRecordService;
+  healthKit: HealthKitService;
+  remoteConfig: RemoteConfigService;
+  sync: SyncService;
 }
 
 // ---------------------------------------------------------------------------
@@ -84,6 +91,9 @@ export interface ServiceOverrides {
   /** Provide a real audio recorder (e.g. `new ExpoAudioRecordService()`). Without it,
    *  speech questions degrade gracefully — phases and animations work, but nothing is captured. */
   audioRecord?: AudioRecordService;
+  /** Provide a HealthKit/Health Connect implementation. Without it, the connect-health
+   *  enrolment step is a no-op. */
+  healthKit?: HealthKitService;
 }
 
 // ---------------------------------------------------------------------------
@@ -176,6 +186,12 @@ export function createServices(overrides: ServiceOverrides = {}): ServiceBag {
   });
 
   const audioRecord = overrides.audioRecord ?? audioRecordServiceFactory({ logger });
+  const healthKit = overrides.healthKit ?? healthKitServiceFactory({ logger });
+
+  const sync = syncServiceFactory({ storage, logger });
+  // Register default sync steps — additional steps can be added via sync.register() at any time.
+  sync.register('cache', () => dataPipeline.flush().then(() => {}));
+  sync.register('schedule', () => schedule.fetchSchedule());
 
   // Wire the API layer's auth token provider so authenticated requests work automatically.
   apiService.setAuthTokenProvider(async () => {
@@ -189,6 +205,7 @@ export function createServices(overrides: ServiceOverrides = {}): ServiceBag {
   return {
     data: dataService, eventBus, api: apiService, appServer,
     token, analytics, cache, kafka, config, auth, notifications,
-    schedule, questionnaireData, dataPipeline, subjectConfig, audioRecord,
+    schedule, questionnaireData, dataPipeline, subjectConfig, audioRecord, healthKit,
+    remoteConfig, sync,
   };
 }

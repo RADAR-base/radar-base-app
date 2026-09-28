@@ -26,12 +26,16 @@ export { dataPipelineFactory, DefaultDataPipeline } from './pipeline';
 export { SchemaType, ConverterFactory } from './pipeline';
 export { audioRecordServiceFactory, DefaultAudioRecordService, ExpoAudioRecordService } from './AudioRecordService';
 export type { AudioRecordConfig } from './AudioRecordService';
+export { healthKitServiceFactory, DefaultHealthKitService, KingstinctHealthKitService } from './HealthKitService';
+export type { HealthKitServiceDeps, HealthKitConfig } from './HealthKitService';
 export {
   subjectConfigServiceFactory,
   ManagementPortalSubjectConfigService,
   subjectIdFromAccessToken,
 } from './SubjectConfigService';
 export type { ManagementPortalSubject } from './SubjectConfigService';
+export { syncServiceFactory, DefaultSyncService } from './SyncService';
+export type { SyncServiceDeps } from './SyncService';
 
 // Service container + lifecycle
 export { createServices } from './ServiceContainer';
@@ -50,5 +54,6 @@ export type {
   ScheduleService,
   QuestionnaireDataService,
   DataPipelineService,
+  SyncService,
   Subject,
 } from '../types';

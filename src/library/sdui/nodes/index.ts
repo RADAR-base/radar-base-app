@@ -28,6 +28,7 @@ import { SurveyTaskListNode } from './SurveyTaskListNode';
 import { TextNode } from './TextNode';
 import { ViewNode } from './ViewNode';
 import { GraphDataNode } from './GraphDataNode';
+import { HealthKitNode } from './HealthKitNode';
 
 /**
  * Idempotently register every built-in node type in the `NodeRegistry` singleton. The
@@ -67,6 +68,7 @@ export function registerBuiltInNodes(): void {
   registry.register('LineGraphCardNode', LineGraphCardNode);
   registry.register('GraphDataNode', GraphDataNode);
   registry.register('NotificationListNode', NotificationListNode);
+  registry.register('HealthKitNode', HealthKitNode);
 
   registered = true;
 }
@@ -100,4 +102,5 @@ export {
   TextNode,
   ViewNode,
   GraphDataNode,
+  HealthKitNode,
 };

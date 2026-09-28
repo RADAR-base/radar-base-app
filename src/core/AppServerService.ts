@@ -35,8 +35,10 @@ export class DefaultAppServerService implements IAppServerService {
       this.getFCMToken(),
     ]);
     await this.addProjectIfMissing(projectId);
-    // TODO: Temporary fcm token for dev testing
-    return this.addSubjectIfMissing(subjectId, projectId, enrolmentDate, attributes, fcmToken ?? "test-" + Math.random().toString(36).substring(2, 15));
+    // Real FCM token from Firebase Messaging; falls back to a random string on simulators
+    // or when @react-native-firebase/messaging is not installed.
+    const token = fcmToken ?? `test-${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+    return this.addSubjectIfMissing(subjectId, projectId, enrolmentDate, attributes, token);
   }
 
   private async getHeaders(): Promise<Record<string, string>> {

@@ -27,6 +27,7 @@ import type { NodeProps } from '../types';
 import { QuestionRenderer } from './questionnaire/QuestionRenderer';
 import { speechContent } from './questionnaire/speechContent';
 import { TaskCompletionScreen } from './questionnaire/TaskCompletionScreen';
+import { REQUIRED_MESSAGE } from './questionnaire/QuestionError';
 import type { SpeechPhase } from './questionnaire/SpeechInput';
 import { evaluateBranchingLogic } from './questionnaire/branchingLogic';
 import { PillButton } from '../PillButton';
@@ -406,7 +407,29 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
     }
   }, [questionnaireData, assessmentName, taskName, answers, timestamps, eventBus]);
 
+  /**
+   * Whether the participant has tried to leave this question. Inputs stay in their default state
+   * until then — being told an answer is wrong before you've finished giving it is just noise.
+   *
+   * Cleared on every move, so an error never follows them to the next question.
+   */
+  const [submitAttempt, setSubmitAttempt] = useState(0);
+  /** Set by the current input. A ref, not state: `goNext` only reads it when pressed. */
+  const answerValid = useRef(true);
+  const handleValidityChange = useCallback((valid: boolean) => {
+    answerValid.current = valid;
+  }, []);
+
   const goNext = useCallback(() => {
+    // Hold them here and show why, rather than carrying a bad answer forward.
+    if (!canProceed || !answerValid.current) {
+      // Counted, not flagged: pressing Next again on the same answer has to register as a fresh
+      // refusal so the field knocks again instead of sitting there looking inert.
+      setSubmitAttempt((n) => n + 1);
+      return;
+    }
+    setSubmitAttempt(0);
+    answerValid.current = true;
     // Stamp info/descriptive types (no user input) so every shown question has a timestamp.
     if (currentQuestion?.field_name && timestamps[currentQuestion.field_name] == null) {
       setTimestamps((prev) => ({
@@ -431,6 +454,8 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   }, [currentIndex, total, currentQuestion, timestamps, submitResult]);
 
   const goPrevious = useCallback(() => {
+    setSubmitAttempt(0);
+    answerValid.current = true;
     if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1);
       setSpeechPhase('idle'); // See `goNext` — the phase belongs to the question being left.
@@ -493,9 +518,37 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   // Required-field gate for the primary button (matches QuestionnaireNode).
   const isInfoType =
     currentQuestion?.field_type === 'info' || currentQuestion?.field_type === 'descriptive';
-  const hasAnswer = currentQuestion?.field_name ? answers[currentQuestion.field_name] != null : false;
-  const isRequired = currentQuestion?.required_field === 'y';
+  /**
+   * Whether this question has been answered at all.
+   *
+   * `!= null` alone counted an empty string: typing into a text field and deleting it again left `''`
+   * behind, which satisfied a required question without answering it. An empty multi-select array is
+   * the same story.
+   */
+  const hasAnswer = (() => {
+    if (!currentQuestion?.field_name) return false;
+    const answer = answers[currentQuestion.field_name];
+    if (answer == null) return false;
+    if (typeof answer === 'string') return answer.trim().length > 0;
+    if (Array.isArray(answer)) return answer.length > 0;
+    return true;
+  })();
+  /**
+   * Required unless the definition explicitly opts out, and never on a page with nothing to answer.
+   *
+   * The aRMT app's behaviour rather than REDCap's stricter reading: there, a blank or absent
+   * `required_field` still had to be answered, and only an explicit 'n' let a question be skipped.
+   * Definitions are shared between the two apps, so requiring an explicit 'y' here would quietly make
+   * every question optional in questionnaires written against the old rule.
+   *
+   * The `isInfoType` guard matters more under this default than it did under the old one: `info` and
+   * `descriptive` pages have nothing to answer, so without it every one of them would block Next
+   * forever rather than only the few a definition had mistakenly marked required.
+   */
+  const isRequired = !isInfoType && currentQuestion?.required_field !== 'n';
   const canProceed = !isRequired || hasAnswer || isInfoType;
+  /** Surfaced only once they've tried to leave — see `submitAttempt`. */
+  const requiredError = submitAttempt > 0 && !canProceed ? REQUIRED_MESSAGE : null;
 
   // The speech question owns its own progression (record → stop → "Continue"), so it never shows Next.
   // It keeps the back/exit button on the idle screen as an escape hatch, but drops the footer entirely
@@ -788,7 +841,7 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                           // Folds away once recording starts — see `CollapsibleHeading`.
                           <CollapsibleHeading
                             collapsed={isActive && speechPhase === 'recording'}
-                            text={questionTitle}
+                            text={questionTitle || ''}
                             textStyle={[styles.sectionHeader, { color: muted }]}
                           />
                         ) : (
@@ -827,6 +880,11 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                         onContinue={goNext}
                         onPhaseChange={isActive ? handleSpeechPhase : undefined}
                         allowReplay={allowReplay}
+                          // Only the active panel: a parked neighbour reporting its own validity
+                          // would overwrite the answer this screen is actually gating on.
+                          submitAttempt={isActive ? submitAttempt : 0}
+                          onValidityChange={isActive ? handleValidityChange : undefined}
+                          errorMessage={isActive ? requiredError : null}
                       />
                       {hideTitleHere ? (
                         <>
@@ -867,7 +925,9 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                 variant="primary"
                 label={isLast ? 'Finish' : 'Next'}
                 onPress={goNext}
-                disabled={!canProceed}
+                // Never disabled. `goNext` refuses instead, and the question says why — a greyed-out
+                // button leaves the participant tapping a dead control with nothing to work from, and
+                // is skipped by screen readers, so the reason never reaches them at all.
                 mode={mode}
                 brandColors={context.theme.brandColors}
               />

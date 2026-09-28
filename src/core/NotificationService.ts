@@ -102,6 +102,10 @@ export class DefaultNotificationService implements NotificationService {
     return this.pushToken;
   }
 
+  async requestPermission(): Promise<boolean> {
+    return true;
+  }
+
   // ---------------------------------------------------------------------------
   // Publish / cancel
   // ---------------------------------------------------------------------------
@@ -326,7 +330,6 @@ export class FirebaseNotificationService extends DefaultNotificationService {
   private cleanupHandlers: Array<() => void> = [];
 
   protected override async initPush(): Promise<void> {
-    const { Platform } = require('react-native');
     const msg = getMessaging();
 
     if (!msg) {
@@ -335,16 +338,18 @@ export class FirebaseNotificationService extends DefaultNotificationService {
     }
 
     try {
-      // iOS requires explicit permission
-      if (Platform.OS === 'ios') {
-        await msg.requestPermission();
-      }
-
-      // Acquire token
-      const token: string | null = await msg.getToken();
-      if (token) {
-        await this.setPushToken(token);
-        this.logger.log(`FCM token acquired: ${token.substring(0, 12)}…`);
+      // Try to acquire a token (works on Android without explicit permission,
+      // and on iOS only if permission was previously granted).
+      try {
+        const token: string | null = await msg.getToken();
+        if (token) {
+          await this.setPushToken(token);
+          this.logger.log(`FCM token acquired: ${token.substring(0, 12)}…`);
+        }
+      } catch {
+        // Expected on iOS before permission is granted — token will be acquired
+        // when requestPermission() is called from the enrolment flow.
+        this.logger.log('FCM token not available yet (permission not granted)');
       }
 
       // Token refresh
@@ -362,7 +367,34 @@ export class FirebaseNotificationService extends DefaultNotificationService {
         this.eventBus.emit('notifications.foreground_message', remoteMessage);
       });
     } catch (err) {
-      this.logger.log(`Firebase messaging init failed, using stored token fallback: ${err}`);
+      this.logger.log(`Firebase messaging init failed: ${err}`);
+    }
+  }
+
+  override async requestPermission(): Promise<boolean> {
+    const msg = getMessaging();
+    if (!msg) {
+      this.logger.log('Firebase messaging not available — cannot request notification permission');
+      return false;
+    }
+    try {
+      const authStatus = await msg.requestPermission();
+      this.logger.log(`Notification permission result: ${authStatus}`);
+      // Firebase returns 1 for AUTHORIZED, 2 for PROVISIONAL
+      const granted = authStatus === 1 || authStatus === 2;
+      if (granted) {
+        try {
+          const token: string | null = await msg.getToken();
+          if (token) await this.setPushToken(token);
+        } catch {
+          // Token acquisition can fail on simulator — permission is still granted
+          this.logger.log('FCM token acquisition failed after permission grant (expected on simulator)');
+        }
+      }
+      return granted;
+    } catch (err) {
+      this.logger.log(`Firebase notification permission request failed: ${err}`);
+      return false;
     }
   }
 
