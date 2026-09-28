@@ -147,6 +147,13 @@ export function StatCardNode({ node, context }: NodeProps) {
       style={[
         styles.card,
         size === 'large' ? styles.cardLarge : styles.cardSmall,
+        // A large card in a grid fills its column rather than stopping at `minHeight`.
+        //
+        // The column stretches to whatever is tallest across the grid, and a `DataWheelCardNode` is
+        // taller than this card's 195 (its ring alone is 142). Without this the stat card stops short
+        // and its bottom edge sits a few points above the wheel's beside it. Large only: two small
+        // cards sharing a column must keep their own 93 each, not split the column between them.
+        fillWidth && size === 'large' && styles.cardFill,
         {
           backgroundColor: tokens.card.background,
           width: fillWidth ? '100%' : 176,
@@ -199,6 +206,10 @@ const styles = StyleSheet.create({
   cardSmall: {
     minHeight: 93,
     justifyContent: 'space-between',
+  },
+  /** Grid-only — see the call site. `minHeight` above stays the floor when there is no slack. */
+  cardFill: {
+    flex: 1,
   },
   titleRow: {
     flexDirection: 'row',
