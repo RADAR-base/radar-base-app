@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useCoreServices } from '../../../../core/CoreServicesContext';
 import { EVENTS } from '../../../../core/EventBus';
-import type { TaskView as Task } from '../../../../types';
+import type { ScheduleService, Task as ScheduledTask, TaskView as Task } from '../../../../types';
 import { layout as layoutTokens } from '../../../../theme/theme';
 import { TaskCardNode, type TaskCardType } from '../card/TaskCardNode';
 import { normalizeTaskType } from '../card/taskTypes';
@@ -28,9 +28,54 @@ export interface TaskDayListProps {
   /** `singleCard` shows the first available task; `multiCard` shows the whole day. */
   variant: 'singleCard' | 'multiCard';
   filter?: FilterShape;
+  /**
+   * Which tasks belong on the list.
+   *
+   * `day` is every task scheduled for `date` — what the calendar wants, since it is showing that day.
+   * `open` also keeps anything carried over from an earlier day whose completion window has not run
+   * out yet, which is what home wants: a task scheduled on Monday with a three-day window is still
+   * the participant's to do on Wednesday, and by day it would simply vanish.
+   */
+  scope?: 'day' | 'open';
   /** Prefix for generated child node ids (React keys / ToDoStatus id). */
   idPrefix: string;
 }
+
+/**
+ * Every task that is still the participant's to do: scheduled for today, or carried over from an
+ * earlier day and not yet out of time.
+ *
+ * A carried-over task only counts while it can still be acted on — one left unfinished and since
+ * expired, or already done, has no business on today's list.
+ */
+async function loadOpenTasks(
+  schedule: ScheduleService,
+  dayStamp: number,
+): Promise<ScheduledTask[]> {
+  const dayStart = dayStamp;
+  const dayEnd = dayStamp + DAY_MS - 1;
+  const now = Date.now();
+  const instances = await schedule.getTasksForRange(
+    new Date(dayStart - OPEN_LOOKBACK_DAYS * DAY_MS),
+    new Date(dayEnd),
+  );
+  return instances.filter((task) => {
+    if (task.timestamp + task.completionWindow <= now) return false;
+    const scheduledToday = task.timestamp >= dayStart && task.timestamp <= dayEnd;
+    if (scheduledToday) return true;
+    return task.state === 'pending' || task.state === 'overdue';
+  });
+}
+
+/**
+ * How far back `open` looks for tasks still within their window.
+ *
+ * Only a bound on the query — what actually decides is each task's own `completionWindow`. Generous
+ * enough to cover any sane window without walking the whole schedule.
+ */
+const OPEN_LOOKBACK_DAYS = 30;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * The task list body shared by `TaskListSectionNode` (today, with section chrome) and `CalendarNode`
@@ -40,7 +85,14 @@ export interface TaskDayListProps {
  * `TaskCardNode`'s `taskType` comes from the assessment's declared `questionnaire.type`, falling back
  * to keyword-matching the title when the protocol doesn't declare one — see `inferTaskType`.
  */
-export function TaskDayList({ context, date, variant, filter = NO_FILTER, idPrefix }: TaskDayListProps) {
+export function TaskDayList({
+  context,
+  date,
+  variant,
+  filter = NO_FILTER,
+  scope = 'day',
+  idPrefix,
+}: TaskDayListProps) {
   const { schedule, eventBus } = useCoreServices();
 
   // Normalize to a start-of-day timestamp so the loader's deps are a stable primitive even when the
@@ -58,7 +110,10 @@ export function TaskDayList({ context, date, variant, filter = NO_FILTER, idPref
 
   const loadTasks = useCallback(async () => {
     try {
-      const instances = await schedule.getTasksForDate(new Date(dayStamp));
+      const instances =
+        scope === 'day'
+          ? await schedule.getTasksForDate(new Date(dayStamp))
+          : await loadOpenTasks(schedule, dayStamp);
       // `toTaskView` sets `isNew` (true until the user opens the task) — see `markTaskOpened`.
       const sduiTasks = instances.map((i) => schedule.toTaskView(i));
       setAllTasks(sduiTasks);
@@ -67,7 +122,7 @@ export function TaskDayList({ context, date, variant, filter = NO_FILTER, idPref
       setAllTasks([]);
       setTasks([]);
     }
-  }, [schedule, dayStamp, filter]);
+  }, [schedule, dayStamp, filter, scope]);
 
   useEffect(() => {
     loadTasks();
