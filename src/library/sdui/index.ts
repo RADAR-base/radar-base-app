@@ -10,12 +10,15 @@ export { AppShell } from './AppShell';
 export type { AppShellProps } from './AppShell';
 
 export { NodeRegistry } from './NodeRegistry';
-export type { NodeComponent, NodeProps, SDUIContext, TemplateContext, ActionPayload } from './types';
+export type {
+  NodeComponent,
+  NodeProps,
+  SDUIContext,
+  TemplateContext,
+  ActionPayload,
+} from './types';
 
-export {
-  ManifestLoader,
-  parseManifest,
-} from './ManifestLoader';
+export { ManifestLoader, parseManifest } from './ManifestLoader';
 export type { ManifestSource } from './ManifestLoader';
 
 export {
@@ -54,6 +57,7 @@ export type { StepFlow, StepDirection } from './useStepFlow';
 export { useSlideOverlay } from './useSlideOverlay';
 export { useTopInset } from './useTopInset';
 export { useBottomInset } from './useBottomInset';
+export { useStepHaptics } from './useStepHaptics';
 export { NotificationsScreen } from './NotificationsScreen';
 export type { NotificationsScreenProps } from './NotificationsScreen';
 export { ConnectHealthScreen } from './ConnectHealthScreen';
@@ -110,6 +114,8 @@ export {
   CheckboxInput,
   RangeInput,
   SliderInput,
+  VerticalSliderInput,
+  ScaleInput,
   TextQuestionInput,
   InfoScreen,
   SpeechInput,

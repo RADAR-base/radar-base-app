@@ -36,9 +36,21 @@ export { createAsyncStorageService } from './core/AsyncStorageService';
 export { apiService } from './core/ApiService';
 export { eventBus } from './core/EventBus';
 export { appServerServiceFactory } from './core/AppServerService';
-export { analyticsServiceFactory, DefaultAnalyticsService, FirebaseAnalyticsService } from './core/AnalyticsService';
-export { remoteConfigServiceFactory, DefaultRemoteConfigService, FirebaseRemoteConfigService } from './core/RemoteConfigService';
-export { notificationServiceFactory, DefaultNotificationService, FirebaseNotificationService } from './core/NotificationService';
+export {
+  analyticsServiceFactory,
+  DefaultAnalyticsService,
+  FirebaseAnalyticsService,
+} from './core/AnalyticsService';
+export {
+  remoteConfigServiceFactory,
+  DefaultRemoteConfigService,
+  FirebaseRemoteConfigService,
+} from './core/RemoteConfigService';
+export {
+  notificationServiceFactory,
+  DefaultNotificationService,
+  FirebaseNotificationService,
+} from './core/NotificationService';
 export { scheduleServiceFactory } from './core/AppserverScheduleService';
 export { questionnaireDataServiceFactory } from './core/QuestionnaireDataService';
 export { audioRecordServiceFactory, DefaultAudioRecordService, ExpoAudioRecordService } from './core/AudioRecordService';
@@ -98,6 +110,8 @@ export {
   CheckboxInput,
   RangeInput,
   SliderInput,
+  VerticalSliderInput,
+  ScaleInput,
   TextQuestionInput,
   TextInputField,
   HintCard,
@@ -109,6 +123,7 @@ export {
   useSlideOverlay,
   useTopInset,
   useBottomInset,
+  useStepHaptics,
   NotificationsScreen,
   ConnectHealthScreen,
   TaskInstructionsScreen,

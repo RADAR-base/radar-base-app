@@ -5,6 +5,7 @@ import type { Answer, Question, QuestionnaireResult, QuestionTimestamp } from '.
 import type { NodeProps } from '../types';
 import { QuestionRenderer } from './questionnaire/QuestionRenderer';
 import { evaluateBranchingLogic } from './questionnaire/branchingLogic';
+import { blocksProgress } from './questionnaire/questionGate';
 import { fontFamily, cardShadow, getColorTokens, withAlpha, layout as layoutTokens } from '../../../theme/theme';
 
 const ON_PRIMARY = '#FFFFFF';
@@ -166,10 +167,11 @@ export function QuestionnaireNode({ node, context }: NodeProps) {
     );
   }
 
-  const isInfoType = currentQuestion?.field_type === 'info' || currentQuestion?.field_type === 'descriptive';
   const hasAnswer = currentQuestion?.field_name ? answers[currentQuestion.field_name] != null : false;
-  const isRequired = currentQuestion?.required_field === 'y';
-  const canProceed = !isRequired || hasAnswer || isInfoType;
+  // Asked rather than spelled out here, so this card and the full-screen questionnaire can't drift
+  // apart on which types are exempt — which is how they came to disagree in the first place.
+  const isRequired = blocksProgress(currentQuestion) && currentQuestion?.required_field === 'y';
+  const canProceed = !isRequired || hasAnswer;
 
   return (
     <View style={containerStyle}>
