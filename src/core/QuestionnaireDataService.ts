@@ -139,6 +139,11 @@ export class DefaultQuestionnaireDataService implements QuestionnaireDataService
     this.logger.log(`Questionnaire submitted: ${result.assessmentName}`);
   }
 
+  async clear(): Promise<void> {
+    this.definitions.clear();
+    await this.storage.set(STORAGE_KEY, null);
+  }
+
   // ---------------------------------------------------------------------------
   // Private
   // ---------------------------------------------------------------------------

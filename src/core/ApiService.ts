@@ -57,6 +57,19 @@ class SimpleApiService implements ApiService {
     return parseBody<T>(res);
   }
 
+  async put<T = any>(path: string, body: unknown, options: RequestInit = {}): Promise<T> {
+    const authHeaders = await this.buildAuthHeaders();
+    const url = this.resolveUrl(path);
+    const res = await fetch(url, {
+      ...options,
+      method: 'PUT',
+      headers: { ...this.headers, ...authHeaders, ...(options.headers || {}) },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`PUT ${path} failed: ${res.status} ${res.statusText}`);
+    return parseBody<T>(res);
+  }
+
   /** If path is already an absolute URL, use it as-is; otherwise prepend baseUrl. */
   private resolveUrl(path: string): string {
     if (path.startsWith('http://') || path.startsWith('https://')) return path;

@@ -24,12 +24,18 @@ export { AppserverScheduleService, scheduleServiceFactory } from './AppserverSch
 export { questionnaireDataServiceFactory, DefaultQuestionnaireDataService } from './QuestionnaireDataService';
 export { dataPipelineFactory, DefaultDataPipeline } from './pipeline';
 export { SchemaType, ConverterFactory } from './pipeline';
+export { audioRecordServiceFactory, DefaultAudioRecordService, ExpoAudioRecordService } from './AudioRecordService';
+export type { AudioRecordConfig } from './AudioRecordService';
 export {
   subjectConfigServiceFactory,
   ManagementPortalSubjectConfigService,
   subjectIdFromAccessToken,
 } from './SubjectConfigService';
 export type { ManagementPortalSubject } from './SubjectConfigService';
+
+// Service container + lifecycle
+export { createServices } from './ServiceContainer';
+export type { ServiceBag, ServiceOverrides } from './ServiceContainer';
 
 // Re-export types for convenience
 export type {

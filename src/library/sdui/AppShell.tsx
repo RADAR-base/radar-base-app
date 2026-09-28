@@ -4,13 +4,15 @@ import { eventBus } from '../../core/EventBus';
 import { useAuth } from '../../core/useAuth';
 import {
   CoreServicesProvider,
-  useScheduleInit,
+  useServicesReady,
+  useSigningOut,
   useSubjectConfigService,
   type CoreServiceOverrides,
 } from '../../core/CoreServicesContext';
 import type { BlueprintSource } from './BlueprintLoader';
 import { createBundledBlueprintSource, createRemoteBlueprintSource } from './BlueprintLoader';
 import { NodeRegistry } from './NodeRegistry';
+import { registerBuiltInNodes } from './nodes';
 import type { NodeComponent } from './types';
 import { SDUIShell } from './SDUIShell';
 import { LoginScreen } from './LoginScreen';
@@ -67,14 +69,22 @@ export function AppShell({
     return () => { cancelled = true; };
   }, [manifestProp]);
 
-  // Register plugins with NodeRegistry
+  // Register built-in + custom nodes with NodeRegistry.
+  useMemo(() => {
+    registerBuiltInNodes();
+    if (plugins) {
+      const registry = NodeRegistry.getInstance();
+      for (const [type, component] of Object.entries(plugins)) {
+        registry.register(type, component);
+      }
+    }
+  }, [plugins]);
+
+  // Unregister custom plugins on unmount / plugins change
   useEffect(() => {
     if (!plugins) return;
-    const registry = NodeRegistry.getInstance();
-    for (const [type, component] of Object.entries(plugins)) {
-      registry.register(type, component);
-    }
     return () => {
+      const registry = NodeRegistry.getInstance();
       for (const type of Object.keys(plugins)) {
         registry.unregister(type);
       }
@@ -112,7 +122,8 @@ function AppShellInner({
 }) {
   const { status, logout } = useAuth();
   const subjectConfig = useSubjectConfigService();
-  const scheduleReady = useScheduleInit();
+  const servicesReady = useServicesReady();
+  const signingOut = useSigningOut();
 
   const appName = manifest.appName as string | undefined;
   const description = manifest.description as string | undefined;
@@ -147,7 +158,7 @@ function AppShellInner({
     return () => eventBus.off('auth.sign_out', handler);
   }, [logout]);
 
-  // Build template context from SubjectConfigService + manifest
+  // Build template context from SubjectConfigService + manifest.
   const [templateContext, setTemplateContext] = useState<Record<string, Record<string, unknown>>>({
     user: { firstName: 'User' },
     app: { version: version ?? '' },
@@ -177,26 +188,72 @@ function AppShellInner({
   // After a fresh authentication in THIS session, show the post-enrolment flow before
   // entering the app. Returning users who are already authenticated on launch skip it.
   const [enteredApp, setEnteredApp] = useState(false);
+  // Always show a loading screen after the post-enrolment flow so services
+  // (config, protocol, questionnaires, schedule) are guaranteed ready before
+  // the home page renders — even if they finished during onboarding.
+  const [postEnrolmentLoading, setPostEnrolmentLoading] = useState(false);
+  // Keeps the loading screen mounted through its exit animation after sign-out
+  // cleanup finishes — without this, the screen unmounts instantly when signingOut
+  // flips to false and the user sees a jarring cut to the welcome screen.
+  const [signOutLoading, setSignOutLoading] = useState(false);
+  useEffect(() => {
+    if (signingOut) setSignOutLoading(true);
+  }, [signingOut]);
   const sawAuthFlow = useRef(false);
   useEffect(() => {
     if (status === 'unauthenticated' || status === 'authenticating') {
       sawAuthFlow.current = true;
+      // Reset on sign-out so the next login goes through the full flow with fresh state.
+      setEnteredApp(false);
+      setPostEnrolmentLoading(false);
+      // signOutLoading is NOT reset here — it stays true until LoadingScreen's
+      // onHidden fires, ensuring the exit animation completes before LoginScreen.
+      setTemplateContext({
+        user: { firstName: 'User' },
+        app: { version: version ?? '' },
+      });
     }
-  }, [status]);
+  }, [status, version]);
 
   // Boot loading overlay
   const [bootLoading, setBootLoading] = useState(true);
 
   let content: React.ReactNode = null;
-  if (status === 'unauthenticated' || status === 'authenticating') {
+  if (signOutLoading) {
+    // Sign-out loading — visible while services tear down, then animates off.
+    // ready={!signingOut}: becomes ready once cleanup finishes, then LoadingScreen
+    // runs its min-duration + exit animation before calling onHidden.
+    content = (
+      <LoadingScreen
+        brandColors={theme}
+        ready={!signingOut}
+        onHidden={() => setSignOutLoading(false)}
+      />
+    );
+  } else if (status === 'unauthenticated' || status === 'authenticating') {
     content = (
       <LoginScreen brandColors={theme} appName={appName} description={description} showSignUp={showSignUp} />
     );
   } else if (status !== 'unknown') {
-    content =
-      sawAuthFlow.current && !enteredApp ? (
-        <PostEnrolmentFlow onDone={() => setEnteredApp(true)} brandColors={theme} />
-      ) : (
+    if (sawAuthFlow.current && !enteredApp) {
+      content = (
+        <PostEnrolmentFlow
+          onDone={() => { setEnteredApp(true); setPostEnrolmentLoading(true); }}
+          brandColors={theme}
+        />
+      );
+    } else if (!servicesReady || postEnrolmentLoading) {
+      // Core services (config, protocol, questionnaires, schedule) are still bootstrapping,
+      // or we just finished onboarding and need to confirm everything is ready.
+      content = (
+        <LoadingScreen
+          brandColors={theme}
+          ready={servicesReady}
+          onHidden={() => setPostEnrolmentLoading(false)}
+        />
+      );
+    } else {
+      content = (
         <View style={styles.shellWrapper}>
           <SDUIShell
             manifestSource={async () => manifest}
@@ -207,6 +264,7 @@ function AppShellInner({
           />
         </View>
       );
+    }
   }
 
   return (
@@ -215,7 +273,7 @@ function AppShellInner({
       {bootLoading && (
         <LoadingScreen
           brandColors={theme}
-          ready={status !== 'unknown' && (status === 'unauthenticated' || status === 'authenticating' || scheduleReady)}
+          ready={!signingOut && status !== 'unknown' && (status === 'unauthenticated' || status === 'authenticating' || servicesReady)}
           onHidden={() => setBootLoading(false)}
         />
       )}

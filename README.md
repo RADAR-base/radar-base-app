@@ -7,10 +7,11 @@ The repo root **is the library**. A runnable host template lives in [`starter-ki
 ```text
 radar-base-app/                 <- the library (publishable as @radarbase/app-kit)
 ├── src/                        <- library source (TypeScript)
-│   ├── core/                   <- services: ApiService, ConfigService, AuthService, EventBus, ...
+│   ├── core/                   <- services: Auth, Token, Analytics, RemoteConfig, Schedule, ...
 │   ├── library/
-│   │   ├── sdui/               <- SDUI engine: SDUIShell, NodeRegistry, loaders, built-in nodes
+│   │   ├── sdui/               <- SDUI engine: SDUIShell, AppShell, NodeRegistry, loaders, screens
 │   │   └── contracts/          <- Zod schemas + type-only public contracts
+│   ├── theme/                  <- design tokens, icons, font scaling
 │   └── index.ts                <- public API surface
 ├── lib/                        <- tsc build output (what consumers import)
 ├── starter-kit/                <- clone-and-rename host template (consumes the library)
@@ -22,12 +23,15 @@ radar-base-app/                 <- the library (publishable as @radarbase/app-ki
 
 ## Features
 
-- **SDUI engine**: `SDUIShell` consumes a manifest + per-screen blueprint JSON files and renders the UI through a node-tree walker (`NodeRenderer`) with per-node error isolation.
-- **Built-in nodes**: layout (`ViewNode`, `SectionNode`, `CardNode`), content (`TextNode`, `ActionNode`), feature (`SurveyTaskListNode`, `QuestionnaireNode`, `GraphDataNode`, `ConnectDevicesMenuNode`, `CalendarNode`), plus stubs for inbox / activity / alert nodes.
+- **SDUI engine**: `SDUIShell` / `AppShell` consumes a manifest + per-screen blueprint JSON files and renders the UI through a node-tree walker (`NodeRenderer`) with per-node error isolation.
+- **Built-in nodes**: layout, content, feature, and settings nodes — see [Built-in nodes](#built-in-nodes) below.
 - **Custom nodes**: register your own with `NodeRegistry.getInstance().register(...)`; nodes receive their blueprint slice, theme, dispatch, and template variables.
 - **Zod-validated configs**: `ManifestSchema`, `BlueprintSchema`, and `NodeSchema` guard every load.
 - **Pluggable loaders**: `ManifestLoader` and `BlueprintLoader` accept any async source (bundled JSON, remote fetch, hybrid) with primary + fallback strategies and in-memory caching.
-- **Core services**: `CoreServicesProvider` + `useCoreServices()` for `ApiService`, `ConfigService`, `AuthService`, `EventBus`, `DataService`, etc.
+- **Core services**: `CoreServicesProvider` + `useCoreServices()` — extensible service architecture with Firebase and no-op base implementations.
+- **Auth flow**: Built-in `LoginScreen`, `RegistrationFlow`, `PostEnrolmentFlow` — fully manifest-driven via the `auth` and `login` blocks.
+- **Task flow**: `TaskInstructionsScreen` → `QuestionnaireNode` → `TaskCompletionScreen` — driven by `ScheduleService` and protocol config.
+- **Extensible services**: Each service follows a base + Firebase subclass pattern (e.g. `DefaultAnalyticsService` / `FirebaseAnalyticsService`). Hosts can subclass or swap implementations.
 - **TypeScript-first**: full type definitions for the public surface.
 
 ## Installation (consumer)
@@ -39,10 +43,13 @@ npm install @radarbase/app-kit
 Peer dependencies (the host provides these — React Native projects already have most of them):
 
 - `react >=16.8`, `react-native >=0.60`
+- `react-native-reanimated`, `react-native-safe-area-context`, `react-native-svg`
 - Optional peers used by certain services / built-in nodes:
   - `@react-native-firebase/app`, `/analytics`, `/messaging`, `/remote-config`
   - `@react-native-async-storage/async-storage`
   - `react-native-keychain`
+  - `@shopify/react-native-skia` (for `GradientMeshBackground`)
+  - `expo-camera` (for `CameraScanScreen` QR scanning)
 
 ## Usage
 
@@ -50,10 +57,9 @@ Everything is imported from the package root. You should never reach into `lib/.
 
 ```tsx
 import {
-  SDUIShell,
+  AppShell,
   NodeRegistry,
-  CoreServicesProvider,
-  createBundledBlueprintSource,
+  createAsyncStorageService,
   useCoreServices,
   eventBus,
 } from '@radarbase/app-kit';
@@ -63,32 +69,22 @@ import type { NodeProps, CoreServiceOverrides } from '@radarbase/app-kit';
 ### Minimal host app
 
 ```tsx
-import React from 'react';
-import {
-  CoreServicesProvider,
-  SDUIShell,
-  createBundledBlueprintSource,
-} from '@radarbase/app-kit';
-import manifest from './config/app-manifest.json';
-import home from './config/views/home.json';
-import insights from './config/views/insights.json';
-
-const BUNDLED_BLUEPRINTS = {
-  'views/home.json': home,
-  'views/insights.json': insights,
-};
+import React, { useMemo } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AppShell, createAsyncStorageService } from '@radarbase/app-kit';
+import appConfig from './config';
 
 export default function App() {
+  const storage = useMemo(() => createAsyncStorageService(), []);
   return (
-    <CoreServicesProvider>
-      <SDUIShell
-        manifestSource={async () => manifest}
-        blueprintSource={createBundledBlueprintSource(BUNDLED_BLUEPRINTS)}
-      />
-    </CoreServicesProvider>
+    <SafeAreaProvider>
+      <AppShell manifest={appConfig} storage={storage} />
+    </SafeAreaProvider>
   );
 }
 ```
+
+The `manifest` object combines the `app-manifest.json` with a `blueprints` map of all bundled view JSON files — see the starter-kit's [`config/index.ts`](./starter-kit/config/index.ts) for the pattern.
 
 ### Consuming core services from anywhere
 
@@ -96,8 +92,8 @@ export default function App() {
 import { useCoreServices } from '@radarbase/app-kit';
 
 function MyNode() {
-  const { api, config, auth, eventBus } = useCoreServices();
-  // call api.get(...), config.get(...), auth.signIn(...), eventBus.emit(...)
+  const { api, config, auth, schedule, eventBus } = useCoreServices();
+  // call api.get(...), config.get(...), auth.isAuthenticated(), schedule.getUpcomingTasks()
 }
 ```
 
@@ -121,235 +117,138 @@ function MyCustomNode({ node, context }: NodeProps) {
 NodeRegistry.getInstance().register('MyCustomNode', MyCustomNode);
 ```
 
-Reference it from any blueprint by `"type": "MyCustomNode"` — the `NodeRenderer` will resolve and render it. Optionally declare it in your manifest's `widgetsRegistry` (discovery metadata for tooling; the component must still be registered in `NodeRegistry` at runtime):
-
-```json
-"widgetsRegistry": [
-  { "type": "MyCustomNode", "module": "./MyCustomNode" }
-]
-```
+Reference it from any blueprint by `"type": "MyCustomNode"` — the `NodeRenderer` will resolve and render it.
 
 ## Configuration
 
-The library is fully configuration-driven via the SDUI multi-file format. See [`docs/planning/SDUI_CONFIG_DESIGN.md`](./docs/planning/SDUI_CONFIG_DESIGN.md) for the full spec.
+The library is fully configuration-driven via the SDUI multi-file format.
 
-- **`app-manifest.json`** — lightweight entry point: app name, theme, header, tabs (each with a `viewPath` pointer), secondary views, custom node registry, alerts, roles, CMS endpoints.
+- **`app-manifest.json`** — lightweight entry point: app name, theme, header, tabs (each with a `viewPath` pointer), secondary views, custom node registry, auth config, login config, roles.
 - **`views/*.json`** — per-screen blueprints, each a `ScreenBlueprint` containing a node tree under `root`.
+
+### Manifest schema
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `appName` | string | Display name |
+| `description` | string | App description |
+| `version` | string | App version |
+| `theme` | object | `brandColors` (brand, accent, background) |
+| `header` | object | Dashboard header config (title, subtitle, settings/notifications paths) |
+| `tabs` | array | Tab definitions (`id`, `label`, `icon`, `viewPath`) |
+| `secondaryViews` | object | Named secondary view paths |
+| `widgetsRegistry` | array | Custom node type declarations |
+| `auth` | object | OAuth config (`clientId`, `endpoint`, `scopes`, `audience`, `redirectUri`, etc.) |
+| `login` | object | Login screen config (`showSignUp`) |
+| `roles` | object | Role-based view assignments |
 
 ### Loading strategies
 
-`ManifestLoader` and `BlueprintLoader` accept any async `() => Promise<unknown>` source, so hosts can plug in:
+`ManifestLoader` and `BlueprintLoader` accept any async `() => Promise<unknown>` source:
 
-- **Bundled JSON** — `createBundledBlueprintSource({ 'views/home.json': home, … })` for static imports (used by the starter kit today).
+- **Bundled JSON** — `createBundledBlueprintSource({ 'views/home.json': home, … })` for static imports.
 - **Remote fetch** — `async (path) => (await fetch(\`\${cdn}/\${path}\`)).json()` for OTA updates.
 - **Hybrid** — a primary `source` + `fallback` chain (e.g. remote → bundled offline copy).
 
 Validation against the Zod schemas runs on every load; invalid blueprints throw before they reach the renderer.
 
+## Core services
+
+All services are created and provided via `CoreServicesProvider`. Each follows an extensible base class + Firebase subclass pattern with auto-selecting factories.
+
+| Service | Base class | Firebase class | Factory |
+|---------|-----------|---------------|---------|
+| Analytics | `DefaultAnalyticsService` | `FirebaseAnalyticsService` | `analyticsServiceFactory` |
+| Remote Config | `DefaultRemoteConfigService` | `FirebaseRemoteConfigService` | `remoteConfigServiceFactory` |
+| Notifications | `DefaultNotificationService` | `FirebaseNotificationService` | `notificationServiceFactory` |
+| Token | `DefaultTokenService` | — | `tokenServiceFactory` |
+| Auth | `DefaultAuthService` | — | `authServiceFactory` |
+| Cache | `DefaultCacheService` | — | `cacheServiceFactory` |
+| Kafka | `DefaultKafkaService` | — | `kafkaServiceFactory` |
+| Config | `DefaultConfigService` | — | `configServiceFactory` |
+| Schedule | `AppserverScheduleService` | — | `scheduleServiceFactory` |
+| AppServer | `DefaultAppServerService` | — | `appServerServiceFactory` |
+| SubjectConfig | `ManagementPortalSubjectConfigService` | — | `subjectConfigServiceFactory` |
+| QuestionnaireData | `DefaultQuestionnaireDataService` | — | `questionnaireDataServiceFactory` |
+| DataPipeline | `DefaultDataPipeline` | — | `dataPipelineFactory` |
+
+Hosts can override services via `CoreServiceOverrides` (passed to `AppShell` or `CoreServicesProvider`):
+
+```tsx
+<AppShell
+  manifest={config}
+  storage={myStorageService}     // required for persistence
+  // Optional overrides:
+  // logger, localization, remoteConfig, subjectConfig
+/>
+```
+
+## Task flow
+
+The full task lifecycle, from schedule to completion:
+
+1. **Schedule** — `ScheduleService` fetches tasks from the AppServer, maps protocol `startText`/`endText` onto each task.
+2. **Task card** — `TaskListSectionNode` / `CalendarNode` renders tasks. Tapping emits `OPEN_TASK_INSTRUCTIONS`.
+3. **Instructions** — `TaskInstructionsScreen` slides in with the task's `startText` (or `description`), duration, question count, expiry.
+4. **Questionnaire** — `QuestionnaireNode` renders questions with branching logic, progress tracking, and per-question timestamps.
+5. **Completion** — `TaskCompletionScreen` shows a celebration with the task's `endText` (or a default message). Buttons: Home / Calendar.
+6. **Data pipeline** — `QuestionnaireDataService` submits results through `DataPipelineService` → `ConverterFactory` (ms → seconds) → `KafkaService`.
+
 ## Built-in nodes
 
-| Type                              | Purpose                                                                 |
-| --------------------------------- | ----------------------------------------------------------------------- |
-| `ViewNode`                        | Root scroll container for a screen                                      |
-| `SectionNode`                     | Logical grouping with an optional header                                |
-| `CardNode`                        | Elevated surface for a child cluster                                    |
-| `TextNode`                        | Static / interpolated text (`{{user.firstName}}` etc.)                  |
-| `ActionNode`                      | Tappable button — `OpenCustomView`, `Navigate`, `OpenExternalUrl`, `TriggerEvent` |
-| `SurveyTaskListNode`              | ePRO task list (`singleCard` / `multiCard` variants)                    |
-| `QuestionnaireNode`               | Inline or full-page questionnaire form                                  |
-| `GraphDataNode`                 | Single-metric chart (`mini` sparkline / `detailed` bar)                 |
-| `ConnectDevicesMenuNode`          | Wearable / sensor connection status                                     |
-| `CalendarNode`                    | Schedule of tasks / events (`calendar` / `agenda` variants)             |
-| `InboxItemListCoordinatorNode`    | Tabbed coordinator across multiple `InboxItemListNode`s                 |
-| `InboxItemListNode`               | Filtered inbox list (stub until data layer lands)                       |
-| `RelativeActivityTodayNode`       | Activity progress ring (stub demo data)                                 |
-| `AlertBannerNode`                 | Inline banner (`info` / `warning` / `critical`)                         |
-| `StatCardNode`                    | Engagement stat card (check-in / streak / active days)                  |
-| `TaskCardNode`                    | Single task pill (questionnaire / speech / physical / medication)       |
-| `ToDoStatusNode`                  | End-of-day status banner, derived from completed/total counts           |
-| `DataWheelCardNode`                | Circular progress ring for a wearable metric (`small` / `large`)        |
-| `ArcDataCardNode`                  | 180° gauge that fills by value, color derived from fill % (red/amber/green) |
-| `BarChartCardNode`                 | Seven-day bar chart with a dashed average line (`small` / `large`)      |
-| `LineGraphCardNode`                | Time-series line with a drag-to-scrub tooltip (`day` / `week` axis)     |
-| `CardSectionNode`                 | Generic titled card list — vertical, horizontal-scroll, or 2-col grid   |
-| `TaskListSectionNode`             | `ScheduleService`-driven task list, rendered as `TaskCardNode`s          |
-| `HeaderNode`                       | Dashboard header — logo/avatar, sync/notifications/settings, greeting   |
-| `NavbarNode`                       | Floating bottom tab bar, driven by the manifest's `tabs`                |
+| Type | Purpose |
+|------|---------|
+| **Layout** | |
+| `ViewNode` | Root scroll container for a screen |
+| `SectionNode` | Logical grouping with optional header + "See All" |
+| `CardNode` | Elevated surface for a child cluster |
+| `CardSectionNode` | Generic titled card list — vertical, horizontal-scroll, or 2-col grid |
+| **Content** | |
+| `TextNode` | Static / interpolated text (`{{user.firstName}}` etc.) |
+| `ActionNode` | Tappable button — `OpenCustomView`, `Navigate`, `OpenExternalUrl`, `TriggerEvent` |
+| **Task & Schedule** | |
+| `TaskListSectionNode` | `ScheduleService`-driven task list, rendered as `TaskCardNode`s |
+| `TaskCardNode` | Single task pill (questionnaire / speech / physical / medication) |
+| `ToDoStatusNode` | End-of-day status banner, derived from completed/total counts |
+| `CalendarNode` | Schedule of tasks / events (`calendar` / `agenda` variants) |
+| `SurveyTaskListNode` | ePRO task list (`singleCard` / `multiCard` variants) |
+| `QuestionnaireNode` | Full-page questionnaire form with branching logic |
+| **Data & Charts** | |
+| `StatCardNode` | Engagement stat card (check-in / streak / active days) |
+| `DataWheelCardNode` | Circular progress ring for a wearable metric |
+| `ArcDataCardNode` | 180° gauge that fills by value |
+| `BarChartCardNode` | Seven-day bar chart with a dashed average line |
+| `LineGraphCardNode` | Time-series line with drag-to-scrub tooltip |
+| `GraphDataNode` | Single-metric chart (`mini` sparkline / `detailed` bar) |
+| **Settings** | |
+| `SettingsRowNode` | Flexible settings row — 4 variants: `value`, `toggle`, `link`, `action` |
+| **Dashboard** | |
+| `HeaderNode` | Dashboard header — logo/avatar, sync/notifications/settings, greeting |
+| `NavbarNode` | Floating bottom tab bar, driven by the manifest's `tabs` |
+| **Other** | |
+| `ConnectDevicesMenuNode` | Wearable / sensor connection status |
+| `AlertBannerNode` | Inline banner (`info` / `warning` / `critical`) |
+| `InboxItemListCoordinatorNode` | Tabbed coordinator across multiple `InboxItemListNode`s |
+| `InboxItemListNode` | Filtered inbox list |
+| `RelativeActivityTodayNode` | Activity progress ring |
+| `NotificationListNode` | AppServer notification list (past/expired only) |
 
-### New node props
+## Screens (built-in)
 
-Every node also takes a `type` (the string it's registered under) and an optional `id`. The
-parameters below are set as sibling keys on the same node object in a blueprint. `—` in the
-Default column means the parameter is optional with no fallback.
-
-**Data-driven cards** (`DataWheelCardNode`, `ArcDataCardNode`, `BarChartCardNode`,
-`LineGraphCardNode`) resolve their numbers through `useDashboardData`: pass inline
-`value`/`values` to show real data, otherwise synthesized placeholder data is rendered so
-the card is never empty in previews. `metric` names the series so a future API/wearable
-fetch can target it.
-
-#### `StatCardNode` — engagement stat card
-
-| Parameter       | Type                                                              | Default          | Description                                                        |
-| --------------- | ---------------------------------------------------------------- | ---------------- | ----------------------------------------------------------------- |
-| `statsType`     | `checkIn` / `activeDays` / `currentStreak` / `longestStreak`      | `checkIn`        | Which engagement metric this card represents (sets default label). |
-| `size`          | `large` / `small`                                                 | `large`          | Card size variant.                                                |
-| `fillWidth`     | boolean                                                           | `false`          | Stretch to fill the parent cell instead of the fixed 176px width (for grid layouts). |
-| `value`         | string / number                                                   | `0`              | The stat value shown.                                             |
-| `label`         | string                                                            | per `statsType`  | Caption under the value.                                          |
-| `showKeepItUp`  | boolean                                                           | `true`           | Show the "Keep it up!" encouragement line.                       |
-| `keepItUpLabel` | string                                                            | `"Keep it up!"`  | Text for that line.                                              |
-
-#### `TaskCardNode` — single task pill
-
-| Parameter            | Type                                                     | Default        | Description                                                    |
-| -------------------- | -------------------------------------------------------- | -------------- | ------------------------------------------------------------- |
-| `taskType`           | `questionnaire` / `speech` / `physical` / `medication`   | `questionnaire`| Task category — drives the icon and which fields show.        |
-| `taskName`           | string                                                   | `"Task Name"`  | Task title.                                                   |
-| `time`               | string                                                   | `"9 AM"`       | Scheduled time label.                                         |
-| `expirationTime`     | string                                                   | `"24H 00M"`    | Countdown / expiry label.                                     |
-| `duration`           | string                                                   | `"10 min"`     | Estimated duration.                                           |
-| `questionNumber`     | string                                                   | `"x8"`         | Question-count badge (questionnaire).                        |
-| `medicationQuantity` | string                                                   | `"Quantity"`   | Quantity label (medication).                                 |
-| `medicationDose`     | string                                                   | `"Dose"`       | Dose label (medication).                                     |
-| `reminder`           | boolean                                                  | `false`        | Enable a reminder (only for task types that support one).    |
-| `reminderTime`       | string                                                   | `"12:00 PM"`   | Reminder time label.                                         |
-
-#### `ToDoStatusNode` — end-of-day status banner
-
-| Parameter   | Type   | Default | Description                                                              |
-| ----------- | ------ | ------- | ----------------------------------------------------------------------- |
-| `completed` | number | `0`     | Number of completed tasks.                                              |
-| `total`     | number | `0`     | Total tasks. The banner message/state is derived from these two counts. |
-
-#### `DataWheelCardNode` — circular progress ring
-
-| Parameter     | Type              | Default            | Description                                                   |
-| ------------- | ----------------- | ------------------ | ------------------------------------------------------------ |
-| `size`        | `small` / `large` | `small`            | Card size variant.                                           |
-| `title`       | string            | `"Title"`          | Card heading.                                               |
-| `description` | string            | `""`               | Sub-text (`large` only).                                    |
-| `value`       | number            | —                  | Single inline reading.                                      |
-| `values`      | number[]          | —                  | Inline series; the last entry is the current value (wins over `value`). |
-| `target`      | number (> 0)      | `100`              | Full-scale value; fill % = value ÷ target.                 |
-| `reverse`     | boolean           | `false`            | Flip the red/amber/green mapping for "less is better" metrics. |
-| `metric`      | string            | `"wearable_metric"`| Series id resolved via `useDashboardData`.                 |
-| `unit`        | string            | —                  | Unit label shown beside the value.                         |
-| `viewPath`    | string            | —                  | Blueprint opened via the arrow badge (`OpenCustomView`); badge disabled when omitted. |
-
-#### `ArcDataCardNode` — 180° gauge
-
-| Parameter  | Type              | Default            | Description                                                          |
-| ---------- | ----------------- | ------------------ | ------------------------------------------------------------------- |
-| `title`    | string            | `"Title"`          | Card heading.                                                      |
-| `value`    | number            | —                  | Single inline reading.                                             |
-| `values`   | number[]          | —                  | Inline series; the last entry is the gauge value (wins over `value`). |
-| `target`   | number (> 0)      | `100`              | Full-scale value; fill fraction = value ÷ target.                 |
-| `reverse`  | boolean           | `false`            | Flip the low→bad / high→good color mapping for "less is better" metrics. |
-| `metric`   | string            | `"wearable_metric"`| Series id resolved via `useDashboardData`.                        |
-| `unit`     | string            | —                  | Unit label rendered beside the value.                             |
-| `viewPath` | string            | —                  | Blueprint opened via the arrow badge (`OpenCustomView`).          |
-
-> The arc color (red / amber / green) is derived from the fill percentage, not passed as a prop.
-
-#### `BarChartCardNode` — seven-day bar chart
-
-| Parameter         | Type              | Default            | Description                                                        |
-| ----------------- | ----------------- | ------------------ | ----------------------------------------------------------------- |
-| `size`            | `small` / `large` | `small`            | `small` = square (bars above labels); `large` = bars beside a title/description block. |
-| `title`           | string            | `"Title"`          | Card heading.                                                    |
-| `description`     | string            | `""`               | Sub-text (`large` only).                                        |
-| `values`          | number[]          | —                  | Daily values; the last 7 form the week (Mon–Sun).               |
-| `currentDayIndex` | number (0–6)      | today              | Highlighted weekday column (0 = Mon … 6 = Sun). Pin it for fixed previews/reports. |
-| `metric`          | string            | `"wearable_metric"`| Series id resolved via `useDashboardData`.                      |
-| `unit`            | string            | —                  | Unit label.                                                     |
-| `viewPath`        | string            | —                  | Blueprint opened via the arrow badge (`OpenCustomView`).        |
-
-#### `LineGraphCardNode` — time-series line with drag-to-scrub
-
-| Parameter  | Type              | Default            | Description                                                            |
-| ---------- | ----------------- | ------------------ | --------------------------------------------------------------------- |
-| `title`    | string            | `"Title"`          | Card heading.                                                        |
-| `values`   | number[]          | —                  | The plotted series.                                                 |
-| `xAxis`    | `day` / `week`    | `day`              | Time granularity (hours-in-a-day vs days-in-a-week); drives labelling. |
-| `metric`   | string            | `"wearable_metric"`| Series id resolved via `useDashboardData`.                          |
-| `unit`     | string            | —                  | Unit shown in the scrub tooltip (falls back to `metric`).           |
-| `viewPath` | string            | —                  | Blueprint opened via the arrow badge (`OpenCustomView`).            |
-
-#### `SectionNode` — logical grouping with an optional "See All" header
-
-| Parameter      | Type                     | Default    | Description                                                             |
-| -------------- | ------------------------ | ---------- | ---------------------------------------------------------------------- |
-| `title`        | string                   | —          | Section heading (optional; the header row only renders with a title).  |
-| `showSeeAll`   | boolean                  | `false`    | Show a "See All" link next to the title.                              |
-| `seeAllTab`    | string                   | —          | A tab `id` — "See All" **switches to that primary tab** (full header, navbar highlights it). |
-| `seeAllAction` | string                   | —          | A blueprint path — "See All" **pushes it as a secondary view** (Back button, current tab kept). Used only when `seeAllTab` is absent. |
-| `layout`       | `vertical` / `horizontal`| `vertical` | How the children are arranged.                                         |
-| `children`     | node[]                   | `[]`       | Child nodes to render.                                                 |
-
-> **`seeAllTab` vs `seeAllAction`:** the "See All" handler checks `seeAllTab` **first** — if set, it
-> navigates to that tab and `seeAllAction` is ignored. To open a secondary/detail view instead, omit
-> `seeAllTab` and set `seeAllAction` to a bundled blueprint path (a key in the host's `blueprintSource`,
-> e.g. `"views/secondary/todo-all.json"`). This is distinct from `CardSectionNode` / `TaskListSectionNode`,
-> which have no tab option — their `viewPath` always opens a secondary view.
-
-#### `CardSectionNode` — generic titled card list
-
-| Parameter    | Type                              | Default    | Description                                     |
-| ------------ | --------------------------------- | ---------- | ----------------------------------------------- |
-| `title`      | string                            | —          | Section heading (optional).                     |
-| `showSeeAll` | boolean                           | `false`    | Show a "See All" link in the header.           |
-| `viewPath`   | string                            | —          | Blueprint the "See All" link opens, pushed as a secondary view (`OpenCustomView`). |
-| `layout`     | `vertical` / `horizontal` / `grid`| `vertical` | How the child cards are arranged.               |
-| `children`   | node[]                            | `[]`       | Child card nodes to render.                     |
-
-#### `TaskListSectionNode` — schedule-driven task list
-
-| Parameter    | Type                          | Default      | Description                                                    |
-| ------------ | ----------------------------- | ------------ | ------------------------------------------------------------- |
-| `title`      | string                        | —            | Section heading (optional).                                   |
-| `showSeeAll` | boolean                       | `false`      | Show a "See All" link.                                       |
-| `viewPath`   | string                        | —            | Blueprint the "See All" link opens, pushed as a secondary view (`OpenCustomView`). |
-| `variant`    | `singleCard` / `multiCard`    | `singleCard` | One card containing the tasks, or one card per task.         |
-| `filter`     | object `{ status, category }` | `{}`         | Filters which `ScheduleService` tasks are shown.             |
-
-#### `HeaderNode` — dashboard header
-
-| Parameter                | Type    | Default | Description                                              |
-| ------------------------ | ------- | ------- | ------------------------------------------------------- |
-| `title`                  | string  | —       | Greeting / title text.                                  |
-| `name`                   | string  | —       | User name (shown when `showName`).                      |
-| `showName`               | boolean | —       | Whether to render the name.                             |
-| `description`            | string  | —       | Sub-text under the title.                               |
-| `profileIcon`            | boolean | `true`  | Show the avatar (`true`) vs. the RadarBase logo.        |
-| `showActions`            | boolean | `true`  | Show the sync / notifications / settings buttons.       |
-| `lastSyncedLabel`        | string  | —       | "Last synced" caption.                                  |
-| `notificationCount`      | number  | —       | Badge count on the notifications button.                |
-| `showEditButton`         | boolean | —       | Show the edit button.                                   |
-| `editLabel`              | string  | —       | Edit button label.                                      |
-| `backgroundColor`        | string  | theme   | Header background color override.                       |
-| `textColor`              | string  | theme   | Title / name text color override.                       |
-| `descriptionColor`       | string  | theme   | Description text color override.                        |
-| `buttonBackgroundColor`  | string  | theme   | Action-button background override.                      |
-| `buttonIconColor`        | string  | theme   | Action-button icon / text color override.               |
-| `syncEventName` · `notificationsEventName` · `settingsEventName` · `editEventName` | string | — | EventBus event names emitted when those buttons are tapped. |
-
-#### `NavbarNode` — floating bottom tab bar
-
-| Parameter                 | Type    | Default  | Description                                                     |
-| ------------------------- | ------- | -------- | -------------------------------------------------------------- |
-| `tabs`                    | tab[]   | manifest | Tab definitions — usually sourced from the manifest's `tabs`, not hand-written per screen. |
-| `selectedTabId`           | string  | —        | Which tab `id` is active.                                      |
-| `showLabels`              | boolean | `true`   | Show the tab text labels.                                      |
-| `backgroundColor`         | string  | theme    | Bar background override.                                       |
-| `selectedBackgroundColor` | string  | theme    | Active-tab background override.                                |
-| `textColor`               | string  | theme    | Inactive-tab text / icon color override.                       |
-| `selectedTextColor`       | string  | theme    | Active-tab text / icon color override.                         |
-| `borderColor`             | string  | theme    | Bar border color override.                                     |
+| Screen | Purpose |
+|--------|---------|
+| `LoginScreen` | Login / sign-up gate with `WelcomeCard` (configurable via `login.showSignUp`) |
+| `RegistrationFlow` | QR scan or manual enrolment |
+| `PostEnrolmentFlow` | Post-login onboarding (notifications, health connect) |
+| `TaskInstructionsScreen` | Pre-task briefing with task details and illustration |
+| `TaskCompletionScreen` | Post-task celebration with Home/Calendar navigation |
+| `NotificationsScreen` | AppServer notifications (fetched, filtered to past only) |
+| `ConnectHealthScreen` | Apple Health / Health Connect permission flow |
+| `InfoScreen` | Generic information screen |
+| `LoadingScreen` | Loading state with animated dots |
+| `CameraScanScreen` | QR code scanner for enrolment |
 
 ## Development
-
-The repo is laid out as a library + a sibling consumer app for fast feedback.
 
 ```bash
 ./scripts/dev.sh install     # install library + starter-kit deps
@@ -362,22 +261,21 @@ The repo is laid out as a library + a sibling consumer app for fast feedback.
 Equivalent npm scripts at the repo root:
 
 ```bash
-npm run build        # tsc
+npm run build        # tsc + copy assets
 npm run typecheck    # tsc --noEmit
 npm run clean        # rm -rf lib
-npm run prepublishOnly  # clean + build (runs automatically on `npm publish`)
 ```
 
 ### Editing the library
 
 1. Edit files under `src/`.
 2. Run `npm run build` at the repo root to refresh `lib/`.
-3. The `starter-kit/` pins `"@radarbase/app-kit": "^1.0.0"`. While the library is unpublished, point the starter at the workspace via either `"@radarbase/app-kit": "file:../"` (temporary edit, don't commit) or `npm link` — see [`starter-kit/README.md`](./starter-kit/README.md#local-library-development).
+3. The starter-kit consumes the library via `"file:../"` — changes are picked up after a rebuild.
 
 ### Editing the starter-kit
 
-1. `cd starter-kit && npm start` (or `./scripts/dev.sh starter` from root).
-2. Edit `starter-kit/App.tsx` and `starter-kit/config/**/*.json` to experiment with manifests, blueprints, and custom nodes.
+1. `cd starter-kit && npx expo start` (or `./scripts/dev.sh starter`).
+2. Edit `starter-kit/App.tsx` and `starter-kit/config/**/*.json`.
 
 ## Publishing
 
@@ -394,7 +292,3 @@ MIT — see [LICENSE](./LICENSE).
 3. Make your changes under `src/` and add a usage example in `starter-kit/` if relevant.
 4. Run `npm run typecheck` and `npm run build` at the repo root before opening a PR.
 5. Submit a pull request.
-
-## Support
-
-For questions and support, please open an issue on GitHub.

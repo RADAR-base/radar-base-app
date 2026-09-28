@@ -94,7 +94,10 @@ export function TaskInstructionsScreen({
   const resolvedMode: ThemeMode = mode ?? (deviceScheme === 'dark' ? 'dark' : 'light');
   const tokens = getColorTokens(resolvedMode, brandColors);
   const topInset = useTopInset();
-  const bottomInset = useBottomInset(16); // clear the home indicator / gesture bar + the design's 16px gap
+  // Just the home indicator / gesture bar. No extra gutter on top: the safe-area inset is already
+  // ~34pt on a notched phone, and adding the design's 16 to it left the buttons floating well clear
+  // of the edge. Raise this if a device with no inset (older phones, some Android) looks too tight.
+  const bottomInset = useBottomInset();
 
   // Same per-type palette as the home task card (`TYPE_COLORS`): solid `badge`, light `pillBg`, `accent`.
   const c = TYPE_COLORS[taskType];

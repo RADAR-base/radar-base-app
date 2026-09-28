@@ -52,7 +52,7 @@ class AssessmentConverter implements Converter {
   ): any[] {
     return Object.entries(answers).map(([key, value]) => ({
       questionId: key,
-      value: String(value),
+      value: serializeAnswerValue(value),
       startTime: timestamps[key]?.startTime ? getSeconds(timestamps[key].startTime) : 0,
       endTime: timestamps[key]?.endTime ? getSeconds(timestamps[key].endTime) : 0,
     }));
@@ -64,6 +64,25 @@ class AssessmentConverter implements Converter {
     }
     return this.GENERAL_TOPIC;
   }
+}
+
+/**
+ * Serialize an answer value to a Kafka-safe string.
+ *
+ * Most answers are primitives that `String()` handles fine. Speech recordings are objects
+ * with a `base64Data` field — those serialize as a data URI (`data:<mime>;base64,<data>`)
+ * matching the format RADAR-Questionnaire's `AudioRecordService.getFormattedAudioData()`
+ * produced.
+ */
+function serializeAnswerValue(value: any): string {
+  if (value == null) return '';
+  // SpeechRecording with captured audio → data URI
+  if (typeof value === 'object' && value.base64Data) {
+    return `data:${value.mimeType || 'audio/m4a'};base64,${value.base64Data}`;
+  }
+  // Safety net for other objects (shouldn't happen, but avoids "[object Object]")
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
 }
 
 // ---------------------------------------------------------------------------

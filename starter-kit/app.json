@@ -9,23 +9,29 @@
     "newArchEnabled": true,
     "plugins": [
       "expo-font",
+      "expo-audio",
       "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
       [
         "expo-build-properties",
         {
           "ios": {
             "useFrameworks": "static",
-            "privacyManifestAggregationEnabled": false
+            "privacyManifestAggregationEnabled": false,
+            "deploymentTarget": "16.4"
           }
         }
-      ],
-      "./plugins/withPodBuildSettings"
+      ]
     ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "org.radarbase.starter",
       "scheme": "com.radarbase.starter",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "deploymentTarget": "16.4",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "This app requires microphone access to record audio messages."
+      }
     },
     "android": {
       "edgeToEdgeEnabled": true,
