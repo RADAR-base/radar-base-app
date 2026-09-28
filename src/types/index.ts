@@ -324,10 +324,15 @@ export interface AuthService {
   completeAuthentication(refreshToken: string, baseUrl: string, tokenEndpoint: string, accessToken?: string): Promise<TokenPair>;
   reset(): Promise<void>;
   isAuthenticated(): Promise<boolean>;
+  /** Override the OAuth endpoint at runtime (e.g. from Firebase Remote Config's `platform_url`). */
+  setEndpoint(url: string): void;
 }
 
 export interface AnalyticsService {
   init(): Promise<void>;
+  /** Pull participant identity + attributes from SubjectConfigService and set them as
+   *  analytics user properties. Called once after subject registration during post-auth init. */
+  initUserContext(subjectConfig: SubjectConfigService): Promise<void>;
   logEvent(eventName: string, parameters?: Record<string, any>): Promise<void>;
   setUserProperties(properties: Record<string, any>): Promise<void>;
   setUserId(userId: string): Promise<void>;
@@ -348,6 +353,8 @@ export interface NotificationService {
   cancelSingleNotification(user: Subject, notificationId: string | number): Promise<any>;
   /** Returns the current FCM token, or null if unavailable. */
   getFCMToken(): Promise<string | null>;
+  /** Requests OS notification permission. Returns true if granted. */
+  requestPermission(): Promise<boolean>;
 }
 
 export enum NotificationActionType {
@@ -361,6 +368,13 @@ export enum NotificationActionType {
 export interface Subject {
   subjectId: string;
   projectId: string;
+}
+
+export interface HealthKitService {
+  /** Requests HealthKit (iOS) / Health Connect (Android) permissions. Returns true if granted. */
+  requestPermission(): Promise<boolean>;
+  /** Whether permissions have been granted. */
+  isAuthorized(): Promise<boolean>;
 }
 
 export interface CacheService {
@@ -589,6 +603,20 @@ export interface AudioRecordService {
   stopPlayback(): Promise<void>;
   /** Release all native resources (recorder + player). */
   destroy(): Promise<void>;
+}
+
+export interface SyncResult {
+  success: boolean;
+  partial: boolean;
+  lastSyncedAt: Date;
+  failures: string[];
+}
+
+export interface SyncService {
+  register(name: string, step: () => Promise<void>): void;
+  unregister(name: string): void;
+  sync(): Promise<SyncResult>;
+  getLastSyncedAt(): Date | null;
 }
 
 export interface DataPipelineService {

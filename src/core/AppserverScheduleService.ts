@@ -183,9 +183,7 @@ export class AppserverScheduleService extends ScheduleServiceBase {
         );
         return Promise.race([fetchFromServer, timeout]);
       });
-      // TODO: remove once server-side duplicate issue is fixed
-      const deduped = deduplicateTasks(fetched);
-      this.tasks = mergeWithServer(this.tasks, deduped);
+      this.tasks = mergeWithServer(this.tasks, fetched);
       console.log(
         `[AppserverScheduleService] fetchSchedule: ${fetched.length} task(s) fetched`,
       );
@@ -263,16 +261,6 @@ function mapServerTask(task: any, assessments: Map<string, AssessmentConfig>): T
  * if the server hasn't caught up yet (async sync race).
  */
 /** Workaround: server sometimes returns duplicate entries for the same task. Remove once fixed. */
-function deduplicateTasks(tasks: Task[]): Task[] {
-  const seen = new Set<string>();
-  return tasks.filter(t => {
-    const key = `${t.name}:${t.timestamp}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
 function mergeWithServer(existing: Task[], fetched: Task[]): Task[] {
   const existingMap = new Map(existing.map(t => [t.id, t]));
 

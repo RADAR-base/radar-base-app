@@ -11,12 +11,10 @@ import BellIcon from '../../../../theme/icons/bell.svg';
 import SettingsIcon from '../../../../theme/icons/settings.svg';
 import { tracking, fontFamily, getColorTokens, headerLayout } from '../../../../theme/theme';
 import { useUnreadNotificationCount } from '../../useNotifications';
+import { useSyncService } from '../../../../core/CoreServicesContext';
 import type { NodeProps } from '../../types';
 
-// Shown before the first manual sync this session; pressing sync replaces it with the real time.
-const DEFAULT_LAST_SYNCED = 'Last Synced: 12:00';
-
-/** "Last Synced: HH:MM" for the given time, zero-padded to match the placeholder's format. */
+/** "Last Synced: HH:MM" for the given time, zero-padded. */
 function syncLabelFor(date: Date): string {
   const hh = date.getHours().toString().padStart(2, '0');
   const mm = date.getMinutes().toString().padStart(2, '0');
@@ -64,23 +62,29 @@ export function HeaderBarNode({ node, context }: NodeProps) {
       ? context.dispatch({ type: 'OpenCustomView', viewUrl: viewPath })
       : dispatch(eventName);
 
-  // Sync affordance: the icon spins on press and the label stamps the press time. State is
-  // per-header-instance for now — a shared sync service should own the real "last synced" time
-  // once the wearable fetch below is wired.
-  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
-  const lastSyncedText = lastSyncedAt ? syncLabelFor(lastSyncedAt) : DEFAULT_LAST_SYNCED;
+  const syncService = useSyncService();
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(
+    () => syncService.getLastSyncedAt(),
+  );
+  const [syncing, setSyncing] = useState(false);
+  const lastSyncedText = lastSyncedAt ? syncLabelFor(lastSyncedAt) : 'Last Sync';
   const syncSpin = useSharedValue(0);
   const syncSpinStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${syncSpin.value}deg` }] }));
 
-  const handleSync = () => {
-    // One full turn per press. (When the real async fetch is wired, loop this until it resolves.)
+  const handleSync = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    // Spin continuously until sync completes.
     syncSpin.value = withTiming(syncSpin.value - 360, {
       duration: 600,
       easing: Easing.inOut(Easing.ease),
     });
-    setLastSyncedAt(new Date());
-    // TODO: trigger the wearable-data fetch from the server here, then set the label from the real
-    // sync-completion time instead of the press time.
+    try {
+      const result = await syncService.sync();
+      setLastSyncedAt(result.lastSyncedAt);
+    } finally {
+      setSyncing(false);
+    }
     dispatch(typeof node.syncEventName === 'string' ? node.syncEventName : 'HeaderSync');
   };
 

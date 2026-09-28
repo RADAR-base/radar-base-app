@@ -10,8 +10,21 @@
     "plugins": [
       "expo-font",
       "expo-audio",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "This app uses the camera to scan QR codes for study enrolment."
+        }
+      ],
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "This app reads your health data to track study metrics.",
+          "NSHealthUpdateUsageDescription": "This app writes health data related to your study participation."
+        }
+      ],
       [
         "expo-build-properties",
         {
@@ -31,7 +44,8 @@
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "This app requires microphone access to record audio messages."
-      }
+      },
+      "appleTeamId": "J7SH7ST98B"
     },
     "android": {
       "edgeToEdgeEnabled": true,
@@ -52,6 +66,12 @@
             "DEFAULT"
           ]
         }
+      ],
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ]
     },
     "web": {
