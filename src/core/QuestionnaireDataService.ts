@@ -13,6 +13,7 @@ import type {
 } from '../types';
 import { EVENTS } from './EventBus';
 import { SchemaType } from './pipeline';
+import { repairUtf8, repairUtf8Deep } from './utf8';
 
 const STORAGE_KEY = '@radarbase/questionnaire_definitions';
 const DEFAULT_QUESTIONNAIRE_TYPE = '_armt';
@@ -185,7 +186,9 @@ export class DefaultQuestionnaireDataService implements QuestionnaireDataService
   private async fetchDirectFromGithub(githubUrl: string): Promise<any> {
     const response = await fetch(githubUrl);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return response.json();
+    // Not `response.json()`: that decodes with the response's charset, and raw GitHub content comes
+    // back without one, so iOS reads UTF-8 as Latin-1 — see `repairUtf8`.
+    return JSON.parse(repairUtf8(await response.text()));
   }
 
   private async persist(): Promise<void> {
@@ -205,8 +208,9 @@ export class DefaultQuestionnaireDataService implements QuestionnaireDataService
 function parseGithubContent(data: any): Question[] {
   // GitHub API returns { content: base64, encoding: 'base64' }
   if (data.content && data.encoding === 'base64') {
-    const decoded = atob(data.content.replace(/\n/g, ''));
-    return JSON.parse(decoded) as Question[];
+    // `decodeBase64Utf8`, not bare `atob`: see the note on that function. `atob` hands back one
+    // character per byte, so every curly quote and dash in the study's copy arrives in pieces.
+    return JSON.parse(decodeBase64Utf8(data.content)) as Question[];
   }
   // Direct JSON array (raw content or appserver proxy)
   if (Array.isArray(data)) return data as Question[];
