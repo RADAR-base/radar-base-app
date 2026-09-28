@@ -214,30 +214,9 @@ export function QuestionRenderer({
 
     switch (question.field_type) {
       case 'radio': {
-        const radioChoices = parseChoices(question.select_choices_or_calculations);
-        // An ordered run of degrees is a scale, and reads better as one — see `matchLikertScale`,
-        // which decides that from the labels because the definitions carry no field saying so.
-        // Anything it doesn't recognise stays the list it has always been.
-        const likert = matchLikertScale(radioChoices);
-        if (likert) {
-          return (
-            <LikertSliderInput
-              choices={radioChoices}
-              value={value != null ? String(value) : undefined}
-              onChange={onChange}
-              primaryColor={primaryColor}
-              textColor={textColor}
-              accentColor={radioAccent}
-              surfaceColor={radioSurface}
-              backgroundColor={backgroundColor}
-              positiveEnd={likert.positiveEnd}
-              onScrollLock={onScrollLock}
-            />
-          );
-        }
         return (
           <RadioInput
-            choices={radioChoices}
+            choices={parseChoices(question.select_choices_or_calculations)}
             value={value != null ? String(value) : undefined}
             onChange={onChange}
             accentColor={radioAccent}
@@ -246,6 +225,25 @@ export function QuestionRenderer({
           />
         );
       }
+
+      case 'likert-emoji': {
+        const likert = matchLikertScale(parseChoices(question.select_choices_or_calculations));
+        return (
+          <LikertSliderInput
+            choices={parseChoices(question.select_choices_or_calculations)}
+            value={value != null ? String(value) : undefined}
+            onChange={onChange}
+            primaryColor={primaryColor}
+            textColor={textColor}
+            accentColor={radioAccent}
+            surfaceColor={radioSurface}
+            backgroundColor={backgroundColor}
+            positiveEnd={likert?.positiveEnd ?? 'last'}
+            onScrollLock={onScrollLock}
+          />
+        );
+      }
+
 
       case 'checkbox':
         return (
