@@ -107,6 +107,7 @@ export {
   HealthKitNode,
   RadioInput,
   CheckboxInput,
+  MatrixRadioRows,
   RangeInput,
   SliderInput,
   VerticalSliderInput,
