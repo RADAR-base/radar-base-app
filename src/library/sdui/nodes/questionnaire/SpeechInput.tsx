@@ -17,6 +17,7 @@ import { useCoreServices } from '../../../../core/CoreServicesContext';
 import MicIcon from '../../../../theme/icons/mic.svg';
 import ReRecordIcon from '../../../../theme/icons/rerecord.svg';
 import {
+  alertRed,
   fontFamily,
   tracking,
   layout as layoutTokens,
@@ -48,9 +49,8 @@ export interface SpeechRecording {
   levels?: number[];
 }
 
-/** Recording red — a fixed semantic (design `#E84855`, the palette's red400 / `button.error`). It is
- *  deliberately NOT brand-tinted: "recording" should read the same in every study's theme. */
-const RECORD_RED = '#E84855';
+/** Recording red — the app's fixed alert red. Not brand-tinted: "live" reads the same everywhere. */
+const RECORD_RED = alertRed;
 
 /**
  * The read-aloud passage card, drawn in the manifest's accent — the same fill a selected radio

@@ -28,7 +28,8 @@ import {
 } from './questionnaire/SpeechPanel';
 import { matrixPageTitle, toQuestionPages } from './questionnaire/matrixGroups';
 import { panelBehaviour } from './questionnaire/panelBehaviour';
-import { REQUIRED_MESSAGE } from './questionnaire/QuestionError';
+import { EdgeFade, FADE_HEIGHT } from './questionnaire/EdgeFade';
+import { QuestionError, REQUIRED_MESSAGE } from './questionnaire/QuestionError';
 import type { SpeechPhase } from './questionnaire/SpeechInput';
 import { evaluateBranchingLogic } from './questionnaire/branchingLogic';
 import { blocksProgress } from './questionnaire/questionGate';
@@ -36,7 +37,17 @@ import { PillButton } from '../PillButton';
 import { useTopInset } from '../useTopInset';
 import { useBottomInset } from '../useBottomInset';
 import { useLocalMetric } from '../useLocalMetric';
+import { refusalHaptic } from '../useStepHaptics';
 import { StepSlider } from '../StepSlider';
+
+/**
+ * What an explainer is worth on the progress bar, against 1 for a page with something to answer.
+ *
+ * Low enough that a run of preamble can't look like real progress, high enough that the bar still
+ * visibly moves when one is dismissed. Raise it if explainers start feeling unacknowledged; lower it
+ * if a task that opens with several still looks half-done before it begins.
+ */
+const INFO_PAGE_WEIGHT = 0.25;
 
 /** Page-transition duration (ms). Shared by the question slide and the progress bar so they move
  *  together. Matches `StepSlider`'s own default. */
@@ -205,14 +216,21 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
     ? answeredSoFar
     : Math.min(answeredSoFar + 1, answerable);
   /**
-   * Position through *every* page, info screens included — unlike the count above.
+   * Position through every page, info screens included — but weighted, unlike the count above.
    *
-   * The two answer different questions. The counter says how much there is to do, so an explainer
+   * The two answer different questions. The counter says how much there is to *do*, so an explainer
    * shouldn't inflate it. The bar says how far through the task you are, and an explainer is a page
-   * you still have to get past — leaving it out froze the bar on those pages, which read as the app
-   * having missed the tap.
+   * you still have to get past — leaving it out froze the bar there, which read as a missed tap.
+   *
+   * Counting them equally had the opposite fault: a speech task opening with three explainers showed
+   * three quarters of the bar filled before the participant had done anything at all. A fraction of a
+   * step keeps the bar moving on every page without letting the preamble claim progress the task
+   * itself has yet to earn.
    */
-  const progress = total > 0 ? (currentIndex + 1) / total : 0;
+  const pageWeight = (page: Question[]) => (isAnswerable(page[0]) ? 1 : INFO_PAGE_WEIGHT);
+  const walked = pages.slice(0, currentIndex + 1).reduce((sum, p) => sum + pageWeight(p), 0);
+  const wholeTask = pages.reduce((sum, p) => sum + pageWeight(p), 0);
+  const progress = wholeTask > 0 ? walked / wholeTask : 0;
 
   // The bar eases to its new position in step with the page slide, instead of snapping. Driven by a
   // manual shared value (not a layout animation) — see the note on entering/exiting stranding an
@@ -268,11 +286,67 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
    * Cleared on every move, so an error never follows them to the next question.
    */
   const [submitAttempt, setSubmitAttempt] = useState(0);
+  /**
+   * Whether the active panel has more content below the fold, and whether they have reached it.
+   *
+   * Two booleans rather than the scroll offset: a fade driven by the offset re-renders this screen on
+   * every frame of every scroll, and all this needs to know is when to appear and when to stop. Both
+   * are written only when the answer actually flips.
+   */
+  const [panelOverflows, setPanelOverflows] = useState(false);
+  const [panelAtBottom, setPanelAtBottom] = useState(false);
+  /** Measured as they arrive, so either one landing second still settles `panelOverflows`. */
+  const panelFrame = useRef(0);
+  const panelContent = useRef(0);
+  const settleOverflow = useCallback(() => {
+    const frame = panelFrame.current;
+    const content = panelContent.current;
+    // A point of slack: a content height a hair over the frame is rounding, not something to scroll.
+    setPanelOverflows(frame > 0 && content > frame + 1);
+  }, []);
+  const handlePanelLayout = useCallback(
+    (h: number) => {
+      panelFrame.current = h;
+      settleOverflow();
+    },
+    [settleOverflow],
+  );
+  const handlePanelContent = useCallback(
+    (h: number) => {
+      panelContent.current = h;
+      settleOverflow();
+    },
+    [settleOverflow],
+  );
+  useEffect(() => {
+    panelFrame.current = 0;
+    panelContent.current = 0;
+    setPanelOverflows(false);
+    setPanelAtBottom(false);
+  }, [currentIndex]);
+  const handlePanelScroll = useCallback((offset: number) => {
+    const frame = panelFrame.current;
+    const content = panelContent.current;
+    if (!frame || !content) return;
+    // `FADE_HEIGHT` from the end counts as arrived: the fade should be gone by the time the last of
+    // the content is clear of it, not still sitting over it.
+    setPanelAtBottom(content - frame - offset <= FADE_HEIGHT);
+  }, []);
+
   /** Set by the current input. A ref, not state: `goNext` only reads it when pressed. */
   const answerValid = useRef(true);
   const handleValidityChange = useCallback((valid: boolean) => {
     answerValid.current = valid;
   }, []);
+
+  /**
+   * Held still while an input inside the panel is being dragged.
+   *
+   * Claiming the gesture isn't enough on its own: `onShouldBlockNativeResponder` is Android-only, and
+   * on iOS the enclosing `ScrollView` is a native view whose own pan recogniser can cancel the touches
+   * out from under the JS responder. Turning the scroller off for the length of the gesture is the
+   * only thing that reliably stops the page moving under the finger.
+   */
 
   const goNext = useCallback(() => {
     // Hold them here and show why, rather than carrying a bad answer forward.
@@ -355,14 +429,18 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   const { width } = useWindowDimensions();
 
   /**
-   * Today's completed tasks and today's total, for the ring on the completion screen.
+   * Completed tasks against everything still open, for the ring on the completion screen.
+   *
+   * Across all days rather than today alone, matching the dashboard's wheel: a participant who
+   * clears today still has the week ahead, and a ring that reads "3 of 3" on a full schedule
+   * overstates how far along they are.
    *
    * Read here rather than in that screen so it stays presentational, and because this hook tracks
    * `SCHEDULE_UPDATED` — the host marks the task complete off the submission event, which lands a
    * moment *after* the screen appears. The task just finished therefore arrives as an update rather
    * than being there on mount, and the ring animates to whatever has settled by the time it runs.
    */
-  const todaysTasks = useLocalMetric('task_completed');
+  const openTasks = useLocalMetric('task_completed');
 
   // Completion is no longer a horizontal push. `TaskCompletionScreen` opens its own background
   // out of the centre of the screen and covers the questions where they stand, so there is nothing to
@@ -399,14 +477,30 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
    * every question optional in questionnaires written against the old rule.
    *
    * `blocksProgress` matters more under this default than the `isInfoType` check it replaces did
-   * under the old one: a blank `required_field` now reads as required, so without it every text page
-   * — and every scale this branch adds — would block Next rather than only the few a definition had
-   * mistakenly marked required.
+   * under the old one: a blank `required_field` now reads as required, so without it every page with
+   * nothing on it to answer would block Next, rather than only the few a definition had mistakenly
+   * marked required. Sliders are *not* among those — see `NON_BLOCKING_TYPES`.
    */
   const isRequired = blocksProgress(currentQuestion) && currentQuestion?.required_field !== 'n';
   const canProceed = !isRequired || hasAnswer;
   /** Surfaced only once they've tried to leave — see `submitAttempt`. */
   const requiredError = submitAttempt > 0 && !canProceed ? REQUIRED_MESSAGE : null;
+
+  /**
+   * What every refused answer does, whatever kind of question it was.
+   *
+   * Just the buzz now. The message is pinned above the footer, so there is nothing to scroll to in
+   * order to see it — which is what makes a refusal feel the same on every page. A matrix block still
+   * moves itself to the row that is holding them up; that is about the row, not the message.
+   *
+   * Keyed on `submitAttempt`, not on the message, so pressing Next again on the same unanswered
+   * question buzzes again — the counter exists precisely so a repeated refusal registers as a fresh
+   * one rather than looking inert.
+   */
+  useEffect(() => {
+    if (submitAttempt === 0 || !requiredError) return;
+    refusalHaptic();
+  }, [submitAttempt, requiredError]);
 
   // The speech question owns its own progression (record → stop → "Continue"), so it never shows Next.
   // It keeps the back/exit button on the idle screen as an escape hatch, but drops the footer entirely
@@ -530,8 +624,8 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
       endText={endText}
       onHome={() => finishTo(homeTabId)}
       onCalendar={() => finishTo(calendarTabId)}
-      tasksCompleted={todaysTasks?.value ?? 0}
-      tasksTotal={todaysTasks?.target ?? 0}
+      tasksCompleted={openTasks?.value ?? 0}
+      tasksTotal={openTasks?.target ?? 0}
       brandColor={brand}
       backgroundColor={pageBg}
       mode={mode}
@@ -659,10 +753,26 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                         isScalePanel && styles.scrollContentFill,
                       ]
                 }
+                onLayout={
+                  isActive && !isFixedPanel
+                    ? (e) => handlePanelLayout(e.nativeEvent.layout.height)
+                    : undefined
+                }
+                onContentSizeChange={
+                  isActive && !isFixedPanel ? (_w, h) => handlePanelContent(h) : undefined
+                }
+                onScroll={
+                  isActive && !isFixedPanel
+                    ? (e) => handlePanelScroll(e.nativeEvent.contentOffset.y)
+                    : undefined
+                }
+                // 16ms: the handler above only calls `setState` when its answer flips, so the cost of
+                // a frequent event is a comparison rather than a render.
+                scrollEventThrottle={16}
                 showsVerticalScrollIndicator={false}
-                  // Set even on a View panel, where it is simply ignored — see `panelBehaviour`
-                  // for which pages refuse to scroll and why.
-                  scrollEnabled={behaviour.scrollEnabled}
+                // Set even on a View panel, where it is simply ignored — see `panelBehaviour`
+                // for which pages refuse to scroll and why.
+                scrollEnabled={behaviour.scrollEnabled}
               >
                 {!question ? (
                   <Text style={[styles.emptyText, { color: muted }]}>No questions available</Text>
@@ -708,16 +818,15 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                       <View
                         style={[
                           styles.titleBlock,
-                          // Only shrink when the passage is actually in here. It's the passage that's
-                          // meant to yield to the controls; when the study puts the passage in
-                          // `select_choices_or_calculations` this block holds just a heading and a
-                          // line of copy, and letting that shrink collapses it to nothing — nothing
-                          // else in the panel gives way, so it absorbs the whole overflow.
-                          // Every speech panel, not just one with the passage inline. A long
-                          // instruction here is the first thing that should give way: it's read once
-                          // before starting, whereas the passage is read *while* recording and the
-                          // stop button has to stay reachable throughout.
-                          isSpeechPanel && styles.titleBlockShrink,
+                          // Deliberately not shrunk, though it used to be.
+                          //
+                          // The passage always goes to `SpeechInput`'s own card now, wherever the definition
+                          // put it, so this block only ever holds a heading and a line of copy. Letting *that*
+                          // shrink collapsed it: text has no give, so the box got shorter while its content
+                          // stayed full height, and the `StepSlider` viewport — which clips, to hide the parked
+                          // panels — cut off whatever spilled. That is the clipped section header. The passage
+                          // card is the thing that yields here, and it can: it scrolls, so losing height costs
+                          // reading room rather than words.
                         ]}
                       >
                         {/* The small grey header only earns its place when there's a distinct question
@@ -738,7 +847,7 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                           // Folds away once recording starts — see `CollapsibleHeading`.
                           <CollapsibleHeading
                             collapsed={isActive && speechPhase === 'recording'}
-                            text={questionTitle || ''}
+                            text={questionTitle ?? ''}
                             textStyle={[styles.sectionHeader, { color: muted }]}
                           />
                         ) : (
@@ -809,6 +918,10 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                           // would overwrite the answer this screen is actually gating on.
                           submitAttempt={isActive ? submitAttempt : 0}
                           onValidityChange={isActive ? handleValidityChange : undefined}
+                          // Only the active panel: a parked neighbour has no business freezing the
+                          // page the participant is actually looking at.
+                          // Only the text field draws this itself, lined up with its own card. Every
+                          // other type gets the screen's pinned row below.
                           errorMessage={isActive ? requiredError : null}
                       />
                       {hideTitleHere ? (
@@ -831,12 +944,56 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
         </StepSlider>
       </View>
 
+      {/*
+        * The page runs on below the fold.
+        *
+        * The same fade the matrix block puts on its own ends, applied to the panel — so a page that
+        * scrolls says so the same way wherever the scrolling happens. It sits just above the footer's
+        * reserved space rather than at the screen's edge, because that space is where the content
+        * stops; a fade below it would be painting the page onto the page.
+        *
+        * Gone once they reach the bottom: an edge that never lifts stops meaning "there is more" and
+        * becomes part of the furniture.
+        */}
+      {panelOverflows && !panelAtBottom && (
+        <View
+          style={[styles.bottomFade, { bottom: FOOTER_RESERVE + bottomInset, height: FADE_HEIGHT }]}
+          pointerEvents="none"
+        >
+          <EdgeFade color={pageBg} width={width} height={FADE_HEIGHT} reversed />
+        </View>
+      )}
+
+      {/*
+        * Why the page was refused, pinned above the footer.
+        *
+        * Drawn here rather than inside the panel so it is on screen whatever the input is doing. In
+        * the content it sat after the input, which put it below the fold on any page that overflows —
+        * a long radio list — and pressing Next appeared to do nothing at all. The matrix block always
+        * looked right only because its container fills the screen, so its message was already pinned;
+        * this gives every type that same behaviour instead of one type scrolling to find it.
+        *
+        * `text` is the exception and draws its own, lined up with its card.
+        */}
+      {currentQuestion?.field_type !== 'text' && (
+        <View
+          style={[styles.errorDock, { bottom: FOOTER_RESERVE + bottomInset }]}
+          pointerEvents="none"
+        >
+          <QuestionError message={requiredError} shakeKey={submitAttempt} mode={mode} />
+        </View>
+      )}
+
       {/* Footer: Exit (first) / Back (thereafter) + Next / Finish (last). The speech question shows only
           the back/exit half while idle, and no footer at all once recording starts. */}
       {/* Always mounted, shown by opacity — see `footerStyle`. `pointerEvents` is what actually takes
           it out of play, so a faded footer can't be pressed on the way out. */}
       <Animated.View
-        style={[styles.footer, { paddingBottom: bottomInset }, footerStyle]}
+        // Opaque, in the page's own colour. The footer is positioned *over* the panel rather than
+        // above it, so with no fill the question's content scrolls straight through the buttons and
+        // the two read as one jumble — `Next` in particular loses the ground its label was chosen
+        // against. Matching `pageBg` keeps the bar invisible except where it is doing that job.
+        style={[styles.footer, { paddingBottom: bottomInset, backgroundColor: pageBg }, footerStyle]}
         pointerEvents={showFooter ? 'auto' : 'none'}
       >
         <View style={styles.footerButton}>
@@ -1003,17 +1160,6 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   /**
-   * Lets the passage give way to the controls below it.
-   *
-   * React Native defaults `flexShrink` to 0 (CSS defaults it to 1), so every element between the
-   * height-bounded panel and the scrollable passage has to opt in explicitly — miss one and the
-   * chain breaks, the passage keeps its full natural height, and the record button is pushed off
-   * the bottom of the screen.
-   */
-  titleBlockShrink: {
-    flexShrink: 1,
-  },
-  /**
    * The speech instruction's window. `flexGrow: 0` keeps it no taller than its text, `flexShrink: 1`
    * lets it give way under pressure, and `minHeight` stops it collapsing to nothing — so there is
    * always something readable, and something to scroll.
@@ -1058,6 +1204,29 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     fontFamily: fontFamily.regular,
     includeFontPadding: false,
+  },
+  /**
+   * Where the refusal message sits: above the footer, across the page.
+   *
+   * Positioned rather than laid out, for the same reason the footer is — a message appearing must not
+   * resize the panels, or every page would reflow its text the moment somebody pressed Next. The
+   * panels already reserve `FOOTER_RESERVE`, so this sits in space that was being kept clear anyway.
+   *
+   * `pointerEvents: 'none'` at the call site: it overlaps the bottom of the content, and a message is
+   * not something to tap.
+   */
+  /** Full-bleed: the fade is the page's own colour, so it runs to the screen's edges, not the gutter's. */
+  bottomFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+  },
+  errorDock: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    paddingHorizontal: PAGE_PADDING,
+    alignItems: 'center',
   },
   footer: {
     // Over the page, not above it. Laid out in flow, the footer's appearance shortened the slider's
