@@ -10,10 +10,28 @@ import {
 
 import { tracking, fontFamily, getColorTokens, layout, readableTextColor, type ThemeColorOverrides, type ThemeMode } from '../../theme/theme';
 
-// Base vertical padding, and the outline border width. RN adds the border on top of the padding, so
-// the outline variant subtracts the border from its padding to keep every variant the same height.
-const VERTICAL_PADDING = 16;
-const OUTLINE_BORDER = 3;
+/**
+ * The two button scales, each a padding / height / label-size / border-width set.
+ *
+ * `default` is the design system's button — the one a screen ends on ("Start", "Continue"). `small`
+ * is for a button that sits *inside* content rather than under it, where a full-height pill would
+ * outrank what it belongs to: the "See all tasks" row closing a task list, say. Kept as one table so
+ * the two stay proportional; the border thins with the rest, since a 3pt outline on a 30pt pill reads
+ * as a box rather than an edge.
+ *
+ * Both are full width by default, because that is what a button under a form wants. One sitting in
+ * content usually does not — pass `alignSelf: 'center'` and `width: 'auto'` in `style`, which is
+ * applied last and so wins, to get a pill that hugs its label.
+ *
+ * RN adds a border on top of the padding, so the outline variant subtracts its border from the
+ * padding to keep every variant of a given size the same height.
+ */
+const SIZES = {
+  default: { paddingVertical: 16, minHeight: 52, fontSize: 16, border: 3 },
+  small: { paddingVertical: 6, minHeight: 30, fontSize: 13, border: 2 },
+} as const;
+
+export type PillButtonSize = keyof typeof SIZES;
 
 /**
  * Pill-shaped action button in the design system's variants (Figma "Buttons"): `primary` — a filled
@@ -26,6 +44,8 @@ export interface PillButtonProps {
   onPress?: () => void;
   /** Visual style. Defaults to `primary`. */
   variant?: 'primary' | 'outline' | 'text';
+  /** Scale. Defaults to `default` — see `SIZES` for when `small` is the right one. */
+  size?: PillButtonSize;
   disabled?: boolean;
   /** Which theme's tokens to use. Defaults to the device color scheme. */
   mode?: ThemeMode;
@@ -47,6 +67,7 @@ export function PillButton({
   label,
   onPress,
   variant = 'primary',
+  size = 'default',
   disabled = false,
   mode,
   brandColors,
@@ -77,15 +98,20 @@ export function PillButton({
     : isOutline
       ? brand
       : filledLabel;
+  const scale = SIZES[size];
+  const sizeStyle: ViewStyle = {
+    paddingVertical: scale.paddingVertical,
+    minHeight: scale.minHeight,
+  };
   const variantStyle: ViewStyle = isText
     ? { backgroundColor: 'transparent' }
     : isOutline
       ? {
           backgroundColor: 'transparent',
-          borderWidth: OUTLINE_BORDER,
+          borderWidth: scale.border,
           borderColor: brand,
           // Subtract the border from the padding so the total height matches the other variants.
-          paddingVertical: VERTICAL_PADDING - OUTLINE_BORDER,
+          paddingVertical: scale.paddingVertical - scale.border,
         }
       : { backgroundColor: brand };
 
@@ -94,9 +120,11 @@ export function PillButton({
       accessibilityRole="button"
       onPress={onPress}
       disabled={disabled}
-      style={[styles.button, variantStyle, disabled && styles.disabled, style]}
+      style={[styles.button, sizeStyle, variantStyle, disabled && styles.disabled, style]}
     >
-      <Text style={[styles.label, { color: labelColor }]}>{label}</Text>
+      <Text style={[styles.label, { fontSize: scale.fontSize }, { color: labelColor }]}>
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 }
@@ -106,12 +134,9 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: VERTICAL_PADDING,
     borderRadius: layout.radiusPill,
-    minHeight: 52,
   },
   label: {
-    fontSize: 16,
     fontFamily: fontFamily.regular,
     textAlign: 'center',
     letterSpacing: tracking.regular,
