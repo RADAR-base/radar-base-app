@@ -1,6 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { tracking, fontFamily, getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
+import {
+  tracking,
+  fontFamily,
+  getColorTokens,
+  cardShadowBleed,
+  layout as layoutTokens,
+} from '../../../../theme/theme';
 import type { Node } from '../../../contracts/NodeSchema';
 import type { NodeProps } from '../../types';
 
@@ -8,8 +14,22 @@ function asNodeArray(value: unknown): Node[] | undefined {
   return Array.isArray(value) ? (value as Node[]) : undefined;
 }
 
-function withFillWidth(child: Node): Node {
-  return { ...child, fillWidth: true };
+function withFillWidth(child: Node, fillWidth: boolean): Node {
+  // A blueprint that states it wins — this only supplies what the layout implies.
+  return child.fillWidth === undefined ? { ...child, fillWidth } : child;
+}
+
+/**
+ * Hand a horizontal row's children the width the section itself was given.
+ *
+ * Inside a horizontally-scrolling content container there is no width to be a percentage of — the
+ * container is as wide as its children make it — so a card that wants to span the page cannot say
+ * `width: '100%'` and has nothing to measure. This passes the number down instead: the width the
+ * section occupies, which is the page's content width. A card that sizes itself (a 176 stat card)
+ * ignores it; one that spans the page (`StreakCardNode`) uses it in place of the percentage.
+ */
+function withAvailableWidth(child: Node, availableWidth: number): Node {
+  return availableWidth > 0 ? { ...child, availableWidth } : child;
 }
 
 /**
@@ -53,7 +73,7 @@ function packGrid(children: Node[]): [Node[], Node[]] {
       }
       if (placedCol === -1) row++;
     }
-    columns[placedCol].push(withFillWidth(child));
+    columns[placedCol].push(withFillWidth(child, true));
   }
   return columns;
 }
@@ -87,11 +107,28 @@ export function CardSectionNode({ node, context, render }: NodeProps) {
     node.layout === 'horizontal' ? 'horizontal' : node.layout === 'grid' ? 'grid' : 'vertical';
   const children = asNodeArray(node.children);
   const [gridColumn0, gridColumn1] = layout === 'grid' ? packGrid(children ?? []) : [[], []];
+  /**
+   * The width the section itself occupies — the page's content width, measured rather than assumed.
+   *
+   * Only a horizontal row needs it, and only because its children have no width to be a percentage
+   * of; see `withAvailableWidth`. Measured on the outer container, which is the element still sized
+   * by the page: the `ScrollView` inside it is deliberately wider (see `horizontalBleed`).
+   */
+  const [sectionWidth, setSectionWidth] = useState(0);
+  const horizontalChildren =
+    layout === 'horizontal'
+      ? (children ?? []).map(c => withAvailableWidth(c, sectionWidth))
+      : children;
 
   const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
 
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      onLayout={
+        layout === 'horizontal' ? e => setSectionWidth(e.nativeEvent.layout.width) : undefined
+      }
+    >
       {title && (
         <View style={styles.headerRow}>
           <Text style={[styles.title, { color: tokens.text.primary }]}>{title}</Text>
@@ -111,9 +148,10 @@ export function CardSectionNode({ node, context, render }: NodeProps) {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={styles.horizontalBleed}
           contentContainerStyle={styles.horizontalContent}
         >
-          {render(children)}
+          {render(horizontalChildren)}
         </ScrollView>
       ) : layout === 'grid' ? (
         <View style={styles.grid}>
@@ -162,9 +200,29 @@ const styles = StyleSheet.create({
     lineHeight: layoutTokens.captionFontSize,
     letterSpacing: tracking.regular,
   },
+  /**
+   * Escape the page gutter so the row scrolls edge to edge.
+   *
+   * Left inside it, cards are clipped at the gutter and the row reads as a window with a margin
+   * rather than as content running off the screen. The negative margin widens the scroll view to the
+   * full screen; `horizontalContent` pays the same amount back as padding, so the first card still
+   * starts flush with the heading above it and the last one clears the right edge.
+   */
+  horizontalBleed: {
+    marginHorizontal: -layoutTokens.pageGutter,
+    // Deliberately no negative *vertical* margin to match the padding below. A horizontal scroll
+    // view takes its height from its content and stretches its children to it, so pulling the frame
+    // in by a margin shortens the cards themselves — it sliced the bottom off the streak card's day
+    // circles. The row simply gets that much taller instead.
+  },
+  // `stretch` so cards of different natural heights come out level — a streak card is shorter than a
+  // wheel, and left to themselves they'd sit on a ragged baseline.
   horizontalContent: {
+    alignItems: 'stretch',
     gap: layoutTokens.gap,
-    paddingRight: layoutTokens.cardPadding,
+    paddingHorizontal: layoutTokens.pageGutter,
+    // Room for the shadow to fall into, so the scroll view's own clip doesn't cut it off.
+    paddingVertical: cardShadowBleed,
   },
   verticalContent: {
     width: '100%',

@@ -118,8 +118,8 @@ const styles = StyleSheet.create({
   },
   // Standard screen gutter for the page content, below the header.
   body: {
-    paddingHorizontal: 15,
-    paddingTop: 15,
+    paddingHorizontal: layoutTokens.pageGutter,
+    paddingTop: layoutTokens.pageGutter,
     gap: layoutTokens.sectionGap,
   },
 });
