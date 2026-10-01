@@ -3,7 +3,6 @@ import { StyleSheet, Text, View } from 'react-native';
 import type { Question } from '../../../../types';
 import { RadioInput } from './RadioInput';
 import { LikertSliderInput } from './LikertSliderInput';
-import { matchLikertScale } from './likertScale';
 import { CheckboxInput } from './CheckboxInput';
 import { ArcSliderInput } from './ArcSliderInput';
 import { parseChoices } from './questionScale';
@@ -182,7 +181,6 @@ export function QuestionRenderer({
       }
 
       case 'likert-emoji': {
-        const likert = matchLikertScale(parseChoices(question.select_choices_or_calculations));
         return (
           <LikertSliderInput
             choices={parseChoices(question.select_choices_or_calculations)}
@@ -193,7 +191,6 @@ export function QuestionRenderer({
             accentColor={radioAccent}
             surfaceColor={radioSurface}
             backgroundColor={backgroundColor}
-            positiveEnd={likert?.positiveEnd ?? 'last'}
             onScrollLock={onScrollLock}
           />
         );

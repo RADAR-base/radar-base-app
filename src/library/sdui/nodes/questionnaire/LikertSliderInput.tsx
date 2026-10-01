@@ -21,12 +21,12 @@ import type { SelectChoice } from '../../../../types';
 import {
   cardShadow,
   fontFamily,
+  lightTheme,
   mix,
   tracking,
   withAlpha,
 } from '../../../../theme/theme';
 import { useStepHaptics } from '../../useStepHaptics';
-import { likertRamp, type PositiveEnd } from './likertScale';
 import { plainLabel, richLabel } from './richLabel';
 
 import LikertWorst from '../../../../theme/icons/likertworstemoji.svg';
@@ -34,6 +34,33 @@ import LikertBad from '../../../../theme/icons/likertbademoji.svg';
 import LikertNeutral from '../../../../theme/icons/likertneutralemoji.svg';
 import LikertGood from '../../../../theme/icons/likertgoodemoji.svg';
 import LikertBest from '../../../../theme/icons/likertbestemoji.svg';
+
+/**
+ * A colour per step, running from the scale's negative end to its positive one.
+ *
+ * Mixed from the theme's own three-stop ramp (dataWheel bad / neutral / good — the colours the
+ * progress rings already grade themselves with) rather than a new set of literals, so a scale reads
+ * as the same language as the rest of the app.
+ *
+ * The ends are the stops exactly; the steps between are interpolated, which is what lets one rule
+ * serve a four-point scale and a five-point one without a table per length.
+ */
+function likertRamp(steps: number): string[] {
+  // Read off lightTheme rather than through getColorTokens: dataWheel is one of the few token groups
+  // with no light/dark variant and no brand override — the same three hexes in both themes — so
+  // there is no mode to resolve, and taking one would only invite a caller to pass the wrong one.
+  const stops = lightTheme.dataWheel;
+  if (steps <= 0) return [];
+  if (steps === 1) return [stops.neutral];
+  return Array.from({ length: steps }, (_, i) => {
+    const t = i / (steps - 1);
+    // Two halves, each interpolated on its own, so the midpoint lands exactly on neutral rather than
+    // on whatever a single bad-to-good blend happens to pass through.
+    return t <= 0.5
+      ? mix(stops.bad, stops.neutral, t * 2)
+      : mix(stops.neutral, stops.good, (t - 0.5) * 2);
+  });
+}
 
 interface LikertSliderInputProps {
   /** The scale's steps, in the order the definition lists them — worst end first. */
@@ -57,14 +84,6 @@ interface LikertSliderInputProps {
    * and is invisible where it shows through the features, because it is already what was there.
    */
   backgroundColor?: string;
-  /**
-   * Which end of the scale is the good one — see `matchLikertScale`, which decides it.
-   *
-   * Severity is authored best-first ("Not at all" … "Severe") and agreement best-last ("Strongly
-   * disagree" … "Strongly agree"), so the faces and the colour ramp are laid along the choices in
-   * one direction or the other. Without this a severity scale would put the happy face on "Severe".
-   */
-  positiveEnd: PositiveEnd;
   /**
    * Asked to hold the page still for the duration of a drag, and to let it go again.
    *
@@ -156,7 +175,7 @@ const ADJUST_ACTIONS = [{ name: 'increment' }, { name: 'decrement' }] as const;
 /**
  * A Likert scale drawn as a slider rather than a list of radio rows (Figma 3769:5916).
  *
- * Shown instead of `RadioInput` when the choices are an ordered run of degrees — see `matchLikertScale`,
+ * Shown instead of `RadioInput` when the definition asks for it with `field_type: 'likert-emoji'`,
  * which decides that from the labels. The control is the scale itself: a track carrying a face per
  * step, a handle that lands on the chosen one, and a large preview of it above.
  *
@@ -172,25 +191,23 @@ export function LikertSliderInput({
   textColor,
   surfaceColor,
   backgroundColor,
-  positiveEnd,
   onScrollLock,
 }: LikertSliderInputProps) {
   const steps = choices.length;
   /**
-   * Faces and colours indexed by *choice*, not by position on the ramp.
+   * Faces and colours indexed by *choice*, both running unhappy-to-happy.
    *
-   * Both run unhappy-to-happy; reversing them for a best-first scale is what puts the happy face on
-   * "Not at all" and the unhappy one on "Severe". Done once here so nothing downstream has to
-   * remember which way round this scale runs.
+   * Laid straight along the choices, so the definition's own ordering is what decides which end is
+   * which: the first choice gets the unhappy face, the last the happy one. A scale that reads the
+   * other way round — severity, where "Not at all" is the good end — is authored best-last.
    */
-  const scale = useMemo(() => {
-    const base = steps === 4 ? FACES_NO_MIDPOINT : FACES;
-    const colors = likertRamp(steps);
-    return positiveEnd === 'first'
-      ? { faces: [...base].reverse(), colors: [...colors].reverse() }
-      : { faces: base, colors };
-  }, [steps, positiveEnd]);
-  const { faces, colors } = scale;
+  const { faces, colors } = useMemo(
+    () => ({
+      faces: steps === 4 ? FACES_NO_MIDPOINT : FACES,
+      colors: likertRamp(steps),
+    }),
+    [steps],
+  );
 
   const track = surfaceColor ?? withAlpha(primaryColor, 0.1);
 
