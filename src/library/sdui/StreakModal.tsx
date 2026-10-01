@@ -148,32 +148,32 @@ export function StreakModal({
       <Animated.View style={[styles.backdropFill, backdropStyle]}>
         <Pressable style={styles.backdrop} onPress={onClose}>
           <Animated.View style={cardStyle}>
-          <Pressable
-            style={[styles.card, { backgroundColor: surface }, cardShadow]}
-            onPress={() => {}}
-          >
-          <View style={[styles.badge, { backgroundColor: badgeFill }]}>
-            <FireIcon width={BADGE_ICON.width} height={BADGE_ICON.height} color={badgeInk} />
-          </View>
+            <Pressable
+              style={[styles.card, { backgroundColor: surface }, cardShadow]}
+              onPress={() => {}}
+            >
+              <View style={[styles.badge, { backgroundColor: badgeFill }]}>
+                <FireIcon width={BADGE_ICON.width} height={BADGE_ICON.height} color={badgeInk} />
+              </View>
 
-          <Text style={[styles.title, { color: titleColor }]}>{title}</Text>
-          <Text style={[styles.description, { color: muted }]}>{description}</Text>
+              <Text style={[styles.title, { color: titleColor }]}>{title}</Text>
+              <Text style={[styles.description, { color: muted }]}>{description}</Text>
 
-          <Pressable
-            accessibilityRole="button"
-            style={({ pressed }) => [
-              styles.cta,
-              { backgroundColor: primary, opacity: pressed ? 0.85 : 1 },
-            ]}
-            onPress={onAction ?? onClose}
-          >
-            <Text style={[styles.ctaText, { color: onPrimary }]}>{ctaLabel}</Text>
-          </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  styles.cta,
+                  { backgroundColor: primary, opacity: pressed ? 0.85 : 1 },
+                ]}
+                onPress={onAction ?? onClose}
+              >
+                <Text style={[styles.ctaText, { color: onPrimary }]}>{ctaLabel}</Text>
+              </Pressable>
 
-          <Pressable accessibilityRole="button" style={styles.dismiss} onPress={onClose}>
-            <Text style={[styles.dismissText, { color: muted }]}>{dismissLabel}</Text>
-          </Pressable>
-          </Pressable>
+              <Pressable accessibilityRole="button" style={styles.dismiss} onPress={onClose}>
+                <Text style={[styles.dismissText, { color: muted }]}>{dismissLabel}</Text>
+              </Pressable>
+            </Pressable>
           </Animated.View>
         </Pressable>
       </Animated.View>

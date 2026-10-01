@@ -93,8 +93,7 @@ const BADGE_MIN = 72;
  * and the disc at its compact size, inside the card's padding.
  */
 const STRIP_NATURAL = DAY_BASE * STREAK_WINDOW_DAYS + DAY_GAP * (STREAK_WINDOW_DAYS - 1);
-const NATURAL_WIDTH =
-  layoutTokens.cardPadding * 2 + STRIP_NATURAL + layoutTokens.gap + BADGE_MIN;
+const NATURAL_WIDTH = layoutTokens.cardPadding * 2 + STRIP_NATURAL + layoutTokens.gap + BADGE_MIN;
 
 /**
  * Corner radius: the task cards' 24, which every card surface in the app shares.
@@ -269,16 +268,7 @@ interface DayCellProps {
  * `View`: iOS renders a dashed border as solid once `borderRadius` is set, which would lose the only
  * thing separating a lost day from an untouched one.
  */
-function DayCell({
-  letter,
-  label,
-  day,
-  size,
-  caption,
-  disc,
-  flame,
-  missed,
-}: DayCellProps) {
+function DayCell({ letter, label, day, size, caption, disc, flame, missed }: DayCellProps) {
   const stroke = size * RING_STROKE_RATIO;
   const centre = size / 2;
   /** The outermost edge anything in this cell reaches — see `EDGE_BLEED`. */
