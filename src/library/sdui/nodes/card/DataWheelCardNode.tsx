@@ -58,6 +58,16 @@ export function DataWheelCardNode({ node, context }: NodeProps) {
   // to hide it. Navigation still requires `viewPath` — a shown button with no target stays disabled.
   const showOpenButton = node.showOpenButton !== false;
   const inlineValue = typeof node.value === 'number' ? node.value : undefined;
+  /**
+   * Whether the ring sits *above* its text rather than beside it.
+   *
+   * Driven by the space available, not by `size` alone. The side-by-side arrangement needs a card the
+   * width of the page: the ring alone is `RING_SIZE` (142) against a grid column's inner width of
+   * about 135, so the row overflows, `justifyContent: 'center'` centres the overflow, and the ring
+   * lands left of centre with its text block outside the card entirely. In a column — which is what
+   * `fillWidth` means — a large card stacks like a small one.
+   */
+  const stacked = size === 'small' || fillWidth;
   const inlineValues = Array.isArray(node.values)
     ? (node.values as number[]).filter((v) => typeof v === 'number')
     : inlineValue != null
@@ -132,7 +142,7 @@ export function DataWheelCardNode({ node, context }: NodeProps) {
     </TouchableOpacity>
   );
 
-  if (size === 'large') {
+  if (!stacked) {
     return (
       <View style={[styles.card, styles.cardLarge, { backgroundColor: tokens.card.stats.background }]}>
         <View style={styles.headerRow}>
@@ -158,11 +168,11 @@ export function DataWheelCardNode({ node, context }: NodeProps) {
     <View
       style={[
         styles.card,
-        styles.cardSmall,
+        styles.cardStacked,
         // In a grid (fillWidth), fill the column's stretched height so the wheel always lines up with
         // the two stacked StatCards opposite it — even when their content grows past the base 93 (e.g.
         // under font scaling). Standalone (no flex parent) this is a harmless no-op. See CardSectionNode.
-        fillWidth && styles.cardSmallFill,
+        fillWidth && styles.cardStackedFill,
         { backgroundColor: tokens.card.stats.background, width: fillWidth ? '100%' : 176 },
       ]}
     >
@@ -182,13 +192,17 @@ const styles = StyleSheet.create({
     gap: layoutTokens.gap,
     ...cardShadow,
   },
-  // 195 matches StatCardNode's cardLarge height, which is itself two stacked small StatCards
-  // (93 + 9px grid gap + 93). In CardSectionNode's grid the wheel sits alone in one column
-  // opposite two stacked small StatCards, so pinning it to 195 makes the two columns line up.
-  // (padding 16*2 + header 24 + gap 9 + ring 128 = 193, so the ring clears the height.)
-  cardSmall: {
+  // The ring above its value, which is how the card looks in a grid column whatever its `size` —
+  // see `stacked`.
+  //
+  // 195 is StatCardNode's `cardLarge` height (two stacked small StatCards: 93 + 9 gap + 93), so a
+  // wheel alone in one column lines up with the stat cards opposite it. It is a floor rather than
+  // the real height: padding 16*2 + title 16 + gap 12 + ring 142 comes to 202, so this card is the
+  // taller of the two and the column stretches to *it*. `StatCardNode` fills that stretch — see
+  // `cardFill` there — which is what keeps their bottom edges level.
+  cardStacked: {
     // minHeight, not height, so accessibility font scaling grows the card instead of clipping the
-    // title/center value (the ring stays a fixed 128). See fontScaling.ts.
+    // title/center value (the ring stays a fixed `RING_SIZE`). See fontScaling.ts.
     minHeight: 195,
     alignItems: 'center',
     // No inter-child gap: the ring's own flex box (`ringCenter`) centers it in the space below the
@@ -198,7 +212,7 @@ const styles = StyleSheet.create({
   // Grid-only: stretch to the column's full (row-matched) height so the wheel matches the two
   // stacked StatCards opposite it, whatever their combined height. `ringCenter` (flex:1) re-centers
   // the ring in the extra space.
-  cardSmallFill: {
+  cardStackedFill: {
     flex: 1,
   },
   cardLarge: {
@@ -210,7 +224,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     width: '100%',
   },
-  // Small card: the ring sits in its own flex box below the title, centred within the space that's
+  // Stacked card: the ring sits in its own flex box below the title, centred within the space that's
   // left after the title text (not the whole card), so the title→ring and ring→bottom gaps come out equal.
   ringCenter: {
     flex: 1,
