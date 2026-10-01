@@ -816,8 +816,10 @@ export const layout = {
   headingLineHeight: 20,
   /** Corner radius for pill-shaped chips, badges, and buttons. */
   radiusPill: 24,
-  /** Corner radius for card surfaces. */
-  radiusCard: 12,
+  /** Corner radius for card surfaces — every card in the app shares it. */
+  radiusCard: 24,
+  /** Corner radius for non-card elements at a card's scale: a navbar tab, a chart bar, a tooltip. */
+  radiusControl: 12,
   /** Corner radius for a full screen / page (the app frame + sliding overlays), so pages read as
    *  rounded cards — including as they slide over one another. Tune to match the device screen. */
   radiusScreen: 40,

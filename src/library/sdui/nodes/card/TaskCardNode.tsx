@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     padding: layoutTokens.gap,
-    borderRadius: 24,
+    borderRadius: layoutTokens.radiusCard,
     ...cardShadow,
   },
   row: {
@@ -154,6 +154,6 @@ const styles = StyleSheet.create({
   scrim: {
     ...StyleSheet.absoluteFill,
     backgroundColor: UNAVAILABLE_SCRIM,
-    borderRadius: 24,
+    borderRadius: layoutTokens.radiusCard,
   },
 });

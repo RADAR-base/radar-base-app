@@ -16,6 +16,7 @@ import {
   layout,
   type ThemeColorOverrides,
   type ThemeMode,
+  layout as layoutTokens,
 } from '../../theme/theme';
 import QrCodeIcon from '../../theme/icons/qrcode.svg';
 import LoginIcon from '../../theme/icons/login.svg';
@@ -156,7 +157,7 @@ const styles = StyleSheet.create({
     gap: 32,
     paddingHorizontal: 64,
     paddingVertical: 32,
-    borderRadius: 24,
+    borderRadius: layoutTokens.radiusCard,
   },
   cardIcon: {
     width: 80,

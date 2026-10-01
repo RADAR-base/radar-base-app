@@ -942,7 +942,7 @@ const styles = StyleSheet.create({
     height: PROMPT_CARD_HEIGHT,
     minHeight: PROMPT_CARD_MIN_HEIGHT,
     flexShrink: 1,
-    borderRadius: 24,
+    borderRadius: layoutTokens.radiusCard,
     // The ring band. Present in every state — only its colour changes — so switching to recording
     // doesn't resize the card.
     padding: PROMPT_RING_WIDTH,
@@ -1129,7 +1129,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 16,
     padding: layoutTokens.cardPadding,
-    borderRadius: 24,
+    borderRadius: layoutTokens.radiusCard,
   },
   actionText: {
     fontSize: 14,
@@ -1151,7 +1151,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: layoutTokens.cardPadding,
-    borderRadius: 24,
+    borderRadius: layoutTokens.radiusPill,
   },
   continueLabel: {
     fontSize: 16,

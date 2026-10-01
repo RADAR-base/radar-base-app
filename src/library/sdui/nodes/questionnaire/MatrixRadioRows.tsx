@@ -75,12 +75,8 @@ interface MatrixRadioRowsProps {
   pageInset?: number;
 }
 
-/**
- * The card's corner.
- *
- * Rounder than `radiusCard`'s 12: these are small cards, and at this height a 12 reads almost square.
- */
-const CARD_RADIUS = 16;
+/** The card's corner — a matrix row is a card the participant acts on. */
+const CARD_RADIUS = layoutTokens.radiusCard;
 
 /**
  * The segmented track, and the segment that fills inside it.

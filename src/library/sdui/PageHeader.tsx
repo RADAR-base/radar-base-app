@@ -134,11 +134,11 @@ const styles = StyleSheet.create({
   progressTrack: {
     width: '100%',
     height: 5,
-    borderRadius: 24,
+    borderRadius: layout.radiusPill,
   },
   progressTrackFill: {
     ...StyleSheet.absoluteFill,
-    borderRadius: 24,
+    borderRadius: layout.radiusPill,
     opacity: 0.1,
   },
   progressFill: {
@@ -146,6 +146,6 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    borderRadius: 24,
+    borderRadius: layout.radiusPill,
   },
 });
