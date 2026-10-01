@@ -6,7 +6,7 @@
 
 export { SDUIShell } from './SDUIShell';
 export type { SDUIShellProps } from './SDUIShell';
-export { AppShell } from './AppShell';
+export { AppShell, isAppChromeReady } from './AppShell';
 export type { AppShellProps } from './AppShell';
 
 export { NodeRegistry } from './NodeRegistry';
@@ -138,7 +138,6 @@ export { WelcomeCard } from './WelcomeCard';
 export type { WelcomeCardProps } from './WelcomeCard';
 export { StudyNameModal } from './StudyNameModal';
 export { StreakModal } from './StreakModal';
-export { AppChromeReadyProvider, useAppChromeReady } from './AppChromeReady';
 export { useStreakRisk } from './useStreakRisk';
 export type { StudyNameModalProps } from './StudyNameModal';
 export { RegistrationFlow } from './RegistrationFlow';

@@ -19,6 +19,9 @@ import { EVENTS } from '../../../../core/EventBus';
 import { STREAK_WINDOW_DAYS } from '../../../../core/ScheduleService';
 import type { StreakDay } from '../../../../types';
 import type { NodeProps } from '../../types';
+import { useStreakRisk } from '../../useStreakRisk';
+import { StreakModal } from '../../StreakModal';
+import type { SDUIContext } from '../../types';
 
 /**
  * Indexed by `Date.getDay()` (0 = Sunday), not by position in the strip.
@@ -346,6 +349,46 @@ function DayCell({ letter, label, day, size, caption, disc, flame, missed }: Day
  * A blueprint can name the seven states outright with `previewWeek` to see a combination that would
  * otherwise take a real week to produce — see `parsePreviewWeek`.
  */
+/**
+ * The "don't lose your streak" prompt, hosted by the card it belongs to.
+ *
+ * It lived in `SDUIShell` before, which meant the shell — a generic blueprint renderer — carried a
+ * feature it otherwise knows nothing about. Here instead, which also means a study whose home view
+ * has no streak card gets no streak prompt: the two are one feature.
+ *
+ * Its own component rather than a hook in the card body: `useStreakRisk` subscribes to schedule
+ * events, and the card re-renders on each one otherwise — every fifteen minutes, redrawing a week
+ * strip that has not changed.
+ *
+ * Layering is safe wherever this sits: `StreakModal` draws through React Native's `Modal`, which
+ * takes a window of its own above the shell's overlays.
+ */
+function StreakRiskHost({ context }: { context: SDUIContext }) {
+  const { visible, dismiss, unfinished } = useStreakRisk();
+  return (
+    <StreakModal
+      visible={visible}
+      onClose={dismiss}
+      // Outstanding work gets its own words. The default copy is an obituary for a day that is gone;
+      // these days are not gone, and telling someone they missed something they can still finish
+      // would be both wrong and discouraging.
+      {...(unfinished.length > 0
+        ? {
+            title: 'You have tasks waiting',
+            // Named, not counted. "An earlier day" leaves the participant to work out which one, and
+            // being able to go and do something about it is the whole point of the prompt.
+            description:
+              unfinished.length === 1
+                ? `Finish your tasks from ${unfinishedDayName(unfinished[0].timestamp)} to keep your streak going.`
+                : `Finish your tasks from ${unfinished.length} earlier days to keep your streak going.`,
+          }
+        : null)}
+      mode={context.colorScheme ?? 'light'}
+      brandColors={context.theme.brandColors}
+    />
+  );
+}
+
 export function StreakCardNode({ node, context }: NodeProps) {
   const title = typeof node.title === 'string' ? node.title : 'Streak';
   // Spans the page by default — the design draws it that way, and a blueprint can opt out with
@@ -413,54 +456,57 @@ export function StreakCardNode({ node, context }: NodeProps) {
   const daySize = daySizeFor(stripWidth);
 
   return (
-    <View
-      style={[styles.card, { backgroundColor: surface, width }]}
-      accessibilityRole="summary"
-      accessibilityLabel={`Streak: ${streak} ${unit.toLowerCase()}`}
-    >
-      <View style={styles.left}>
-        <Text style={[styles.title, { color: caption }]}>{title}</Text>
-        <View style={styles.valueRow}>
-          <Text style={[styles.value, { color: brand }]}>{streak}</Text>
-          <Text style={[styles.unit, { color: caption }]}>{unit}</Text>
-        </View>
-        {/* Said in words as well as in circles: a dashed ring three days back is easy to miss, and
+    <>
+      <StreakRiskHost context={context} />
+      <View
+        style={[styles.card, { backgroundColor: surface, width }]}
+        accessibilityRole="summary"
+        accessibilityLabel={`Streak: ${streak} ${unit.toLowerCase()}`}
+      >
+        <View style={styles.left}>
+          <Text style={[styles.title, { color: caption }]}>{title}</Text>
+          <View style={styles.valueRow}>
+            <Text style={[styles.value, { color: brand }]}>{streak}</Text>
+            <Text style={[styles.unit, { color: caption }]}>{unit}</Text>
+          </View>
+          {/* Said in words as well as in circles: a dashed ring three days back is easy to miss, and
             the work behind it is the one thing on this card the participant can still act on. */}
-        {pendingNote && (
-          <Text style={[styles.pendingNote, { color: tokens.streak.disc }]}>{pendingNote}</Text>
-        )}
-        <View
-          style={styles.week}
-          accessibilityRole="list"
-          onLayout={e => setStripWidth(e.nativeEvent.layout.width)}
-        >
-          {days.map(day => {
-            const weekday = new Date(day.timestamp).getDay();
-            return (
-              <DayCell
-                key={day.key}
-                letter={DAY_LETTERS[weekday]}
-                label={`${DAY_NAMES[weekday]}: ${DAY_STATE_LABELS[day.state]}`}
-                day={day}
-                size={daySize}
-                caption={caption}
-                disc={tokens.streak.disc}
-                flame={tokens.streak.flame}
-                missed={tokens.streak.missed}
-              />
-            );
-          })}
+          {pendingNote && (
+            <Text style={[styles.pendingNote, { color: tokens.streak.disc }]}>{pendingNote}</Text>
+          )}
+          <View
+            style={styles.week}
+            accessibilityRole="list"
+            onLayout={e => setStripWidth(e.nativeEvent.layout.width)}
+          >
+            {days.map(day => {
+              const weekday = new Date(day.timestamp).getDay();
+              return (
+                <DayCell
+                  key={day.key}
+                  letter={DAY_LETTERS[weekday]}
+                  label={`${DAY_NAMES[weekday]}: ${DAY_STATE_LABELS[day.state]}`}
+                  day={day}
+                  size={daySize}
+                  caption={caption}
+                  disc={tokens.streak.disc}
+                  flame={tokens.streak.flame}
+                  missed={tokens.streak.missed}
+                />
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={[styles.badge, { backgroundColor: tokens.streak.disc }]}>
+          <FireOutlineIcon
+            width={BADGE_MAX * FLAME_SCALE * FLAME_ASPECT}
+            height={BADGE_MAX * FLAME_SCALE}
+            color={tokens.streak.flame}
+          />
         </View>
       </View>
-
-      <View style={[styles.badge, { backgroundColor: tokens.streak.disc }]}>
-        <FireOutlineIcon
-          width={BADGE_MAX * FLAME_SCALE * FLAME_ASPECT}
-          height={BADGE_MAX * FLAME_SCALE}
-          color={tokens.streak.flame}
-        />
-      </View>
-    </View>
+    </>
   );
 }
 

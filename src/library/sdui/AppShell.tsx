@@ -8,7 +8,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { eventBus } from '../../core/EventBus';
+import { eventBus, EVENTS } from '../../core/EventBus';
 import { useAuth } from '../../core/useAuth';
 import {
   CoreServicesProvider,
@@ -31,7 +31,6 @@ import { SDUIShell } from './SDUIShell';
 import { LoginScreen } from './LoginScreen';
 import { PostEnrolmentFlow } from './PostEnrolmentFlow';
 import { LoadingScreen } from './LoadingScreen';
-import { AppChromeReadyProvider } from './AppChromeReady';
 import { ConfirmModal } from './ConfirmModal';
 import {
   fontFamily,
@@ -41,6 +40,20 @@ import {
   type ThemeMode,
 } from '../../theme/theme';
 import type { StorageService, OAuthConfig } from '../../types';
+
+/**
+ * Whether the app's loading surfaces have finished, kept outside React.
+ *
+ * The event below is a moment, and `EventBus` has no replay: anything mounting after it fired would
+ * wait for a second one that never comes. This is the same answer, readable at any time — so a
+ * listener can ask on mount and subscribe only if it is genuinely early.
+ */
+let chromeReadyLatch = false;
+
+/** Whether every loading surface has gone. Pair with `EVENTS.APP_CHROME_READY` for the live edge. */
+export function isAppChromeReady(): boolean {
+  return chromeReadyLatch;
+}
 
 export interface AppShellProps {
   /**
@@ -361,11 +374,22 @@ function AppShellInner({
   }
 
   // Every loading surface this shell can raise. The streak prompt, and anything else that greets the
-  // participant on arrival, waits for all of them — see `AppChromeReady`.
+  // participant on arrival, waits for all of them — see `EVENTS.APP_CHROME_READY`.
+  /**
+   * Every loading surface this shell can raise has gone.
+   *
+   * Announced on the event bus rather than handed down a context: what waits on it is one widget — the
+   * streak prompt — and a provider wrapping the whole app to serve it coupled the shell to a feature
+   * it otherwise knows nothing about.
+   */
   const chromeReady = !bootLoading && !postEnrolmentLoading && servicesReady;
+  useEffect(() => {
+    if (!chromeReady || chromeReadyLatch) return;
+    chromeReadyLatch = true;
+    eventBus.emit(EVENTS.APP_CHROME_READY);
+  }, [chromeReady]);
 
   return (
-    <AppChromeReadyProvider ready={chromeReady}>
     <View style={styles.root}>
       {content}
       {bootLoading && (
@@ -389,7 +413,6 @@ function AppShellInner({
         />
       )}
     </View>
-    </AppChromeReadyProvider>
   );
 }
 

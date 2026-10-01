@@ -76,6 +76,9 @@ export const EVENTS = {
   TASK_SKIPPED: 'taskSkipped',
   /** Tapping a task on the home screen requests its instructions page (payload: task details). */
   OPEN_TASK_INSTRUCTIONS: 'openTaskInstructions',
+
+  /** Every loading surface the shell can raise has gone, and the participant is looking at the app. */
+  APP_CHROME_READY: 'appChromeReady',
   
   // Auth Events
   AUTH_STATE_CHANGED: 'authStateChanged',

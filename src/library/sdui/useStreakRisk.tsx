@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { useCoreServices } from '../../core/CoreServicesContext';
-import { useAppChromeReady } from './AppChromeReady';
+import { isAppChromeReady } from './AppShell';
 import { EVENTS } from '../../core/EventBus';
 import type { StreakDay, StreakRisk } from '../../types';
 
@@ -25,7 +25,16 @@ const NO_RISK: StreakRisk = { atRisk: false, streak: 0, missedDay: null, unfinis
  */
 export function useStreakRisk() {
   const { schedule, eventBus } = useCoreServices();
-  const chromeReady = useAppChromeReady();
+  /**
+   * Whether the app's loading screens have gone.
+   *
+   * Read, not subscribed to through context: `AppShell` announces it on the bus, and a provider
+   * wrapping the whole app to deliver one boolean coupled the shell to this feature. `EventBus` has
+   * no replay, so the value is read here as well as listened for below — this hook can mount either
+   * side of the announcement, and waiting for an edge that has already passed would mean the prompt
+   * never shows.
+   */
+  const [chromeReady, setChromeReady] = useState(isAppChromeReady());
   const [risk, setRisk] = useState<StreakRisk>(NO_RISK);
   /** The days themselves, not just how many — the prompt names them. */
   const [unfinished, setUnfinished] = useState<StreakDay[]>([]);
@@ -44,6 +53,14 @@ export function useStreakRisk() {
     // records as it answers can't be checked and then forgotten.
     if (await schedule.claimStreakPrompt()) setVisible(true);
   }, [schedule, chromeReady]);
+
+  // The chrome going is the other thing that can unblock a check — see `chromeReady`.
+  useEffect(() => {
+    if (chromeReady) return;
+    const onReady = () => setChromeReady(true);
+    eventBus.on(EVENTS.APP_CHROME_READY, onReady);
+    return () => eventBus.off(EVENTS.APP_CHROME_READY, onReady);
+  }, [chromeReady, eventBus]);
 
   // On mount, and again whenever the schedule settles a day — the risk only appears once yesterday
   // has a verdict, which can land after this first runs.
