@@ -29,7 +29,8 @@ import {
 import { matrixPageTitle, toQuestionPages } from './questionnaire/matrixGroups';
 import { richLabel } from './questionnaire/richLabel';
 import { panelBehaviour } from './questionnaire/panelBehaviour';
-import { REQUIRED_MESSAGE } from './questionnaire/QuestionError';
+import { EdgeFade, FADE_HEIGHT } from './questionnaire/EdgeFade';
+import { QuestionError, REQUIRED_MESSAGE } from './questionnaire/QuestionError';
 import type { SpeechPhase } from './questionnaire/SpeechInput';
 import { evaluateBranchingLogic } from './questionnaire/branchingLogic';
 import { blocksProgress } from './questionnaire/questionGate';
@@ -37,6 +38,7 @@ import { PillButton } from '../PillButton';
 import { useTopInset } from '../useTopInset';
 import { useBottomInset } from '../useBottomInset';
 import { useLocalMetric } from '../useLocalMetric';
+import { refusalHaptic } from '../useStepHaptics';
 import { StepSlider } from '../StepSlider';
 
 /**
@@ -285,6 +287,53 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
    * Cleared on every move, so an error never follows them to the next question.
    */
   const [submitAttempt, setSubmitAttempt] = useState(0);
+  /**
+   * Whether the active panel has more content below the fold, and whether they have reached it.
+   *
+   * Two booleans rather than the scroll offset: a fade driven by the offset re-renders this screen on
+   * every frame of every scroll, and all this needs to know is when to appear and when to stop. Both
+   * are written only when the answer actually flips.
+   */
+  const [panelOverflows, setPanelOverflows] = useState(false);
+  const [panelAtBottom, setPanelAtBottom] = useState(false);
+  /** Measured as they arrive, so either one landing second still settles `panelOverflows`. */
+  const panelFrame = useRef(0);
+  const panelContent = useRef(0);
+  const settleOverflow = useCallback(() => {
+    const frame = panelFrame.current;
+    const content = panelContent.current;
+    // A point of slack: a content height a hair over the frame is rounding, not something to scroll.
+    setPanelOverflows(frame > 0 && content > frame + 1);
+  }, []);
+  const handlePanelLayout = useCallback(
+    (h: number) => {
+      panelFrame.current = h;
+      settleOverflow();
+    },
+    [settleOverflow],
+  );
+  const handlePanelContent = useCallback(
+    (h: number) => {
+      panelContent.current = h;
+      settleOverflow();
+    },
+    [settleOverflow],
+  );
+  useEffect(() => {
+    panelFrame.current = 0;
+    panelContent.current = 0;
+    setPanelOverflows(false);
+    setPanelAtBottom(false);
+  }, [currentIndex]);
+  const handlePanelScroll = useCallback((offset: number) => {
+    const frame = panelFrame.current;
+    const content = panelContent.current;
+    if (!frame || !content) return;
+    // `FADE_HEIGHT` from the end counts as arrived: the fade should be gone by the time the last of
+    // the content is clear of it, not still sitting over it.
+    setPanelAtBottom(content - frame - offset <= FADE_HEIGHT);
+  }, []);
+
   /** Set by the current input. A ref, not state: `goNext` only reads it when pressed. */
   const answerValid = useRef(true);
   const handleValidityChange = useCallback((valid: boolean) => {
@@ -439,6 +488,22 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   const canProceed = !isRequired || hasAnswer;
   /** Surfaced only once they've tried to leave — see `submitAttempt`. */
   const requiredError = submitAttempt > 0 && !canProceed ? REQUIRED_MESSAGE : null;
+
+  /**
+   * What every refused answer does, whatever kind of question it was.
+   *
+   * Just the buzz now. The message is pinned above the footer, so there is nothing to scroll to in
+   * order to see it — which is what makes a refusal feel the same on every page. A matrix block still
+   * moves itself to the row that is holding them up; that is about the row, not the message.
+   *
+   * Keyed on `submitAttempt`, not on the message, so pressing Next again on the same unanswered
+   * question buzzes again — the counter exists precisely so a repeated refusal registers as a fresh
+   * one rather than looking inert.
+   */
+  useEffect(() => {
+    if (submitAttempt === 0 || !requiredError) return;
+    refusalHaptic();
+  }, [submitAttempt, requiredError]);
 
   // The speech question owns its own progression (record → stop → "Continue"), so it never shows Next.
   // It keeps the back/exit button on the idle screen as an escape hatch, but drops the footer entirely
@@ -691,6 +756,22 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                         isScalePanel && styles.scrollContentFill,
                       ]
                 }
+                onLayout={
+                  isActive && !isFixedPanel
+                    ? (e) => handlePanelLayout(e.nativeEvent.layout.height)
+                    : undefined
+                }
+                onContentSizeChange={
+                  isActive && !isFixedPanel ? (_w, h) => handlePanelContent(h) : undefined
+                }
+                onScroll={
+                  isActive && !isFixedPanel
+                    ? (e) => handlePanelScroll(e.nativeEvent.contentOffset.y)
+                    : undefined
+                }
+                // 16ms: the handler above only calls `setState` when its answer flips, so the cost of
+                // a frequent event is a comparison rather than a render.
+                scrollEventThrottle={16}
                 showsVerticalScrollIndicator={false}
                   // Set even on a View panel, where it is simply ignored — see `panelBehaviour`
                   // for which pages refuse to scroll and why. `&& !scrollLocked`: an input
@@ -845,6 +926,8 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                           // Only the active panel: a parked neighbour has no business freezing the
                           // page the participant is actually looking at.
                           onScrollLock={isActive ? handleScrollLock : undefined}
+                          // Only the text field draws this itself, lined up with its own card. Every
+                          // other type gets the screen's pinned row below.
                           errorMessage={isActive ? requiredError : null}
                       />
                       {hideTitleHere ? (
@@ -867,12 +950,56 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
         </StepSlider>
       </View>
 
+      {/*
+        * The page runs on below the fold.
+        *
+        * The same fade the matrix block puts on its own ends, applied to the panel — so a page that
+        * scrolls says so the same way wherever the scrolling happens. It sits just above the footer's
+        * reserved space rather than at the screen's edge, because that space is where the content
+        * stops; a fade below it would be painting the page onto the page.
+        *
+        * Gone once they reach the bottom: an edge that never lifts stops meaning "there is more" and
+        * becomes part of the furniture.
+        */}
+      {panelOverflows && !panelAtBottom && (
+        <View
+          style={[styles.bottomFade, { bottom: FOOTER_RESERVE + bottomInset, height: FADE_HEIGHT }]}
+          pointerEvents="none"
+        >
+          <EdgeFade color={pageBg} width={width} height={FADE_HEIGHT} reversed />
+        </View>
+      )}
+
+      {/*
+        * Why the page was refused, pinned above the footer.
+        *
+        * Drawn here rather than inside the panel so it is on screen whatever the input is doing. In
+        * the content it sat after the input, which put it below the fold on any page that overflows —
+        * a long radio list — and pressing Next appeared to do nothing at all. The matrix block always
+        * looked right only because its container fills the screen, so its message was already pinned;
+        * this gives every type that same behaviour instead of one type scrolling to find it.
+        *
+        * `text` is the exception and draws its own, lined up with its card.
+        */}
+      {currentQuestion?.field_type !== 'text' && (
+        <View
+          style={[styles.errorDock, { bottom: FOOTER_RESERVE + bottomInset }]}
+          pointerEvents="none"
+        >
+          <QuestionError message={requiredError} shakeKey={submitAttempt} mode={mode} />
+        </View>
+      )}
+
       {/* Footer: Exit (first) / Back (thereafter) + Next / Finish (last). The speech question shows only
           the back/exit half while idle, and no footer at all once recording starts. */}
       {/* Always mounted, shown by opacity — see `footerStyle`. `pointerEvents` is what actually takes
           it out of play, so a faded footer can't be pressed on the way out. */}
       <Animated.View
-        style={[styles.footer, { paddingBottom: bottomInset }, footerStyle]}
+        // Opaque, in the page's own colour. The footer is positioned *over* the panel rather than
+        // above it, so with no fill the question's content scrolls straight through the buttons and
+        // the two read as one jumble — `Next` in particular loses the ground its label was chosen
+        // against. Matching `pageBg` keeps the bar invisible except where it is doing that job.
+        style={[styles.footer, { paddingBottom: bottomInset, backgroundColor: pageBg }, footerStyle]}
         pointerEvents={showFooter ? 'auto' : 'none'}
       >
         <View style={styles.footerButton}>
@@ -1083,6 +1210,29 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     fontFamily: fontFamily.regular,
     includeFontPadding: false,
+  },
+  /**
+   * Where the refusal message sits: above the footer, across the page.
+   *
+   * Positioned rather than laid out, for the same reason the footer is — a message appearing must not
+   * resize the panels, or every page would reflow its text the moment somebody pressed Next. The
+   * panels already reserve `FOOTER_RESERVE`, so this sits in space that was being kept clear anyway.
+   *
+   * `pointerEvents: 'none'` at the call site: it overlaps the bottom of the content, and a message is
+   * not something to tap.
+   */
+  /** Full-bleed: the fade is the page's own colour, so it runs to the screen's edges, not the gutter's. */
+  bottomFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+  },
+  errorDock: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    paddingHorizontal: PAGE_PADDING,
+    alignItems: 'center',
   },
   footer: {
     // Over the page, not above it. Laid out in flow, the footer's appearance shortened the slider's

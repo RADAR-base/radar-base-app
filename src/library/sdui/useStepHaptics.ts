@@ -6,7 +6,12 @@ import { useCallback, useRef } from 'react';
  * Deliberately not `impactAsync`: a slider crossing a scale fires this many times in a second, and an
  * impact at that rate reads as the phone buzzing rather than the control ticking.
  */
-type HapticsModule = { selectionAsync: () => Promise<void> };
+type HapticsModule = {
+  selectionAsync: () => Promise<void>;
+  /** Present on `expo-haptics`, but not relied on — see `refusalHaptic`. */
+  notificationAsync?: (type: unknown) => Promise<void>;
+  NotificationFeedbackType?: { Error?: unknown };
+};
 
 /**
  * `expo-haptics`, if the host installed it.
@@ -62,4 +67,28 @@ export function useStepHaptics(): () => void {
       ?.selectionAsync()
       .catch(() => {});
   }, []);
+}
+
+/**
+ * The buzz that goes with a refused answer.
+ *
+ * `notificationAsync(Error)` where the platform has it — a double pulse that reads as "no", distinct
+ * from the single tick a control gives when it accepts something. Falls back to `selectionAsync`,
+ * which is always there, rather than going silent: a refusal the participant cannot see (the message
+ * may be off-screen until the page scrolls to it) is exactly the case where the buzz is doing the
+ * work.
+ *
+ * Silent when `expo-haptics` isn't installed, so this is safe to call unconditionally.
+ */
+export function refusalHaptic(): void {
+  const mod = haptics();
+  if (!mod) return;
+  // Fire and forget: a haptic that fails is not worth interrupting anything for, and on a device with
+  // the system setting off it rejects every time.
+  const error = mod.NotificationFeedbackType?.Error;
+  if (typeof mod.notificationAsync === 'function' && error !== undefined) {
+    mod.notificationAsync(error).catch(() => {});
+    return;
+  }
+  mod.selectionAsync().catch(() => {});
 }
