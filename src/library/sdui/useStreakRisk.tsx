@@ -3,9 +3,9 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { useCoreServices } from '../../core/CoreServicesContext';
 import { useAppChromeReady } from './AppChromeReady';
 import { EVENTS } from '../../core/EventBus';
-import type { StreakRisk } from '../../types';
+import type { StreakDay, StreakRisk } from '../../types';
 
-const NO_RISK: StreakRisk = { atRisk: false, streak: 0, missedDay: null };
+const NO_RISK: StreakRisk = { atRisk: false, streak: 0, missedDay: null, unfinishedDays: 0 };
 
 /**
  * Whether to show the "Don't lose your streak" prompt, and a way to close it.
@@ -27,12 +27,15 @@ export function useStreakRisk() {
   const { schedule, eventBus } = useCoreServices();
   const chromeReady = useAppChromeReady();
   const [risk, setRisk] = useState<StreakRisk>(NO_RISK);
+  /** The days themselves, not just how many — the prompt names them. */
+  const [unfinished, setUnfinished] = useState<StreakDay[]>([]);
   const [visible, setVisible] = useState(false);
 
   const check = useCallback(async () => {
     if (!chromeReady) return;
     const current = schedule.getStreakRisk();
     setRisk(current);
+    setUnfinished(schedule.getUnfinishedDays());
     if (!current.atRisk) {
       setVisible(false);
       return;
@@ -61,5 +64,5 @@ export function useStreakRisk() {
 
   const dismiss = useCallback(() => setVisible(false), []);
 
-  return { visible, dismiss, streak: risk.streak };
+  return { visible, dismiss, streak: risk.streak, unfinished };
 }
