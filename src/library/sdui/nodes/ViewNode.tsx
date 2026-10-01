@@ -16,6 +16,9 @@ const NAVBAR_FOOTPRINT =
   navbarLayout.outerPaddingTop +
   navbarLayout.outerPaddingBottom;
 
+/** Slack below the navbar, so the last card rests clear of it and there is room to scroll. */
+const NAVBAR_CLEARANCE = 24;
+
 /**
  * Root container for a screen. Renders its children inside a scrollable view.
  *
@@ -26,7 +29,8 @@ const NAVBAR_FOOTPRINT =
  * against the scroll (which fought the scroll and never re-expanded).
  *
  * `SDUIShell`'s bottom navbar floats via `position: 'absolute'` over this content, so the scroll
- * view's own bottom padding keeps content from ending up underneath it once scrolled to the end.
+ * view's own bottom padding keeps content from ending up underneath it once scrolled to the end —
+ * the pill's footprint plus `NAVBAR_CLEARANCE`.
  */
 export function ViewNode({ node, context, render }: NodeProps) {
   const insets = useSafeAreaInsets();
@@ -52,7 +56,9 @@ export function ViewNode({ node, context, render }: NodeProps) {
     <ScrollLockContext.Provider value={scrollLock}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={{ paddingBottom: NAVBAR_FOOTPRINT + insets.bottom }}
+        contentContainerStyle={{
+          paddingBottom: NAVBAR_FOOTPRINT + NAVBAR_CLEARANCE + insets.bottom,
+        }}
         showsVerticalScrollIndicator={false}
         scrollEnabled={scrollEnabled}
         stickyHeaderIndices={header ? [0] : undefined}
