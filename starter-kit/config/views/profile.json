@@ -31,35 +31,38 @@
             "layout": "grid",
             "children": [
               {
-                "id": "card_active_days",
-                "type": "StatCardNode",
-                "statsType": "activeDays",
-                "metric": "active_days",
-                "size": "small"
-              },
-              {
-                "id": "card_checkins",
-                "type": "StatCardNode",
-                "statsType": "checkIn",
-                "metric": "task_completed",
-                "label": "Total Check-ins",
-                "size": "small"
-              },
-              {
-                "id": "card_streak",
-                "type": "StatCardNode",
-                "statsType": "currentStreak",
-                "size": "large"
-              },
-              {
                 "id": "wheel_days_study",
                 "type": "DataWheelCardNode",
                 "size": "large",
                 "title": "Days in the study",
-                "metric": "active_days",
+                "metric": "study_days",
                 "showOpenButton": false
+              },
+              {
+                "id": "card_active_days",
+                "type": "StatCardNode",
+                "statsType": "activeDays",
+                "metric": "active_days",
+                "size": "large"
               }
             ]
+          }
+        ]
+      },
+      {
+        "id": "section_stats_grid2",
+        "type": "CardSectionNode",
+        "layout": "horizontal",
+        "children": [
+          {
+            "id": "streaks_card",
+            "type": "StreakCardNode"
+          },
+          {
+            "id": "card_longest_streak",
+            "type": "StatCardNode",
+            "statsType": "longestStreak",
+            "size": "small"
           }
         ]
       },

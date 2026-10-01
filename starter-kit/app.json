@@ -45,7 +45,7 @@
       "infoPlist": {
         "NSMicrophoneUsageDescription": "This app requires microphone access to record audio messages."
       },
-      "appleTeamId": "J7SH7ST98B"
+      "appleTeamId": "B2G939N48B"
     },
     "android": {
       "edgeToEdgeEnabled": true,
