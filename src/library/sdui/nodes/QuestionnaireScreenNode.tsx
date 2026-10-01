@@ -290,6 +290,9 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   const [timestamps, setTimestamps] = useState<Record<string, QuestionTimestamp>>({});
   // Reported by the speech input; drives whether this screen keeps its footer (see `showFooter`).
   const [speechPhase, setSpeechPhase] = useState<SpeechPhase>('idle');
+  // An input dragging inside the panel holds it still for the length of the gesture.
+  const [scrollLocked, setScrollLocked] = useState(false);
+  const handleScrollLock = useCallback((locked: boolean) => setScrollLocked(locked), []);
   /**
    * Measured height of the review screen's heading, used to centre the controls on the *page* rather
    * than in the space the heading leaves below it.
@@ -921,6 +924,7 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                         // out above it, so this is the same fixed reserve every panel leaves — nothing
                         // to measure.
                         bottomReserve={FOOTER_RESERVE + bottomInset}
+                        onScrollLock={isActive ? handleScrollLock : undefined}
                       />
                       {hideTitleHere ? (
                         <>
