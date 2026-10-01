@@ -83,6 +83,8 @@ interface QuestionRendererProps {
    * its own lined up with its card.
    */
   errorMessage?: string | null;
+  /** Lets an input hold its panel still while it is being dragged. */
+  onScrollLock?: (locked: boolean) => void;
 }
 
 const DEFAULT_YESNO_CHOICES = [
@@ -137,6 +139,7 @@ export function QuestionRenderer({
   submitAttempt,
   onValidityChange,
   errorMessage,
+  onScrollLock,
 }: QuestionRendererProps) {
   const isRequired = question.required_field === 'y';
   // Hosts that don't theme their inputs still get something coherent: the brand as the selected fill
