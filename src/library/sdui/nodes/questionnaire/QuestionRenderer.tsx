@@ -15,7 +15,6 @@ import { TextQuestionInput } from './TextQuestionInput';
 import { InfoScreen } from './InfoScreen';
 import { SpeechInput, type SpeechPhase } from './SpeechInput';
 import { speechContent } from './speechContent';
-import { QuestionError } from './QuestionError';
 import { fontFamily, withAlpha, type ThemeMode } from '../../../../theme/theme';
 
 interface QuestionRendererProps {
@@ -87,8 +86,11 @@ interface QuestionRendererProps {
    */
   onScrollLock?: (locked: boolean) => void;
   /**
-   * Why this question was refused. Rendered under the input for every type except `text`, which draws
-   * its own lined up with its card.
+   * Why this question was refused — only `text` still draws it, lined up with its own card.
+   *
+   * Everything else is drawn by the screen, pinned above the footer, so the message is on screen
+   * whatever the input is doing: inside scrolling content it sat below the fold on a long page, and
+   * the participant pressed Next to no visible effect.
    */
   errorMessage?: string | null;
 }
@@ -184,46 +186,37 @@ export function QuestionRenderer({
 
       {renderInput()}
 
-      {/* Under the input, inside this container — a sibling of the container outside it would sit
-          below its bottom margin as well as the panel's gap, putting the message more than twice as
-          far from a radio group as from a text field. `text` is excluded: it draws its own, lined up
-          with its card. */}
-      {question.field_type !== 'text' ? (
-        <QuestionError
-          message={errorMessage}
-          style={styles.error}
-          shakeKey={submitAttempt}
-        />
-      ) : null}
     </View>
   );
 
-  function renderInput() {
-    /**
-     * A matrix block, before the per-field switch.
-     *
-     * It is the one thing here that isn't a field type rendered on its own: its rows share a screen,
-     * so the unit is the page. A lone row goes through the same component as a block of one, so it
-     * looks the same whether or not it was gathered with neighbours.
-     *
-     * A row only misses this if it offers nothing to choose from or more than the track can fit; see
-     * `MATRIX_ROWS_MAX_CHOICES`. Those fall to the plain radio list in the switch below, which is
-     * honest at any length.
-     */
+  /** The plain option list — what `radio` draws, and what a matrix row falls back to. */
+  function radioList() {
+    return (
+      <RadioInput
+        choices={question.select_choices_or_calculations ?? []}
+        value={value != null ? String(value) : undefined}
+        onChange={onChange}
+        accentColor={radioAccent}
+        surfaceColor={radioSurface}
+        textColor={textColor}
+      />
+    );
+  }
 
+  function renderInput() {
     switch (question.field_type) {
-      case 'radio': {
-        return (
-          <RadioInput
-            choices={parseChoices(question.select_choices_or_calculations)}
-            value={value != null ? String(value) : undefined}
-            onChange={onChange}
-            accentColor={radioAccent}
-            surfaceColor={radioSurface}
-            textColor={textColor}
-          />
-        );
-      }
+      // case 'radio': {
+      //   return (
+      //     <RadioInput
+      //       choices={parseChoices(question.select_choices_or_calculations)}
+      //       value={value != null ? String(value) : undefined}
+      //       onChange={onChange}
+      //       accentColor={radioAccent}
+      //       surfaceColor={radioSurface}
+      //       textColor={textColor}
+      //     />
+      //   );
+      // }
 
       case 'likert-emoji': {
         return (
@@ -381,32 +374,25 @@ export function QuestionRenderer({
           />
         );
 
+      case 'radio':
+        return radioList();
+
       case 'matrix-radio': {
-        if (isMatrix && onAnswer) {
-          const page = questions?.length ? questions : [question];
-          return (
-            <MatrixRadioRows
-              questions={page}
-              answers={answers ?? (question.field_name ? { [question.field_name]: value } : {})}
-              onAnswer={onAnswer}
-              accentColor={radioAccent}
-              surfaceColor={radioSurface}
-              textColor={textColor}
-              primaryColor={primaryColor}
-              backgroundColor={backgroundColor ?? radioSurface}
-              bottomReserve={bottomReserve}
-              pageInset={pageInset}
-            />
-          );
-        }
+        if (!isMatrix || !onAnswer) return radioList();
+        const page = questions?.length ? questions : [question];
         return (
-          <RadioInput
-            choices={question.select_choices_or_calculations ?? []}
-            value={value != null ? String(value) : undefined}
-            onChange={onChange}
+          <MatrixRadioRows
+            questions={page}
+            answers={answers ?? (question.field_name ? { [question.field_name]: value } : {})}
+            onAnswer={onAnswer}
             accentColor={radioAccent}
             surfaceColor={radioSurface}
             textColor={textColor}
+            primaryColor={primaryColor}
+            backgroundColor={backgroundColor ?? radioSurface}
+            bottomReserve={bottomReserve}
+            pageInset={pageInset}
+            submitAttempt={submitAttempt}
           />
         );
       }
@@ -460,10 +446,6 @@ const styles = StyleSheet.create({
   containerFill: {
     flex: 1,
     marginBottom: 0,
-  },
-  /** The gap above the message — matched to the text field's own. */
-  error: {
-    marginTop: 16,
   },
   /** Hands the scale the height its parent gave us, instead of collapsing to its content. */
   fill: {
