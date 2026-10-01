@@ -1,4 +1,5 @@
-import { Platform, type ViewStyle } from 'react-native';
+import { type ViewStyle } from 'react-native';
+import { cardShadow } from '../../../../theme/theme';
 
 /**
  * The look of a choice drawn as a pill card, shared by `RadioInput` and `CheckboxInput`.
@@ -29,25 +30,16 @@ export const INDICATOR_BORDER = 2;
 export const PRESSED_OPACITY = 0.85;
 
 /**
- * A softer, straight-down version of the app's `cardShadow`.
+ * The app's `cardShadow`, re-exported under the name these inputs used to define their own copy with.
  *
- * The shared one is offset 8px to the *right*, which reaches ~20px past the card. These options are
- * full-width inside a viewport that clips its overflow (the ScrollView and `StepSlider` both do), so
- * that shadow was sliced off at the edges. Dropping the horizontal offset leaves only the blur to
- * spill sideways — a few faint pixels rather than a visible cut — and keeps the pills full width.
- *
- * Android already uses a straight-down shadow, so it matches `cardShadow` there.
+ * That copy existed because `cardShadow` was once offset 8px to the *right*, reaching ~20px past the
+ * card and getting sliced off by the viewports these options sit in (the panel's ScrollView and
+ * `StepSlider` both clip). `cardShadow` is now straight down with a reach the page gutter can hold,
+ * so there is nothing left for a second definition to fix — and the copy had drifted: it still used
+ * the old mid grey, which composites *lighter* than a dark-mode page and rings each option with a
+ * glow instead of lifting it.
  */
-export const optionShadow = Platform.select({
-  android: { boxShadow: '0px 4px 12px rgba(121, 120, 127, 0.14)', elevation: 0 },
-  default: {
-    shadowColor: '#79787F',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 0,
-  },
-}) as ViewStyle;
+export const optionShadow = cardShadow as ViewStyle;
 
 /**
  * What is drawn on the accent fill once an option is chosen: its label, and its indicator.

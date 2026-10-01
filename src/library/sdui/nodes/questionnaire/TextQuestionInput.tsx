@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Platform, StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 import Animated, {
   interpolateColor,
   useAnimatedStyle,
@@ -7,7 +7,13 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import { fontFamily, layout as layoutTokens, tracking, withAlpha } from '../../../../theme/theme';
+import {
+  cardShadow,
+  fontFamily,
+  layout as layoutTokens,
+  tracking,
+  withAlpha,
+} from '../../../../theme/theme';
 import { FAILED_COLOR, QuestionError } from './QuestionError';
 
 interface TextQuestionInputProps {
@@ -81,25 +87,6 @@ const SHAKE_STEP_MS = SHAKE_MS / 8;
 const MIN_HEIGHT = 200;
 /** A single-line field (numbers, email, phone) doesn't need the writing area's height. */
 const SINGLE_LINE_MIN_HEIGHT = 72;
-
-/**
- * A softer, straight-down drop shadow.
- *
- * The design's is offset 8pt right, and the shared `cardShadow` matches it — but this field is
- * full-width inside a viewport that clips its overflow (the panel's ScrollView and `StepSlider`
- * both do), so a horizontal offset is sliced off at the edge. Dropping it leaves only the blur,
- * which reads the same. Android already draws straight down, so it matches there either way.
- */
-const fieldShadow = Platform.select({
-  android: { boxShadow: '0px 4px 12px rgba(121, 120, 127, 0.14)', elevation: 0 },
-  default: {
-    shadowColor: '#79787F',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 0,
-  },
-});
 
 /**
  * Free-text answer (Figma 3593:4092) — a card-sized writing area with three states:
@@ -227,7 +214,7 @@ export function TextQuestionInput({
       {/* Two nested views rather than one bordered box: React Native paints a view's background
           *under* its border, so a translucent halo drawn over the card's own fill would be invisible.
           The outer view carries the halo, the inner one the solid edge and the fill. */}
-      <Animated.View style={[styles.halo, fieldShadow, haloStyle]}>
+      <Animated.View style={[styles.halo, cardShadow, haloStyle]}>
         <Animated.View
           style={[
             styles.field,
