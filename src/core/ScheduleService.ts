@@ -1,6 +1,7 @@
 import { AppState, type NativeEventSubscription } from 'react-native';
 import type {
   DayVerdict,
+  StreakDay,
   StreakRisk,
   ScheduleService,
   Task,
@@ -12,6 +13,9 @@ import type {
   AppServerService,
 } from '../types';
 import { EVENTS } from './EventBus';
+
+/** Days on the streak strip: today and the five before it. See `getStreakWeek`. */
+export const STREAK_WINDOW_DAYS = 6;
 
 export const STORAGE_KEYS = {
   INSTANCES: '@radarbase/schedule_instances',
@@ -215,19 +219,53 @@ export abstract class ScheduleServiceBase implements ScheduleService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Record a verdict for every day that has reached one, and return whether anything changed.
+   * How one day's tasks count toward the streak, or `null` while the day could still go either way.
    *
-   * A day is **complete** the moment every task scheduled for it has been completed — no need to wait
-   * for midnight, since there is nothing left to do and the participant should see the counter move.
-   * It is **missed** only once every one of its tasks has reached a terminal state and at least one
-   * was not completed. Until then it is *pending*: a task whose completion window runs past midnight
-   * keeps its day open, because someone who still has time to act has not missed anything yet.
+   * **Complete** when every task scheduled for it has been completed. **Missed** once every one of
+   * them has reached a terminal state or run out of time, with at least one not completed. Otherwise
+   * *pending*: someone who still has time to act has not missed anything yet.
    *
-   * Runs on every schedule change. A verdict is never revised — the first answer a day gives is the
-   * one that sticks, which is what keeps the streak stable as the server's task window rolls forward.
+   * A day nothing was scheduled on has no tasks and so no status — it is not a day anyone lost.
+   */
+  private streakStatusForTasks(tasks: Task[]): DayVerdict | null {
+    if (tasks.length === 0) return null;
+    if (tasks.every(t => t.state === 'completed')) return 'complete';
+    const now = Date.now();
+    const settled = tasks.every(
+      t => isTerminal(t.state) || t.timestamp + t.completionWindow <= now,
+    );
+    return settled ? 'missed' : null;
+  }
+
+  /** Every task scheduled for the local day starting at `dayStart`. */
+  private tasksForDay(dayStart: number): Task[] {
+    return this.tasks.filter(t => startOfDay(new Date(t.timestamp)).getTime() === dayStart);
+  }
+
+  /**
+   * Record a status for every day that is **over** and has reached one, and return whether anything
+   * changed.
+   *
+   * Only days already past get written down, for two reasons that both used to inflate the streak:
+   *
+   *  - A day still to come was judged like any other. A task dated tomorrow that arrived already
+   *    completed settled *tomorrow* as complete, and the streak counted a day that had not happened.
+   *  - A day was settled against whatever tasks had arrived *so far*. A sync that delivered part of a
+   *    day, cleared by the participant, wrote `complete` permanently — and the rest of that day,
+   *    arriving later and expiring unanswered, could never take it back.
+   *
+   * Waiting until the day is over costs nothing, because today is not read from here at all: it is
+   * computed live by `streakStatusForDay`, so completing the day's last task still moves the counter
+   * at once.
+   *
+   * Runs on every schedule change. A recorded status is revised in exactly one direction — `complete`
+   * down to `missed`, when a day settled on a partial view of itself is later seen to hold a task that
+   * was never finished. Nothing promotes a day back up: a day whose tasks stop being sent has gone
+   * quiet, not been completed, and that is what keeps the streak stable as the server's task window
+   * rolls forward and old tasks drop out of it.
    */
   private async settleDays(): Promise<boolean> {
-    const now = Date.now();
+    const todayStart = startOfDay(new Date()).getTime();
     const byDay = new Map<string, Task[]>();
     for (const task of this.tasks) {
       const key = dayKey(new Date(task.timestamp));
@@ -238,21 +276,25 @@ export abstract class ScheduleServiceBase implements ScheduleService {
 
     let changed = false;
     for (const [key, tasks] of byDay) {
-      if (this.dayVerdicts.has(key)) continue;
+      // Today and anything after it: not this method's business — see the note above.
+      const date = dayKeyToDate(key);
+      if (!date || date.getTime() >= todayStart) continue;
 
-      if (tasks.every(t => t.state === 'completed')) {
-        this.dayVerdicts.set(key, 'complete');
-        changed = true;
-        continue;
-      }
-      // Anything still open — not terminal, and its window has not run out — leaves the day pending.
-      const settled = tasks.every(
-        t => isTerminal(t.state) || t.timestamp + t.completionWindow <= now,
-      );
-      if (settled) {
-        this.dayVerdicts.set(key, 'missed');
-        changed = true;
-      }
+      const status = this.streakStatusForTasks(tasks);
+      if (!status) continue;
+
+      const recorded = this.dayVerdicts.get(key);
+      if (recorded === status) continue;
+      // A day recorded `complete` whose tasks now show one of them was never finished was settled on
+      // a partial view of it — the server had not sent the rest yet. Correcting that is the one
+      // revision allowed, and only ever downwards: `complete` is the claim the missing evidence could
+      // make falsely, so seeing an unfinished task is grounds to withdraw it. The reverse is not true.
+      // A `missed` day going quiet means the server stopped sending its tasks, not that they were
+      // done, so nothing may promote a day back up.
+      if (recorded !== undefined && !(recorded === 'complete' && status === 'missed')) continue;
+
+      this.dayVerdicts.set(key, status);
+      changed = true;
     }
 
     if (changed) {
@@ -264,12 +306,80 @@ export abstract class ScheduleServiceBase implements ScheduleService {
     return changed;
   }
 
-  /** Judged days, oldest first. Days with no tasks — and days still pending — simply aren't in it. */
+  /**
+   * One day's streak status: recorded for a day that is over, computed live for today.
+   *
+   * The single place that decides, so the strip and the count can't disagree about what today is.
+   * Today is deliberately not read from `dayVerdicts` even when an entry exists — an install that
+   * settled today under the previous rule has one, and the live answer is the better of the two.
+   */
+  private streakStatusForDay(dayStart: number): DayVerdict | null {
+    const todayStart = startOfDay(new Date()).getTime();
+    if (dayStart === todayStart) return this.streakStatusForTasks(this.tasksForDay(dayStart));
+    // Nothing after today is ever judged, whatever an older install may have written down.
+    if (dayStart > todayStart) return null;
+    return this.dayVerdicts.get(dayKey(new Date(dayStart))) ?? null;
+  }
+
+  /**
+   * How a day with no status reads: `pending` when it has passed and still holds work, else `open`.
+   *
+   * The distinction the schedule itself doesn't make. A task whose completion window outlives its day
+   * leaves that day unjudged — correctly, since nothing has been missed while it can still be done —
+   * but "you have something from Tuesday to finish" and "Thursday hasn't happened" are not the same
+   * message, and drawn as one empty ring they become the same message.
+   *
+   * Only the days between: today is never `pending` (its tasks are simply today's work), and neither
+   * is a day still to come.
+   */
+  private unsettledState(dayStart: number): 'pending' | 'open' {
+    const todayStart = startOfDay(new Date()).getTime();
+    if (dayStart >= todayStart) return 'open';
+    const now = Date.now();
+    const hasWorkLeft = this.tasksForDay(dayStart).some(
+      t => !isTerminal(t.state) && t.timestamp + t.completionWindow > now,
+    );
+    return hasWorkLeft ? 'pending' : 'open';
+  }
+
+  /**
+   * Days already past that still hold tasks the participant can finish, oldest first.
+   *
+   * What the strip marks `pending`, as a list — so the card can say how much is outstanding and the
+   * prompt can offer to do something about it.
+   */
+  getUnfinishedDays(): StreakDay[] {
+    const todayStart = startOfDay(new Date()).getTime();
+    const days = new Set<number>();
+    for (const task of this.tasks) {
+      const dayStart = startOfDay(new Date(task.timestamp)).getTime();
+      if (dayStart >= todayStart) continue;
+      days.add(dayStart);
+    }
+    return [...days]
+      .filter(d => this.unsettledState(d) === 'pending' && !this.dayVerdicts.has(dayKey(new Date(d))))
+      .sort((a, b) => a - b)
+      .map(d => ({ key: dayKey(new Date(d)), timestamp: d, state: 'pending' as const }));
+  }
+
+  /**
+   * Judged days, oldest first. Days with no tasks — and days still pending — simply aren't in it.
+   *
+   * Today comes from `streakStatusForDay` rather than storage, so the streak moves the moment the
+   * day's last task is completed; days after today are dropped, which is what retires any future
+   * status an older install recorded before `settleDays` stopped writing them.
+   */
   private judgedDays(): { date: Date; verdict: DayVerdict }[] {
-    return [...this.dayVerdicts.entries()]
+    const todayStart = startOfDay(new Date()).getTime();
+    const days = [...this.dayVerdicts.entries()]
       .map(([key, verdict]) => ({ date: dayKeyToDate(key), verdict }))
       .filter((d): d is { date: Date; verdict: DayVerdict } => d.date !== null)
-      .sort((a, b) => a.date.getTime() - b.date.getTime());
+      .filter(d => d.date.getTime() < todayStart);
+
+    const today = this.streakStatusForDay(todayStart);
+    if (today) days.push({ date: new Date(todayStart), verdict: today });
+
+    return days.sort((a, b) => a.date.getTime() - b.date.getTime());
   }
 
   /**
@@ -313,6 +423,45 @@ export abstract class ScheduleServiceBase implements ScheduleService {
   }
 
   /**
+   * The last {@link STREAK_WINDOW_DAYS} days ending on `reference` — what the streak card's strip
+   * draws, oldest first, so today is the rightmost cell.
+   *
+   * A trailing window rather than the calendar week it started as. A Mon→Sun week spends most of its
+   * cells on days that have not happened: on a Tuesday, five of the seven are empty rings and only
+   * one is history, so a streak earned over the previous weekend showed in the card's number with
+   * nothing underneath to account for it. Ending at today means every cell is a day that has been and
+   * gone, and the strip covers the same stretch the number is counting.
+   *
+   * The cost is that the weekday letters no longer start at M, so the caller has to take each one
+   * from its own day's date rather than from a fixed row.
+   *
+   * Days with no status come back `open` rather than being left out, so the strip always has a full
+   * row: a day nothing was scheduled on is not a day the participant lost.
+   */
+  getStreakWeek(reference: Date = new Date()): StreakDay[] {
+    const start = new Date(reference);
+    start.setHours(0, 0, 0, 0);
+    // Back up so the window *ends* on the reference day rather than starting on it.
+    start.setDate(start.getDate() - (STREAK_WINDOW_DAYS - 1));
+
+    return Array.from({ length: STREAK_WINDOW_DAYS }, (_, i) => {
+      // Stepping the date field rather than adding 24h keeps the walk correct across a DST change,
+      // where one of these days is 23 or 25 hours long.
+      const date = new Date(start);
+      date.setDate(start.getDate() + i);
+      const key = dayKey(date);
+      // Through `streakStatusForDay`, not the stored map, so today's circle fills the moment its
+      // last task is completed rather than at midnight — and so a day still to come always draws
+      // as open.
+      return {
+        key,
+        timestamp: date.getTime(),
+        state: this.streakStatusForDay(date.getTime()) ?? this.unsettledState(date.getTime()),
+      };
+    });
+  }
+
+  /**
    * Whether a streak is one missed day from being lost — what the "Don't lose your streak" prompt asks.
    *
    * True when the most recently judged day was missed and there is a streak left to save. Today being
@@ -321,11 +470,24 @@ export abstract class ScheduleServiceBase implements ScheduleService {
   getStreakRisk(): StreakRisk {
     const days = this.judgedDays();
     const last = days[days.length - 1];
-    const today = dayKey(new Date());
+    const todayStart = startOfDay(new Date()).getTime();
     const streak = this.getCurrentStreak();
-    const atRisk =
-      streak > 0 && last != null && last.verdict === 'missed' && this.dayVerdicts.get(today) !== 'complete';
-    return { atRisk, streak, missedDay: atRisk && last ? dayKey(last.date) : null };
+    // Today live, for the same reason `judgedDays` reads it live: the prompt has to stop as soon as
+    // the day's last task is done, not at midnight.
+    const missedRisk =
+      streak > 0 &&
+      last != null &&
+      last.verdict === 'missed' &&
+      this.streakStatusForDay(todayStart) !== 'complete';
+    const unfinishedDays = this.getUnfinishedDays().length;
+    // Outstanding work is worth raising whether or not a streak is riding on it — there is something
+    // to do about it either way, which is exactly what a missed day lacks.
+    return {
+      atRisk: missedRisk || unfinishedDays > 0,
+      streak,
+      missedDay: missedRisk && last ? dayKey(last.date) : null,
+      unfinishedDays,
+    };
   }
 
   /**

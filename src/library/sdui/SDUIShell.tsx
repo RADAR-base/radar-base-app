@@ -40,6 +40,7 @@ import { useAppChromeReady } from './AppChromeReady';
 import { NotificationsProvider } from './useNotifications';
 import { TaskInstructionsScreen } from './TaskInstructionsScreen';
 import type { TaskCardType } from './nodes/card/TaskCardNode';
+import { unfinishedDayName } from './nodes/card/StreakCardNode';
 import {
   fontFamily,
   navbarLayout,
@@ -256,7 +257,7 @@ export function SDUIShell(props: SDUIShellProps) {
 const DEMO_PREVIEW_STREAK_PROMPT = false;
 
 function StreakRiskHost({ context }: { context: SDUIContext }) {
-  const { visible, dismiss } = useStreakRisk();
+  const { visible, dismiss, unfinished } = useStreakRisk();
   const [preview, setPreview] = React.useState(DEMO_PREVIEW_STREAK_PROMPT);
   // The preview waits for the loading screen too — forcing it past that gate is what made the prompt
   // appear to ignore the wait, opening underneath the screen the moment the shell mounted.
@@ -268,6 +269,20 @@ function StreakRiskHost({ context }: { context: SDUIContext }) {
         setPreview(false);
         dismiss();
       }}
+      // Outstanding work gets its own words. The default copy is an obituary for a day that is gone;
+      // these days are not gone, and telling someone they missed something they can still finish
+      // would be both wrong and discouraging.
+      {...(unfinished.length > 0
+        ? {
+            title: 'You have tasks waiting',
+            // Named, not counted. "An earlier day" leaves the participant to work out which one, and
+            // being able to go and do something about it is the whole point of the prompt.
+            description:
+              unfinished.length === 1
+                ? `Finish your tasks from ${unfinishedDayName(unfinished[0].timestamp)} to keep your streak going.`
+                : `Finish your tasks from ${unfinished.length} earlier days to keep your streak going.`,
+          }
+        : null)}
       mode={context.colorScheme ?? 'light'}
       brandColors={context.theme.brandColors}
     />
@@ -785,6 +800,7 @@ function TabPanel({
   }, [viewPath, cached, blueprintLoader]);
 
   const blueprint = cached ?? (loaded && loaded.path === viewPath ? loaded.blueprint : null);
+
 
   if (!tab) {
     return (

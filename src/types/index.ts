@@ -510,12 +510,42 @@ export type TaskState = 'pending' | 'completed' | 'skipped' | 'overdue' | 'expir
 export type DayVerdict = 'complete' | 'missed';
 
 export interface StreakRisk {
-  /** Whether to warn the participant that one more missed day ends their streak. */
+  /** Whether there is anything to prompt the participant about at all. */
   atRisk: boolean;
   /** The streak still standing — what they'd lose. */
   streak: number;
   /** The day that was missed, for a message that wants to name it. */
   missedDay: string | null;
+  /**
+   * Past days that still hold tasks the participant can finish.
+   *
+   * A different thing to warn about from `missedDay`, and the more useful one: a missed day is gone,
+   * whereas these can still be put right. A prompt should say which it is looking at — the two want
+   * opposite copy.
+   */
+  unfinishedDays: number;
+}
+
+/**
+ * How one day of a week strip reads.
+ *
+ * The two `DayVerdict` members are the settled answers. The other two are what `DayVerdict`
+ * deliberately has no member for, split apart for display because they look the same to the schedule
+ * and mean very different things to the participant:
+ *
+ *  - `pending` — a day already past that still has tasks the participant can finish. Their completion
+ *    window outlives the day, so nothing has been missed and the schedule holds no verdict; but there
+ *    is work sitting there, and a strip that drew it like an untouched day would never say so.
+ *  - `open` — nothing to act on: today, the days ahead, and any past day nothing was scheduled on.
+ */
+export type StreakDayState = DayVerdict | 'pending' | 'open';
+
+export interface StreakDay {
+  /** Local day key — the same form `ScheduleService` stores verdicts under. */
+  key: string;
+  /** Local midnight for the day, as epoch ms. */
+  timestamp: number;
+  state: StreakDayState;
 }
 
 /** Core task model — aligned with RADAR-Questionnaire `Task`. */
@@ -577,6 +607,10 @@ export interface ScheduleService {
   getCurrentStreak(): number;
   /** The longest such run on record. */
   getLongestStreak(): number;
+  /** The seven days of the week containing `reference` (default today), Monday first. */
+  getStreakWeek(reference?: Date): StreakDay[];
+  /** Past days that still hold tasks the participant can finish — what the strip marks `pending`. */
+  getUnfinishedDays(): StreakDay[];
   /** Whether one more missed day would end the streak — drives the "Don't lose your streak" prompt. */
   getStreakRisk(): StreakRisk;
   /** Takes today's one showing of that prompt; false once it has already been shown today. */
