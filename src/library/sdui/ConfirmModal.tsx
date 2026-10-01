@@ -15,6 +15,7 @@ import {
   layout,
   type ThemeColorOverrides,
   type ThemeMode,
+  layout as layoutTokens,
 } from '../../theme/theme';
 import { PillButton } from './PillButton';
 
@@ -138,7 +139,7 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     gap: 16,
     padding: 32,
-    borderRadius: 24,
+    borderRadius: layoutTokens.radiusCard,
   },
   closeRow: {
     width: '100%',

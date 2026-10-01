@@ -646,31 +646,32 @@ export function resolveBackground(
 }
 
 /**
- * The single canonical drop shadow (Figma spec: a #79787F shadow at 8%, offset 8/8, 12px blur).
+ * The single canonical drop shadow — a 2pt drop with a 6pt blur, near-black.
  * Spread into any surface's style (`{ ...cardShadow }`) so every card matches.
  *
  * Split per platform because the two renderers differ:
- *  - iOS reads the `shadow*` props exactly — soft diagonal Core Animation shadow.
- *  - Android (New Architecture) renders CSS `boxShadow`, but its blur is harder than iOS's, so the
- *    big 8/8 diagonal comes out as a hard-edged smear. A mostly-downward, more-blurred shadow with a
- *    touch more opacity reads far closer to the iOS softness. Tune the Android values to taste —
- *    bigger blur + smaller offset = softer; the opacity is the darkness knob.
+ *  - iOS reads the `shadow*` props exactly.
+ *  - Android (New Architecture) renders CSS `boxShadow`, whose blur is harder, so it takes slightly
+ *    more opacity to land at a comparable softness.
  *
  * `elevation: 0` on both so no Material shadow stacks on top; only one shadow source per platform.
  */
 export const cardShadow =
   Platform.OS === 'android'
     ? ({
-        boxShadow: '0px 4px 12px rgba(121, 120, 127, 0.14)',
+        boxShadow: '0px 2px 6px rgba(30, 28, 36, 0.12)',
         elevation: 0,
       } as const)
     : ({
-        shadowColor: '#79787F',
-        shadowOffset: { width: 8, height: 8 },
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
+        shadowColor: '#1E1C24',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 6,
         elevation: 0,
       } as const);
+
+/** How far `cardShadow` reaches past its element. Clipping parents reserve this much room. */
+export const cardShadowBleed = 8;
 
 /**
  * Task-status styling shared by the task cards (`TaskCardNode`, `CalendarTaskCard`) and the calendar
@@ -815,8 +816,10 @@ export const layout = {
   headingLineHeight: 20,
   /** Corner radius for pill-shaped chips, badges, and buttons. */
   radiusPill: 24,
-  /** Corner radius for card surfaces. */
-  radiusCard: 12,
+  /** Corner radius for card surfaces — every card in the app shares it. */
+  radiusCard: 24,
+  /** Corner radius for non-card elements at a card's scale: a navbar tab, a chart bar, a tooltip. */
+  radiusControl: 12,
   /** Corner radius for a full screen / page (the app frame + sliding overlays), so pages read as
    *  rounded cards — including as they slide over one another. Tune to match the device screen. */
   radiusScreen: 40,

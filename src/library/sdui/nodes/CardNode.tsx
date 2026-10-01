@@ -12,6 +12,8 @@ import type { NodeProps } from '../types';
  *   - `paddingHorizontal` (number) — overrides default horizontal padding
  *   - `paddingVertical` (number) — overrides default vertical padding
  */
+const CARD_RADIUS = layout.radiusCard;
+
 export function CardNode({ node, context, render }: NodeProps) {
   const theme = context.theme;
   const flat = node.flat === true;
@@ -24,7 +26,7 @@ export function CardNode({ node, context, render }: NodeProps) {
         !flat && cardShadowStyle,
         {
           backgroundColor: theme.surfaceColor ?? '#fff',
-          borderRadius: theme.button?.borderRadius ?? layout.radiusCard,
+          borderRadius: theme.button?.borderRadius ?? CARD_RADIUS,
           paddingHorizontal: ph,
           paddingVertical: pv,
         },

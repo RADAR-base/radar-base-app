@@ -145,11 +145,15 @@ export function HeaderNode({ node, context, render }: NodeProps) {
   );
 }
 
+/** The profile disc's diameter. */
+const AVATAR_SIZE = 48;
+
 const styles = StyleSheet.create({
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    // A circle, so it tracks the size rather than sitting at a literal half of it.
+    borderRadius: AVATAR_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
