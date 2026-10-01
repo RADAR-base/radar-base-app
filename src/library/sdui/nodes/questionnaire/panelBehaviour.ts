@@ -1,6 +1,6 @@
 import type { Question } from '../../../../types';
 import { isMatrixQuestion } from './matrixGroups';
-import { HEIGHT_DRIVEN_TYPES, SCALE_TYPES } from './QuestionRenderer';
+import { SCALE_TYPES } from './QuestionRenderer';
 
 /**
  * How a page's container should behave, decided from what is on it.
@@ -60,14 +60,20 @@ export function panelBehaviour(page: Question[]): PanelBehaviour {
 
   const type = first?.field_type ?? '';
   const isScale = SCALE_TYPES.includes(type);
-  const isHeightDriven = HEIGHT_DRIVEN_TYPES.includes(type);
 
   return {
-    scrolls: !isSpeech && !isMatrix && !isHeightDriven,
-    scrollEnabled: !isSpeech && !isMatrix && !isScale,
+    // The vertical slider used to be excluded here, because a container that sizes to its content
+    // leaves a `flex: 1` child measuring zero. It no longer is: the slider takes an explicit height,
+    // floored so it stays usable, so it needs the page to scroll when a long label squeezes it.
+    scrolls: !isSpeech && !isMatrix,
+    // Every page that scrolls may be dragged. The scale types used to sit on a frozen scroller so a
+    // drag could never be stolen — but a long field label pushed the control off a page that then
+    // refused to move. They hold the page still for the drag instead, as the arc slider already did.
+    scrollEnabled: !isSpeech && !isMatrix,
     fills: isSpeech || isMatrix || isScale,
-    // A scale keeps the footer clear itself, measuring against the window — padding the panel out as
-    // well would take the footer's height off it twice.
+    // A scale keeps the footer clear itself, measuring against the window — padding a *fixed* panel
+    // out as well would take the footer's height off it twice. A scrolling panel pads regardless; see
+    // the note at that call site.
     padsFooter: !isMatrix && !isScale,
   };
 }

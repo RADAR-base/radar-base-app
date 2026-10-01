@@ -774,8 +774,9 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                 scrollEventThrottle={16}
                 showsVerticalScrollIndicator={false}
                 // Set even on a View panel, where it is simply ignored — see `panelBehaviour`
-                // for which pages refuse to scroll and why.
-                scrollEnabled={behaviour.scrollEnabled}
+                  // for which pages refuse to scroll and why. `&& !scrollLocked`: an input dragging
+                  // inside this panel holds it still for the length of the gesture.
+                  scrollEnabled={behaviour.scrollEnabled && !scrollLocked}
               >
                 {!question ? (
                   <Text style={[styles.emptyText, { color: muted }]}>No questions available</Text>

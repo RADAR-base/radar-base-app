@@ -36,6 +36,13 @@ interface SliderInputProps {
    * it. Resolved by the host from the theme and its brand colours; falls back to white.
    */
   backgroundColor?: string;
+  /**
+   * Lets this control hold the page still while it is being dragged.
+   *
+   * The enclosing ScrollView reads a drag as a scroll and takes it, so the page slid away under the
+   * finger instead of the handle moving. Released on finger-up and on a cancelled gesture.
+   */
+  onScrollLock?: (locked: boolean) => void;
 }
 
 /** Figma 3767:5523. Track height, and the radius that makes it a pill. Slightly under the design's
@@ -163,8 +170,17 @@ export function SliderInput({
   textColor,
   accentColor,
   backgroundColor,
+  onScrollLock,
 }: SliderInputProps) {
   const accent = accentColor ?? primaryColor;
+
+  // Read through a ref, as every other live value here is: the handlers below are built once, with an
+  // empty dependency list, so a caller passing an inline arrow must not rebuild them.
+  const onScrollLockRef = useRef(onScrollLock);
+  onScrollLockRef.current = onScrollLock;
+  // A page turn or submit mid-drag unmounts this with no release to fire, which would strand the page
+  // locked. Safe to call when nothing is locked.
+  useEffect(() => () => onScrollLockRef.current?.(false), []);
 
   /** A tick per step crossed, however the value was moved. */
   const tick = useStepHaptics();
@@ -262,6 +278,7 @@ export function SliderInput({
         onPanResponderTerminationRequest: () => false,
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: e => {
+          onScrollLockRef.current?.(true);
           dragging.current = true;
           setPressed(true);
           setDragged(true);
@@ -277,6 +294,7 @@ export function SliderInput({
           setHandle(dragStart.current + gesture.dx);
         },
         onPanResponderRelease: () => {
+          onScrollLockRef.current?.(false);
           dragging.current = false;
           setPressed(false);
           press.value = withTiming(0, { duration: PRESS_MS });
@@ -296,6 +314,8 @@ export function SliderInput({
           onChangeRef.current(valuesRef.current[final]);
         },
         onPanResponderTerminate: () => {
+          // Released here too, or a cancelled gesture leaves the page locked for good.
+          onScrollLockRef.current?.(false);
           dragging.current = false;
           setPressed(false);
           press.value = withTiming(0, { duration: PRESS_MS });

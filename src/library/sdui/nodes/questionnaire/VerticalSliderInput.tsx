@@ -49,6 +49,13 @@ interface VerticalSliderInputProps {
    * Defaults to a safe-area inset plus the questionnaire screen's Back/Next row.
    */
   bottomReserve?: number;
+  /**
+   * Lets this control hold the page still while it is being dragged.
+   *
+   * The enclosing ScrollView reads a vertical drag as a scroll and takes it, so the page slid away
+   * under the finger instead of the handle moving. Released on finger-up and on a cancelled gesture.
+   */
+  onScrollLock?: (locked: boolean) => void;
 }
 
 /**
@@ -143,13 +150,18 @@ const DEFAULT_FOOTER = 52 + 16 + 28;
 const TRACK_INSET = 32;
 
 /**
- * The shortest the track is allowed to get while climbing toward the middle of the screen.
+ * The shortest the track is allowed to get — while climbing toward the middle of the screen, and on a
+ * page whose question text leaves it little room.
  *
  * Centring costs travel: the block can only rise by giving up height at its foot, and matching the
  * screen's middle exactly left a 134pt track — accurate, and far too cramped to drag a seven-point
  * scale on. The block rises as far as it can without cutting below this, then stops.
+ *
+ * This is also what the track settles at once a long label has pushed the block down to
+ * `MIN_BLOCK_HEIGHT`, which is the length a participant actually drags on that page — so it is set
+ * for comfort there rather than merely for "not broken".
  */
-const MIN_TRACK_LENGTH = 240;
+const MIN_TRACK_LENGTH = 320;
 
 /**
  * Gap between the value block and the slider, and between the slider and its end labels.
@@ -162,19 +174,34 @@ const LABEL_GAP = 9;
 /** Height the end labels take, so the track can be sized around them. Their line height. */
 const END_LABEL_HEIGHT = 18;
 
+/**
+ * The least height the block will take, however little the page leaves it.
+ *
+ * The slider sizes itself from what remains between its top and the footer, which is right while that
+ * is generous — it fills the screen rather than floating in it. But a long enough field label pushes
+ * the slider's top so far down that what remains is a few dozen points, and the control went on
+ * dividing *that*: a track too short to drag a scale on, with the end labels crushed against it.
+ *
+ * Below this it stops shrinking and the page grows instead, so the participant scrolls to a slider
+ * that is still usable rather than reaching one that isn't.
+ *
+ * The figure is what the layout actually needs: a minimum track, the end labels above and below it,
+ * and one `TRACK_INSET`. The inset has to be in here — it is drawn from the *spare* height left over
+ * once the track and labels are served, so a floor covering only those two leaves nothing spare and
+ * collapses it to zero.
+ *
+ * One, not two. The body centres its columns, so whatever this floor leaves over is split evenly
+ * above and below — and the clearance above is already the body's own `marginTop`. Reserving a second
+ * inset here paid for that twice at the top and left dead space under the track at the bottom.
+ */
+const MIN_BLOCK_HEIGHT =
+  (END_LABEL_HEIGHT + LABEL_GAP) * 2 + MIN_TRACK_LENGTH + TRACK_INSET;
+
 /** Used when the host names no background. Most pages are light, so white is the safer guess. */
 const TICK_FALLBACK = '#FFFFFF';
 
 /** How long the handle takes to grow or settle back. */
 const PRESS_MS = 120;
-
-/**
- * How far a finger must travel before the block treats it as a drag rather than a tap.
- *
- * Small enough that a real drag is claimed immediately — before an enclosing ScrollView can read it as
- * a scroll — and large enough that pressing a step arrow isn't mistaken for one.
- */
-const DRAG_SLOP = 4;
 
 /** The kick the value gives as it turns over, and how it falls back. */
 const VALUE_POP = 1.12;
@@ -209,7 +236,15 @@ export function VerticalSliderInput({
   accentColor,
   backgroundColor,
   bottomReserve,
+  onScrollLock,
 }: VerticalSliderInputProps) {
+  // Read through a ref, as every other live value here is: the handlers below are built once, with an
+  // empty dependency list, so a caller passing an inline arrow must not rebuild them.
+  const onScrollLockRef = useRef(onScrollLock);
+  onScrollLockRef.current = onScrollLock;
+  // A page turn or submit mid-drag unmounts this with no release to fire, which would strand the page
+  // locked. Safe to call when nothing is locked.
+  useEffect(() => () => onScrollLockRef.current?.(false), []);
   const accent = accentColor ?? primaryColor;
 
   /** A tick per step crossed, however the value was moved. */
@@ -259,7 +294,9 @@ export function VerticalSliderInput({
    */
   const measured = top > 0;
   const reserve = bottomReserve ?? safeArea + DEFAULT_FOOTER;
-  const available = measured ? Math.max(0, windowHeight - top - reserve) : 0;
+  // Floored, not just clamped at zero — see `MIN_BLOCK_HEIGHT`. Past that the block stops giving way
+  // to the question text above it and the page scrolls instead.
+  const available = measured ? Math.max(MIN_BLOCK_HEIGHT, windowHeight - top - reserve) : 0;
 
   /**
    * How far the block has to rise to sit on the screen's middle rather than its own, and how long the
@@ -273,8 +310,17 @@ export function VerticalSliderInput({
     const forLabels = (END_LABEL_HEIGHT + LABEL_GAP) * 2;
     /** How much height the block can give up before the track gets too short to drag. */
     const spare = Math.max(0, (available - forLabels - MIN_TRACK_LENGTH) / 2);
+    /**
+     * Not centred once the page has outgrown the screen.
+     *
+     * The rise exists to put the block on the middle of the *window*, which is worth having while the
+     * whole question fits in one. Past that the page scrolls, there is no single screen to be centred
+     * on, and the padding the rise leaves at the foot is just a gap between the slider and the footer
+     * that the participant has to scroll past.
+     */
+    const overflows = windowHeight - top - reserve < MIN_BLOCK_HEIGHT;
     const wanted = top + available / 2 - windowHeight / 2;
-    const rise = Math.max(0, Math.min(wanted, spare));
+    const rise = overflows ? 0 : Math.max(0, Math.min(wanted, spare));
     /**
      * Whichever is larger: the rise that centres it, or the inset that keeps it off the question text
      * and the footer. They do the same job at the two ends, so they don't stack.
@@ -284,7 +330,7 @@ export function VerticalSliderInput({
       lift: rise,
       trackLength: Math.max(0, available - margin * 2 - forLabels),
     };
-  }, [top, available, windowHeight]);
+  }, [top, available, windowHeight, reserve]);
 
   const [index, setIndex] = useState(() => {
     if (value == null) return 0;
@@ -402,19 +448,6 @@ export function VerticalSliderInput({
     }
   }
 
-  /**
-   * Where the track's top edge sits inside the row.
-   *
-   * The whole row takes the drag, so a touch arrives in the row's coordinates and has to be shifted
-   * into the track's before it means anything.
-   */
-  const trackTop = useMemo(() => {
-    const contentHeight = available - lift * 2;
-    const column = trackLength + (END_LABEL_HEIGHT + LABEL_GAP) * 2;
-    return Math.max(0, (contentHeight - column) / 2) + END_LABEL_HEIGHT + LABEL_GAP;
-  }, [available, lift, trackLength]);
-  const trackTopRef = useRef(trackTop);
-  trackTopRef.current = trackTop;
 
   const panResponder = useMemo(
     () =>
@@ -433,19 +466,20 @@ export function VerticalSliderInput({
          * exactly what an enclosing ScrollView reads as a scroll, and without taking it at the capture
          * phase the page slides away under the finger. Refusing termination keeps it once taken.
          */
-        onStartShouldSetPanResponderCapture: () => false,
-        onMoveShouldSetPanResponderCapture: (_e, gesture) => Math.abs(gesture.dy) > DRAG_SLOP,
+        onStartShouldSetPanResponderCapture: () => true,
+        onMoveShouldSetPanResponderCapture: () => true,
         onPanResponderTerminationRequest: () => false,
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: e => {
+          onScrollLockRef.current?.(true);
           dragging.current = true;
           setPressed(true);
           setDragged(true);
           press.value = withTiming(1, { duration: PRESS_MS });
           // Jump to wherever they touched, centring the handle under the finger. The touch is in the
-          // row's coordinates — the whole row is grabbable, not just the track — so it shifts into the
-          // track's first.
-          setHandle(e.nativeEvent.locationY - trackTopRef.current);
+          // slider column's coordinates now, so only the end label above the track stands between the
+          // two — the column's own centring sits outside its box.
+          setHandle(e.nativeEvent.locationY - (END_LABEL_HEIGHT + LABEL_GAP));
           dragStart.current = offset.value;
         },
         onPanResponderMove: (_e, gesture) => {
@@ -455,6 +489,7 @@ export function VerticalSliderInput({
           setHandle(dragStart.current + gesture.dy);
         },
         onPanResponderRelease: () => {
+          onScrollLockRef.current?.(false);
           dragging.current = false;
           setPressed(false);
           press.value = withTiming(0, { duration: PRESS_MS });
@@ -473,6 +508,8 @@ export function VerticalSliderInput({
           onChangeRef.current(valuesRef.current[final]);
         },
         onPanResponderTerminate: () => {
+          // Released here too, or a cancelled gesture leaves the page locked for good.
+          onScrollLockRef.current?.(false);
           dragging.current = false;
           setPressed(false);
           press.value = withTiming(0, { duration: PRESS_MS });
@@ -481,6 +518,69 @@ export function VerticalSliderInput({
           // step — the participant sees an answer — so returning without reporting it is what left
           // the value on screen and nothing in `answers`, and a required question refusing to move
           // on from a slider that plainly looked answered.
+          onChangeRef.current(valuesRef.current[indexRef.current]);
+        },
+      }),
+    // Handlers read live values through refs, so they never need rebuilding.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  /**
+   * The value column, spun as a wheel.
+   *
+   * The same gesture as the track, minus the jump: a touch on the track names a position along it, so
+   * the handle goes there — but a touch on the wheel names nothing, it is a grip. So this begins where
+   * the value already is and moves by how far the finger travels, which is how a picker behaves.
+   *
+   * Attached to the wheel alone rather than the whole column, so the step arrows above and below it
+   * stay pressable: the gesture is claimed at touch-down, and anything inside a grabbed area stops
+   * receiving presses.
+   */
+  const wheelResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponderCapture: () => true,
+        onMoveShouldSetPanResponderCapture: () => true,
+        onPanResponderTerminationRequest: () => false,
+        onShouldBlockNativeResponder: () => true,
+        onPanResponderGrant: () => {
+          onScrollLockRef.current?.(true);
+          dragging.current = true;
+          setPressed(true);
+          setDragged(true);
+          press.value = withTiming(1, { duration: PRESS_MS });
+          // No jump — the wheel is a grip, not a scale.
+          dragStart.current = offset.value;
+        },
+        onPanResponderMove: (_e, gesture) => {
+          // Pulling the wheel down raises the value, as spinning a picker does — the opposite sense to
+          // the handle, which follows the finger down the track.
+          setHandle(dragStart.current - gesture.dy);
+        },
+        onPanResponderRelease: () => {
+          onScrollLockRef.current?.(false);
+          dragging.current = false;
+          setPressed(false);
+          press.value = withTiming(0, { duration: PRESS_MS });
+          const final = Math.min(stepsRef.current - 1, Math.max(0, Math.round(exactStep())));
+          if (final !== indexRef.current) {
+            indexRef.current = final;
+            setIndex(final);
+            tick();
+          }
+          settledFor.current = `${final}:${travelRef.current}`;
+          settle(final, true);
+          onChangeRef.current(valuesRef.current[final]);
+        },
+        onPanResponderTerminate: () => {
+          onScrollLockRef.current?.(false);
+          dragging.current = false;
+          setPressed(false);
+          press.value = withTiming(0, { duration: PRESS_MS });
+          settle(indexRef.current, true);
           onChangeRef.current(valuesRef.current[indexRef.current]);
         },
       }),
@@ -654,7 +754,6 @@ export function VerticalSliderInput({
         ref={frame}
         style={[styles.body, { height: available, paddingBottom: lift * 2 }]}
         onLayout={onMeasure}
-        {...panResponder.panHandlers}
       >
         {!measured ? null : (
           <>
@@ -672,7 +771,7 @@ export function VerticalSliderInput({
 
               {/* The wheel. One slot per nearby step, each working out its own distance from the
                   centre, so the column rolls with the drag instead of the number swapping. */}
-              <Animated.View style={[styles.stack, valueStyle]}>
+              <Animated.View style={[styles.stack, valueStyle]} {...wheelResponder.panHandlers}>
                 {Array.from({ length: WHEEL_REACH * 2 + 1 }, (_, slot) => {
                   const away = slot - WHEEL_REACH;
                   const at = index + away;
@@ -715,7 +814,23 @@ export function VerticalSliderInput({
               />
             </View>
 
-            <View style={styles.sliderColumn}>
+            {/*
+              The grabbable area: this column, not the whole row.
+
+              The row spans the page, so with the handlers on it every touch anywhere — the empty
+              space beside the value included — was claimed at touch-down, and a page that overflows
+              could not be scrolled at all. Narrowed to the slider and its end labels, the rest of
+              the row scrolls.
+
+              `box-only` so this column is the touch target and its children are not: `locationY` is
+              measured from whichever element the touch lands on, and a label or the track would
+              otherwise report from its own top edge.
+            */}
+            <View
+              style={styles.sliderColumn}
+              pointerEvents="box-only"
+              {...panResponder.panHandlers}
+            >
               <Text style={[styles.endLabel, { color: endLabelColor }]} numberOfLines={1}>
                 {scale.maxLabel ?? values[steps - 1]}
               </Text>
@@ -936,6 +1051,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: BLOCK_GAP,
+    /**
+     * Clear of the question text above.
+     *
+     * `TRACK_INSET` only shortens the *track*; the value column beside it — arrows, wheel, arrows —
+     * is centred on its own and reaches the top of this box, which otherwise starts the moment the
+     * question ends. With a short label there is empty page there and nothing shows; with a long one
+     * the up arrow lands on the last line of the question.
+     *
+     * A margin rather than padding: it sits outside the measured frame, so `top` already counts it
+     * and the height budget below needs no adjusting.
+     */
+    marginTop: TRACK_INSET,
   },
   readout: {
     flex: 1,

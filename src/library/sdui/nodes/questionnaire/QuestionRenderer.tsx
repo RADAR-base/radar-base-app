@@ -253,6 +253,7 @@ export function QuestionRenderer({
             backgroundColor={backgroundColor}
             primaryColor={primaryColor}
             textColor={textColor}
+            onScrollLock={onScrollLock}
           />
         );
 
@@ -268,6 +269,7 @@ export function QuestionRenderer({
             backgroundColor={backgroundColor}
             primaryColor={primaryColor}
             textColor={textColor}
+            onScrollLock={onScrollLock}
           />
         );
 
@@ -284,6 +286,7 @@ export function QuestionRenderer({
             primaryColor={primaryColor}
             textColor={textColor}
             bottomReserve={bottomReserve}
+            onScrollLock={onScrollLock}
           />
         );
 
@@ -299,6 +302,7 @@ export function QuestionRenderer({
             backgroundColor={backgroundColor}
             primaryColor={primaryColor}
             textColor={textColor}
+            onScrollLock={onScrollLock}
           />
         );
 
