@@ -13,8 +13,9 @@ export const MATRIX_LIST_TYPE = 'matrix-radio';
  * The most options a row can offer and still be drawn as one.
  *
  * The segmented track splits evenly between them, so the limit is width rather than design: past six
- * a phone gives each option under 55pt, and a label like "Moderate" no longer fits on the single line
- * they get. A row with more falls back to the plain radio list, which is honest at any length.
+ * a phone gives each option under 55pt, which is too narrow to read a word on even across the two
+ * lines a label now gets. A row with more falls back to the plain radio list, which is honest at any
+ * length.
  *
  * Nothing real comes close — every matrix row in the published definitions asks two or four.
  */

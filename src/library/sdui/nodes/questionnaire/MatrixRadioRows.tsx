@@ -16,7 +16,6 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import type { Question, SelectChoice } from '../../../../types';
 import {
   PRESS_IN_MS,
@@ -27,8 +26,10 @@ import {
 // The same ink the radio and checkbox put on a chosen option, and for the same reason — one white,
 // documented once, rather than three that happen to agree today.
 import { ON_ACCENT } from './optionCard';
+import { EdgeFade, FADE_HEIGHT } from './EdgeFade';
 import {
   cardShadow,
+  cardShadowBleed,
   fontFamily,
   layout as layoutTokens,
   mix,
@@ -75,7 +76,12 @@ interface MatrixRadioRowsProps {
   pageInset?: number;
 }
 
-/** The card's corner — a matrix row is a card the participant acts on. */
+/**
+ * The card's corner — the shared one, because a matrix row is a card the participant acts on, same
+ * as a task card.
+ *
+ * Named locally because the rows reference it twice over and the name says which corner is meant.
+ */
 const CARD_RADIUS = layoutTokens.radiusCard;
 
 /**
@@ -132,6 +138,17 @@ const SEGMENT_OVERLAP = 20;
 const CARD_BORDER = 2;
 
 /**
+ * Space between two rows — wider than the shadow that falls into it.
+ *
+ * `cardShadow` reaches `cardShadowBleed` past a card's bottom edge. At the 10 this used to be, that
+ * shadow landed squarely on the top of the next row: every gap was filled, no page showed through,
+ * and the rows read as one continuous block rather than as separate cards. The fill was never the
+ * problem — a row is more distinct from the page than a white card is — so the fix is room for the
+ * shadow to land in, not a louder card.
+ */
+const ROW_GAP = cardShadowBleed + 6;
+
+/**
  * The answered card's edge, and the card's own tint, as distances rather than values.
  *
  * Mixed to an opaque colour rather than laid on at an alpha: each is drawn over the card's own fill,
@@ -175,62 +192,6 @@ const ROWS_BEFORE_SCROLL = 4;
  * Enough to cover most of a card, so a row leaving the top goes softly rather than being sliced by an
  * edge — a little over the card's own height, which is a label and a track of options.
  */
-const FADE_HEIGHT = 40;
-
-/** Stable, SVG-safe unique suffix for gradient ids (`useId`'s ':' is invalid inside `url(#…)`). */
-function useIdSafe(): string {
-  return React.useId().replace(/:/g, '');
-}
-
-/**
- * One end of the list, fading into the page.
- *
- * Painted rather than masked: React Native has no mask without `@react-native-masked-view`, so this is
- * the page's own colour laid over the list at full opacity where the edge is and nothing where the
- * list is — which comes to the same thing as long as it is given the colour actually behind it.
- */
-function EdgeFade({
-  color,
-  width,
-  height,
-  reversed,
-}: {
-  color: string;
-  /**
-   * The fade's size in points, measured by the caller.
-   *
-   * Given as numbers rather than `"100%"`: react-native-svg only resolves a percentage on the root
-   * `Svg` against a viewBox, and with none set it measures zero and draws nothing at all.
-   */
-  width: number;
-  /**
-   * Taller than the gradient where the edge has to keep covering past it.
-   *
-   * The bottom one runs down behind the footer: a gradient alone would hand the list back at full
-   * strength the moment it ended, and the row sitting under the buttons would read straight through
-   * them. It fades over `FADE_HEIGHT` and then holds the page's colour the rest of the way.
-   */
-  height: number;
-  reversed?: boolean;
-}) {
-  const id = `matrixFade${useIdSafe()}${reversed ? 'B' : 'T'}`;
-  if (!width || !height) return null;
-  // Where the gradient finishes and the flat colour takes over, as a fraction of the whole.
-  const turn = Math.min(1, FADE_HEIGHT / height);
-  return (
-    <Svg width={width} height={height}>
-      <Defs>
-        <LinearGradient id={id} x1="0" y1="0" x2="0" y2={height} gradientUnits="userSpaceOnUse">
-          <Stop offset="0" stopColor={color} stopOpacity={reversed ? 0 : 1} />
-          <Stop offset={turn} stopColor={color} stopOpacity={reversed ? 1 : 0} />
-          <Stop offset="1" stopColor={color} stopOpacity={reversed ? 1 : 0} />
-        </LinearGradient>
-      </Defs>
-      <Rect x="0" y="0" width={width} height={height} fill={`url(#${id})`} />
-    </Svg>
-  );
-}
-
 /**
  * A matrix block as a list of thin cards, each with its own segmented control.
  *
@@ -336,13 +297,23 @@ export function MatrixRadioRows({
       return;
     }
 
-    const card = cards.current[next.field_name];
+    centreOn(next.field_name);
+  };
+
+  /**
+   * Bring one row to the middle of the viewport, as the design's `scrollIntoView({ block: 'center' })`
+   * does — a row that lands at the very top reads as the end of the list rather than as the next thing
+   * to do.
+   *
+   * Shared by the two things that move the list, so being refused takes you to the same place that
+   * answering a row would.
+   */
+  function centreOn(fieldName: string) {
+    const card = cards.current[fieldName];
     if (!card || !viewport.height) return;
-    // Centred in the viewport, as the design's `scrollIntoView({ block: 'center' })` does — a row that
-    // lands at the very top reads as the end of the list rather than as the next thing to do.
     const y = Math.max(0, card.y - (viewport.height - card.height) / 2);
     scroller.current?.scrollTo({ y, animated: true });
-  };
+  }
 
   return (
     // Widened back out over the page's inset, so the frame the list clips to is the screen's edge
@@ -651,7 +622,13 @@ function Segment({
             style={[styles.halo, { backgroundColor: haloColor }, haloStyle]}
           />
           <Animated.View style={[styles.segment, fillStyle]}>
-            <Animated.Text style={[styles.segmentLabel, labelStyle]} numberOfLines={1}>
+            {/* Two lines, not one. A segment is a sixth of the track at most, so a longer option —
+                "Quite a bit", "Nearly every day" — did not fit on one line and was cut off with an
+                ellipsis, which is the one thing a label must never be: the participant is choosing
+                between them. Two rather than unlimited so one wordy option can't grow the row past
+                what the rest of the card is worth; the track stretches its segments together, so
+                whatever one of them needs, they all get. */}
+            <Animated.Text style={[styles.segmentLabel, labelStyle]} numberOfLines={2}>
               {label}
             </Animated.Text>
           </Animated.View>
@@ -670,7 +647,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    gap: 10,
+    gap: ROW_GAP,
   },
   /** Height is set per edge — the bottom one keeps covering past its gradient. See `EdgeFade`. */
   fade: {
@@ -734,12 +711,22 @@ const styles = StyleSheet.create({
    * deck's buttons into bars. The pill's own padding sets the height and the track follows it, which
    * is what makes the fill exactly the container's height without either being told to match.
    */
+  /**
+   * The full height of its share of the track, not the height of its own label.
+   *
+   * The track stretches its options to the tallest of them, but that only reaches as far as the
+   * pressable — every box inside sized to its own content, so an option whose label wraps to two
+   * lines ended up with a taller pill than the one beside it. `flex: 1` at each level passes that
+   * height down, so all the pills match whatever the wordiest option needs.
+   */
   segmentSlot: {
     alignSelf: 'stretch',
+    flex: 1,
   },
   /** Exactly the pill's box, so the halo's insets are measured from the pill and nothing else. */
   pillBox: {
     position: 'relative',
+    flex: 1,
   },
   /**
    * The halo, out of the flow so it can cross the track's edge.
@@ -765,7 +752,10 @@ const styles = StyleSheet.create({
    * nothing but the chip's own size.
    */
   segment: {
+    flex: 1,
     alignItems: 'center',
+    // Centres the label in whatever height the row settled on, so a one-line option sits level with
+    // the middle of a two-line one rather than at the top of its pill.
     justifyContent: 'center',
     paddingVertical: 12,
     paddingHorizontal: 8,
