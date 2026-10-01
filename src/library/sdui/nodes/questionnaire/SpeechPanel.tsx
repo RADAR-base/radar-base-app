@@ -101,8 +101,15 @@ export function CollapsibleHeading({
   }, [collapsed, progress]);
 
   const style = useAnimatedStyle(() => {
-    // Nothing measured yet — leave it at its natural size rather than pinning it shut.
-    if (height.value === 0) return {};
+    // Unconstrained whenever it is fully open — not just before the first measurement.
+    //
+    // `maxHeight: height * (1 - progress)` reads as "natural height" at progress 0, but it is really
+    // a cap pinned to whatever was measured first. A heading that later needs more room — a longer
+    // title wrapping to a second line, or accessibility font scaling — is cut off by the
+    // `overflow: hidden` below, and it can never recover: `onLayout` re-measures the *constrained*
+    // box, so the stale height keeps confirming itself. Dropping the cap while open leaves the fold
+    // to constrain it only while it is actually folding.
+    if (height.value === 0 || progress.value === 0) return { opacity: 1 };
     return {
       maxHeight: height.value * (1 - progress.value),
       opacity: 1 - progress.value,

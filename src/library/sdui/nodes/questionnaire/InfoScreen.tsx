@@ -26,30 +26,34 @@ interface InfoScreenProps {
  * own bulleted paragraph, since studies write them as numbered steps.
  */
 export function InfoScreen({
-  label,
+  // `label` and `textColor` are accepted but not drawn: the host renders the question's title itself
+  // (`hideHeader`), so this card is only ever the body.
   sections,
   primaryColor,
-  textColor,
   textSecondaryColor,
 }: InfoScreenProps) {
   const surface = withAlpha(primaryColor, 0.1);
-  const hasSections = !!sections?.length;
+
+  // No body, no card. `select_choices_or_calculations` is where the prose lives, so without it there
+  // is nothing to put inside — and the card rendered anyway as an empty tinted box, which reads as
+  // something that failed to load rather than as a page with only a heading.
+  if (!sections?.length) return null;
 
   return (
     <View style={[styles.card, { backgroundColor: surface }]}>
-      {hasSections ? (
-        <View style={styles.sections}>
-          {sections!.map((section, i) => (
-            <View key={section.code || i} style={styles.section}>
-              {/* Only bulleted when there's more than one — a single paragraph isn't a list. */}
-              {sections!.length > 1 ? (
-                <View style={[styles.bullet, { backgroundColor: primaryColor }]} />
-              ) : null}
-              <Text style={[styles.sectionText, { color: textSecondaryColor }]}>{section.label}</Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
+      <View style={styles.sections}>
+        {sections.map((section, i) => (
+          <View key={section.code || i} style={styles.section}>
+            {/* Only bulleted when there's more than one — a single paragraph isn't a list. */}
+            {sections.length > 1 ? (
+              <View style={[styles.bullet, { backgroundColor: primaryColor }]} />
+            ) : null}
+            <Text style={[styles.sectionText, { color: textSecondaryColor }]}>
+              {section.label}
+            </Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
