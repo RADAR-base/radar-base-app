@@ -8,6 +8,7 @@
  */
 import { useCallback, useEffect, useRef } from 'react';
 import type { ServiceBag } from './ServiceContainer';
+import { EVENTS } from './EventBus';
 
 /** Maximum time (ms) to wait for services before proceeding anyway. */
 const INIT_TIMEOUT_MS = 20_000;
@@ -121,9 +122,9 @@ export function useServicesLifecycle(
       }
     };
 
-    eventBus.on('auth.state_changed', handler);
+    eventBus.on(EVENTS.AUTH_STATE_CHANGED, handler);
     return () => {
-      eventBus.off('auth.state_changed', handler);
+      eventBus.off(EVENTS.AUTH_STATE_CHANGED, handler);
       services.schedule.destroy();
     };
   }, [initServices, services, eventBus, onReady, onNotReady, onSigningOut]);
