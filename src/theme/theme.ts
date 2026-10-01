@@ -127,6 +127,21 @@ export interface ColorTokens {
    * existing amber (`card.engagement.streakIcon`) is an icon-on-badge contrast color that
    * intentionally swaps with `streakBadge` between themes, so it isn't actually fixed.
    */
+  /**
+   * `StreakCardNode`'s week strip and flame badge (node 4232:4211). Fixed hues with no light/dark
+   * variant, for the same reason `dataWheel` has its own: this card draws a solid amber disc with a
+   * pale flame on it in *both* themes, whereas `card.engagement.streakBadge`/`streakIcon`
+   * deliberately swap those two roles between themes for `StatCardNode`'s badge. Borrowing that
+   * pair here would invert the disc in one mode.
+   */
+  streak: {
+    /** The disc filled behind a completed day, and the large flame badge beside the strip. */
+    disc: string;
+    /** The flame drawn on that disc — reads against `disc` in both themes. */
+    flame: string;
+    /** Dashed ring for a day the streak was lost on. Matches the cross baked into `streakmissed.svg`. */
+    missed: string;
+  };
   dataWheel: {
     bad: string;
     neutral: string;
@@ -321,6 +336,11 @@ export const darkTheme: ColorTokens = {
     someMissed: palette.blue600,
     allMissed: palette.sky450,
   },
+  streak: {
+    disc: palette.orange450,
+    flame: palette.orange50,
+    missed: palette.red400,
+  },
   dataWheel: {
     bad: palette.red550,
     neutral: palette.orange450,
@@ -431,6 +451,11 @@ export const lightTheme: ColorTokens = {
     allCompleted: palette.lime450,
     someMissed: palette.blue600,
     allMissed: palette.sky450,
+  },
+  streak: {
+    disc: palette.orange450,
+    flame: palette.orange50,
+    missed: palette.red400,
   },
   dataWheel: {
     bad: palette.red550,
