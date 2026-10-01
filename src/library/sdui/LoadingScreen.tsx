@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -150,20 +150,6 @@ export function LoadingScreen({
   // it flashes through while it fades in — a visible flicker on reload.
   const translateX = useSharedValue(0);
 
-  /**
-   * The callback, held in a ref rather than closed over.
-   *
-   * Callers pass an inline arrow — a new function every render — and depending on its identity meant
-   * this effect re-ran each time, restarting `withTiming` from wherever the slide had reached. A
-   * restarted animation reports `finished: false`, so the cancelled run never calls back. Two loaders
-   * are mounted at once during the hand-off into the app (the boot screen over the post-enrolment
-   * one), so each one's `setState` re-rendered the parent and cancelled the other's exit: neither
-   * ever finished, and the screen was never dismissed.
-   */
-  const onHiddenRef = useRef(onHidden);
-  onHiddenRef.current = onHidden;
-  const finishHide = useCallback(() => onHiddenRef.current?.(), []);
-
   // Once the app is ready and the minimum time has passed, slide off to the left, then hand control
   // back to the parent (which unmounts us).
   const leaving = ready && minElapsed && onHidden != null;
@@ -173,11 +159,10 @@ export function LoadingScreen({
       -width,
       { duration: SLIDE_OUT_MS, easing: Easing.in(Easing.cubic) },
       (finished) => {
-        if (finished) runOnJS(finishHide)();
+        if (finished && onHidden) runOnJS(onHidden)();
       },
     );
-    // Deliberately not keyed on `onHidden` — see `onHiddenRef`. This starts once per `leaving` edge.
-  }, [leaving, width, translateX, finishHide]);
+  }, [leaving, width, translateX, onHidden]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],

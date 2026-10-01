@@ -19,14 +19,6 @@ export type { ServiceOverrides as CoreServiceOverrides } from './ServiceContaine
 interface CoreServices extends ServiceBag {
   /** True once all core services have initialised (config, schedule, protocol, questionnaires). */
   servicesReady: boolean;
-  /**
-   * Bring services up now — for a host that has just finished an enrolment or login flow.
-   *
-   * The lifecycle otherwise relies on catching a single `auth.state_changed` event, which after a
-   * first enrolment is its only route to ready. Calling this when the flow completes makes it
-   * deterministic instead of a race.
-   */
-  ensureServicesReady: () => void;
   /** True while sign-out cleanup is in progress (tokens cleared, services tearing down). */
   signingOut: boolean;
   /** Non-null when service init completed with errors (timeout or failure). */
@@ -71,20 +63,14 @@ function CoreServicesProviderInner({ children, overrides = {} }: CoreServicesPro
   const markSigningOut = useCallback((active: boolean) => setSigningOut(active), []);
   const markInitError = useCallback((msg: string) => setInitError(msg), []);
 
-  const ensureServicesReady = useServicesLifecycle(services, {
+  useServicesLifecycle(services, {
     onReady: markReady,
     onNotReady: markNotReady,
     onSigningOut: markSigningOut,
     onInitError: markInitError,
   });
 
-  const value: CoreServices = {
-    ...services,
-    servicesReady,
-    signingOut,
-    initError,
-    ensureServicesReady,
-  };
+  const value: CoreServices = { ...services, servicesReady, signingOut, initError };
 
   return (
     <CoreServicesContext.Provider value={value}>
