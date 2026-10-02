@@ -13,7 +13,7 @@ import type {
 } from '../types';
 import { EVENTS } from './EventBus';
 import { SchemaType } from './pipeline';
-import { repairUtf8, repairUtf8Deep } from './utf8';
+import { repairUtf8 } from './utf8';
 
 const STORAGE_KEY = '@radarbase/questionnaire_definitions';
 const DEFAULT_QUESTIONNAIRE_TYPE = '_armt';
