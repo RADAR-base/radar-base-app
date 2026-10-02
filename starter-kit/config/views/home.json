@@ -129,32 +129,6 @@
         ]
       },
       {
-        "id": "section_data",
-        "type": "SectionNode",
-        "title": "My Data",
-        "layout": "horizontal",
-        "children": [
-          {
-            "id": "vitals_sleep",
-            "type": "GraphDataNode",
-            "graphType": "sleep_hours",
-            "variant": "compact"
-          },
-          {
-            "id": "vitals_steps",
-            "type": "GraphDataNode",
-            "graphType": "steps",
-            "variant": "compact"
-          },
-          {
-            "id": "vitals_stress",
-            "type": "GraphDataNode",
-            "graphType": "stress",
-            "variant": "compact"
-          }
-        ]
-      },
-      {
         "id": "card_custom_demo",
         "type": "CardNode",
         "isCanvas": true,

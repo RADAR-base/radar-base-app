@@ -27,7 +27,7 @@ import { SettingsRowNode } from './SettingsRowNode';
 import { SurveyTaskListNode } from './SurveyTaskListNode';
 import { TextNode } from './TextNode';
 import { ViewNode } from './ViewNode';
-import { GraphDataNode } from './GraphDataNode';
+
 import { HealthKitNode } from './HealthKitNode';
 
 /**
@@ -66,7 +66,7 @@ export function registerBuiltInNodes(): void {
   registry.register('BarChartCardNode', BarChartCardNode);
   registry.register('ArcDataCardNode', ArcDataCardNode);
   registry.register('LineGraphCardNode', LineGraphCardNode);
-  registry.register('GraphDataNode', GraphDataNode);
+
   registry.register('NotificationListNode', NotificationListNode);
   registry.register('HealthKitNode', HealthKitNode);
 
@@ -101,6 +101,6 @@ export {
   SurveyTaskListNode,
   TextNode,
   ViewNode,
-  GraphDataNode,
+
   HealthKitNode,
 };
