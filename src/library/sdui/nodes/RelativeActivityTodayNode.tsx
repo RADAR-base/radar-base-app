@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { NodeProps } from '../types';
 import { fontFamily, cardShadow } from '../../../theme/theme';
+import { useLocalMetric } from '../useLocalMetric';
 
 /**
  * Activity summary grid matching the Figma "My Activity" design.
@@ -12,6 +13,10 @@ export function RelativeActivityTodayNode({ node, context }: NodeProps) {
   const goalSteps = typeof node.goalSteps === 'number' ? node.goalSteps : 10000;
   const stepsSoFar = useTodayDemoSteps(goalSteps);
   const checkIns = Math.max(1, Math.floor(stepsSoFar / 3000));
+  // The two streaks are real, off the schedule's day history — unlike the check-in count above, which
+  // is derived from this node's demo step feed. Both cards said `2` before, whatever had happened.
+  const currentStreak = useLocalMetric('current_streak')?.value ?? 0;
+  const longestStreak = useLocalMetric('longest_streak')?.value ?? 0;
   const theme = context.theme;
   const secondary = theme.secondaryColor ?? '#8FA764';
   const text = theme.textColor ?? '#1C3549';
@@ -41,14 +46,14 @@ export function RelativeActivityTodayNode({ node, context }: NodeProps) {
           <View style={[styles.cardSmall, { backgroundColor: surface, borderRadius: radius }]}>
             <Text style={[styles.cardLabel, { color: textSec }]}>Current Streak</Text>
             <View style={styles.streakRow}>
-              <Text style={[styles.streakNumber, { color: text }]}>2</Text>
+              <Text style={[styles.streakNumber, { color: text }]}>{currentStreak}</Text>
               <Text style={styles.streakIcon}>{'\u{1F525}'}</Text>
             </View>
           </View>
           <View style={[styles.cardSmall, { backgroundColor: surface, borderRadius: radius }]}>
             <Text style={[styles.cardLabel, { color: textSec }]}>Longest Streak</Text>
             <View style={styles.streakRow}>
-              <Text style={[styles.streakNumber, { color: text }]}>2</Text>
+              <Text style={[styles.streakNumber, { color: text }]}>{longestStreak}</Text>
               <Text style={styles.streakIcon}>{'\u{1F3C5}'}</Text>
             </View>
           </View>

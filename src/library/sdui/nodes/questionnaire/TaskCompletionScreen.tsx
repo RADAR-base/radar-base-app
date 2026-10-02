@@ -216,7 +216,7 @@ export interface TaskCompletionScreenProps {
   onHome: () => void;
   onCalendar: () => void;
   /**
-   * Today's completed tasks and today's scheduled total — the task that opened this screen included,
+   * Completed tasks and the total still open — the task that opened this screen included,
    * since the host marks it complete off the same event.
    *
    * A total of zero hides the tally: with nothing scheduled there is no progress to show, and a ring
@@ -312,7 +312,7 @@ export function TaskCompletionScreen({
   /** The tally, which arrives after the copy has settled. */
   const tally = useSharedValue(0);
   /**
-   * How far round the ring has swept, 0..1 — today's completed tasks over today's scheduled total.
+   * How far round the ring has swept, 0..1 — completed tasks over everything still open.
    *
    * Drives the same `ProgressRing` the data wheel card draws, so a ring is built the same way and
    * means the same thing wherever it appears: how much of a whole is done. It closes only when the
@@ -434,7 +434,7 @@ export function TaskCompletionScreen({
     );
 
     backdrop.value = withDelay(BACKDROP_DELAY, withTiming(1, { duration: BACKDROP_MS }));
-    // The sweep figures are dependencies because today's numbers can arrive after this screen does —
+    // The sweep figures are dependencies because the numbers can arrive after this screen does —
     // the host marks the task complete off the same event that opened it. The other timings are
     // constants, so re-running simply restarts the same sequence against the settled figures.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -543,7 +543,7 @@ export function TaskCompletionScreen({
             </Text>
           </Animated.View>
 
-          {/* Today's progress. Hidden when nothing is scheduled — see `tasksTotal`. */}
+          {/* Progress across every open task. Hidden when nothing is scheduled — see `tasksTotal`. */}
           {tasksTotal > 0 ? (
             <Animated.View style={[styles.tally, tallyStyle]}>
               {/* Two layers on the same centre, both driven by `collapse`. The box keeps the wheel's

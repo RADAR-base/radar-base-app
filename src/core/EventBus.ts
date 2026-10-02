@@ -1,13 +1,13 @@
 // import mitt, { Emitter } from 'mitt'; // Will be available after npm install
 import { EventBus as EventBusInterface } from '../types/index';
 
-type Events = {
-  [event: string]: any;
-};
+/** What the emitter stores. Named rather than `Function`, which accepts anything callable — a class
+ *  included, which would throw when invoked without `new`. */
+type EventHandler = (data?: any) => void;
 
 // Simple event emitter implementation (will be replaced with mitt after install)
 class SimpleEmitter {
-  private events: { [key: string]: Function[] } = {};
+  private events: { [key: string]: EventHandler[] } = {};
 
   emit(event: string, data?: any): void {
     if (this.events[event]) {
@@ -15,14 +15,14 @@ class SimpleEmitter {
     }
   }
 
-  on(event: string, handler: Function): void {
+  on(event: string, handler: EventHandler): void {
     if (!this.events[event]) {
       this.events[event] = [];
     }
     this.events[event].push(handler);
   }
 
-  off(event: string, handler: Function): void {
+  off(event: string, handler: EventHandler): void {
     if (this.events[event]) {
       this.events[event] = this.events[event].filter(h => h !== handler);
     }
@@ -76,6 +76,9 @@ export const EVENTS = {
   TASK_SKIPPED: 'taskSkipped',
   /** Tapping a task on the home screen requests its instructions page (payload: task details). */
   OPEN_TASK_INSTRUCTIONS: 'openTaskInstructions',
+
+  /** Every loading surface the shell can raise has gone, and the participant is looking at the app. */
+  APP_CHROME_READY: 'appChromeReady',
   
   // Auth Events
   AUTH_STATE_CHANGED: 'authStateChanged',

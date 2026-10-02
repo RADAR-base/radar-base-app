@@ -743,6 +743,7 @@ function TabPanel({
 
   const blueprint = cached ?? (loaded && loaded.path === viewPath ? loaded.blueprint : null);
 
+
   if (!tab) {
     return (
       <View style={styles.centered}>
