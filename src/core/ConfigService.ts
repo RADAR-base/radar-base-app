@@ -40,7 +40,9 @@ export class DefaultConfigService implements ConfigService {
       // Ensure remote config is ready via injected service (safe on web)
       try {
         await this.remoteConfig.forceFetch();
-      } catch {}
+      } catch {
+        // Remote config is optional here — a failed fetch falls back to the bundled defaults.
+      }
       
       try {
         await this.analytics.init();
@@ -330,7 +332,7 @@ export class DefaultConfigService implements ConfigService {
     }
   }
 
-  private extractRemoteConfigValues(config: any): Record<string, any> {
+  private extractRemoteConfigValues(_config: any): Record<string, any> {
     // This would extract all available remote config values
     // For now, we'll return the config object as-is
     return {

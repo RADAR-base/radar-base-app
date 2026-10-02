@@ -19,7 +19,7 @@ export function evaluateBranchingLogic(
 
   try {
     // Normalize the logic string
-    let normalized = logic
+    const normalized = logic
       .replace(/\[([^\]]+)\]/g, (_, inner) => {
         // Convert [field_name(code)] → field_name__code
         // Convert [field_name] → field_name
