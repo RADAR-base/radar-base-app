@@ -841,6 +841,8 @@ export const layout = {
   headingLineHeight: 20,
   /** Corner radius for pill-shaped chips, badges, and buttons. */
   radiusPill: 24,
+  /** The page's own horizontal inset — what a full-bleed row has to widen back out over. */
+  pageGutter: 15,
   /** Corner radius for card surfaces — every card in the app shares it. */
   radiusCard: 24,
   /** Corner radius for non-card elements at a card's scale: a navbar tab, a chart bar, a tooltip. */
