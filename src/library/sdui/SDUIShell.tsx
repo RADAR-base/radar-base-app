@@ -26,7 +26,7 @@ import type { Node } from '../contracts/NodeSchema';
 import { BlueprintLoader, type BlueprintSource } from './BlueprintLoader';
 import { ManifestLoader, type ManifestSource } from './ManifestLoader';
 import { NodeRenderer } from './NodeRenderer';
-import { LoadingScreen, LoadingDots } from './LoadingScreen';
+import { LoadingDots } from './LoadingScreen';
 import { createActionDispatcher } from './ActionDispatcher';
 import { registerBuiltInNodes } from './nodes';
 import { NavbarNode } from './nodes/navbar/NavbarNode';
@@ -233,9 +233,7 @@ export function SDUIShell(props: SDUIShellProps) {
     );
   }
 
-  if (!manifest || !activeTabId) {
-    return <LoadingScreen />;
-  }
+  if (!manifest || !activeTabId) return null;
 
   const context: SDUIContext = {
     template: props.templateContext ?? {},
