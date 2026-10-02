@@ -728,16 +728,15 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                       <View
                         style={[
                           styles.titleBlock,
-                          // Only shrink when the passage is actually in here. It's the passage that's
-                          // meant to yield to the controls; when the study puts the passage in
-                          // `select_choices_or_calculations` this block holds just a heading and a
-                          // line of copy, and letting that shrink collapses it to nothing — nothing
-                          // else in the panel gives way, so it absorbs the whole overflow.
-                          // Every speech panel, not just one with the passage inline. A long
-                          // instruction here is the first thing that should give way: it's read once
-                          // before starting, whereas the passage is read *while* recording and the
-                          // stop button has to stay reachable throughout.
-                          isSpeechPanel && styles.titleBlockShrink,
+                          // Deliberately not shrunk, though it used to be.
+                          //
+                          // The passage always goes to `SpeechInput`'s own card now, wherever the definition
+                          // put it, so this block only ever holds a heading and a line of copy. Letting *that*
+                          // shrink collapsed it: text has no give, so the box got shorter while its content
+                          // stayed full height, and the `StepSlider` viewport — which clips, to hide the parked
+                          // panels — cut off whatever spilled. That is the clipped section header. The passage
+                          // card is the thing that yields here, and it can: it scrolls, so losing height costs
+                          // reading room rather than words.
                         ]}
                       >
                         {/* The small grey header only earns its place when there's a distinct question
@@ -1021,17 +1020,6 @@ const styles = StyleSheet.create({
   },
   titleBlock: {
     gap: 4,
-  },
-  /**
-   * Lets the passage give way to the controls below it.
-   *
-   * React Native defaults `flexShrink` to 0 (CSS defaults it to 1), so every element between the
-   * height-bounded panel and the scrollable passage has to opt in explicitly — miss one and the
-   * chain breaks, the passage keeps its full natural height, and the record button is pushed off
-   * the bottom of the screen.
-   */
-  titleBlockShrink: {
-    flexShrink: 1,
   },
   /**
    * The speech instruction's window. `flexGrow: 0` keeps it no taller than its text, `flexShrink: 1`
