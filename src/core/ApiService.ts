@@ -1,4 +1,5 @@
 import { ApiService } from '../types';
+import { repairUtf8 } from './utf8';
 
 /**
  * Reads a successful response as JSON, tolerating an empty body.
@@ -12,7 +13,10 @@ async function parseBody<T>(res: Response): Promise<T> {
   if (res.status === 204) return null as T;
   const text = await res.text();
   if (text.trim() === '') return null as T;
-  return JSON.parse(text) as T;
+  // `res.text()` takes its encoding from the response's charset, and a server that sends none leaves
+  // iOS decoding UTF-8 as Latin-1 — see `repairUtf8`. Repaired before parsing so the fix reaches
+  // every string in the body rather than whichever ones a screen remembers to clean up.
+  return JSON.parse(repairUtf8(text)) as T;
 }
 
 class SimpleApiService implements ApiService {
