@@ -290,13 +290,13 @@ const styles = StyleSheet.create({
   barTrack: {
     width: BAR_WIDTH,
     height: CHART_HEIGHT,
-    borderRadius: layoutTokens.radiusCard,
+    borderRadius: layoutTokens.radiusControl,
     justifyContent: 'flex-end',
     overflow: 'hidden',
   },
   barFill: {
     width: '100%',
-    borderRadius: layoutTokens.radiusCard,
+    borderRadius: layoutTokens.radiusControl,
   },
   avgLine: {
     position: 'absolute',
@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
     height: AVG_PILL_HEIGHT,
     minWidth: 18,
     paddingHorizontal: 5,
-    borderRadius: layoutTokens.radiusCard,
+    borderRadius: layoutTokens.radiusControl,
     alignItems: 'center',
     justifyContent: 'center',
   },

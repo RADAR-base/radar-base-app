@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 9,
     paddingVertical: BUTTON_PADDING,
-    borderRadius: 24,
+    borderRadius: layoutTokens.radiusPill,
     minHeight: 52,
   },
   outlineButton: {

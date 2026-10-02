@@ -81,7 +81,7 @@ const CARD_GAP = layoutTokens.gap;
  * circle and a tighter corner beside it reads as two different radii arguing. Named rather than
  * repeated, so the pile can't round differently from the card it hides under.
  */
-const CARD_RADIUS = 26;
+const CARD_RADIUS = layoutTokens.radiusCard;
 
 /** The disc holding a notification's type glyph. */
 const TYPE_BADGE_SIZE = 52;

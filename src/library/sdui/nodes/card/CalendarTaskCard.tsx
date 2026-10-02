@@ -162,7 +162,7 @@ export function CalendarTaskCard(props: CalendarTaskCardProps) {
 const styles = StyleSheet.create({
   card: {
     width: '100%',
-    borderRadius: 24,
+    borderRadius: layoutTokens.radiusCard,
     padding: layoutTokens.gap,
     ...cardShadow,
   },

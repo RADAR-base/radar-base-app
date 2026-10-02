@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: layoutTokens.radiusCard,
+    borderRadius: layoutTokens.radiusControl,
   },
   tooltipValue: {
     fontSize: 16,

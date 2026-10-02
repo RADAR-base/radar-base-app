@@ -15,6 +15,7 @@ import {
   layout,
   type ThemeColorOverrides,
   type ThemeMode,
+  layout as layoutTokens,
 } from '../../theme/theme';
 
 /**
@@ -102,7 +103,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 16,
     paddingVertical: 6,
-    borderRadius: 24,
+    borderRadius: layoutTokens.radiusCard,
   },
   buttonLabel: {
     fontSize: 10,

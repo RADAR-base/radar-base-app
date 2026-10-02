@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
   item: {
     width: 80,
     height: navbarLayout.itemHeight,
-    borderRadius: layoutTokens.radiusCard,
+    borderRadius: layoutTokens.radiusControl,
     alignItems: 'center',
     justifyContent: 'center',
   },
