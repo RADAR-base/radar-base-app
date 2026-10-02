@@ -102,7 +102,7 @@ export {
   SurveyTaskListNode,
   TextNode,
   ViewNode,
-  GraphDataNode,
+
   HealthKitNode,
 } from './nodes';
 
