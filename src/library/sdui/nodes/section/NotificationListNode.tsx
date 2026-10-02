@@ -3,8 +3,10 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   interpolate,
+  interpolateColor,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withTiming,
 } from 'react-native-reanimated';
 import type { ComponentType } from 'react';
@@ -19,6 +21,7 @@ import {
   fontFamily,
   getColorTokens,
   cardShadow,
+  cardShadowBleed,
   layout as layoutTokens,
   notificationColors,
   withAlpha,
@@ -27,6 +30,9 @@ import { useNotifications, type AppNotification, type NotificationType } from '.
 import type { NodeProps } from '../../types';
 
 type ColorTokens = ReturnType<typeof getColorTokens>;
+
+/** A card whose ring colour animates; `Pressable`'s render-prop style can't carry an animated style. */
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 /** Opacity for a type's badge fill — derived from its `iconColor`, so one color drives both (like
  *  `TaskCardNode`'s `TASK_TINT`), and the tint adapts to a light/dark card background for free. */
@@ -51,6 +57,8 @@ const TYPE_STYLES: Record<
 };
 
 const UNREAD_BORDER = notificationColors.unreadRing;
+/** Resolved here, not in the worklet: `withAlpha` is JS and can't be called on the UI thread. */
+const UNREAD_BORDER_CLEAR = withAlpha(UNREAD_BORDER, 0);
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
@@ -77,9 +85,11 @@ const CARD_GAP = layoutTokens.gap;
 /**
  * The card's corner, and the peeking cards' behind it.
  *
- * Rounder than `radiusCard`'s 12 and than `radiusPill`'s 24, because the type badge inside is a 52pt
- * circle and a tighter corner beside it reads as two different radii arguing. Named rather than
- * repeated, so the pile can't round differently from the card it hides under.
+ * The task cards' 24, which every card surface in the app now shares. It was 26 — picked to sit
+ * beside the 52pt circular type badge without the two radii arguing — and 24 is near enough that the
+ * badge still reads right, which is worth less than the whole app agreeing on one corner.
+ *
+ * Named rather than repeated, so the pile can't round differently from the card it hides under.
  */
 const CARD_RADIUS = layoutTokens.radiusCard;
 
@@ -145,13 +155,14 @@ export function NotificationListNode({ context }: NodeProps) {
               </Pressable>
             ) : null}
           </View>
-          {toStacks(section.items).map((group) =>
+          {toStacks(section.items).map((group, groupIndex) =>
             group.items.length === 1 ? (
               <NotificationCard
                 key={group.key}
                 notification={group.items[0]}
                 tokens={tokens}
                 onPress={() => handlePress(group.items[0])}
+                index={groupIndex}
               />
             ) : (
               <NotificationStack
@@ -159,6 +170,7 @@ export function NotificationListNode({ context }: NodeProps) {
                 items={group.items}
                 tokens={tokens}
                 onPress={handlePress}
+                index={groupIndex}
               />
             ),
           )}
@@ -228,31 +240,76 @@ function CardFace({
   );
 }
 
+/**
+ * How long a card's unread ring takes to fade, and how far apart the cards do it.
+ *
+ * "Mark all as read" clears every ring at once, and switching them all off on the same frame reads as
+ * a glitch rather than as something the button did. Staggering them turns it into a sweep down the
+ * list, which is slow enough to see and short enough not to be waited on.
+ */
+const RING_FADE_MS = 240;
+const RING_STAGGER_MS = 45;
+/** Past this the tail of a long list would still be fading well after the press. */
+const RING_STAGGER_MAX = 6;
+
+/**
+ * The card's unread ring, as an animated border colour.
+ *
+ * Interpolated between the ring colour at zero alpha and at full, rather than from `'transparent'` —
+ * that is `rgba(0,0,0,0)`, so a colour interpolation would drag the ring through grey on its way out
+ * instead of simply fading.
+ */
+function useUnreadRing(unread: boolean, index: number) {
+  const progress = useSharedValue(unread ? 1 : 0);
+
+  useEffect(() => {
+    const delay = Math.min(index, RING_STAGGER_MAX) * RING_STAGGER_MS;
+    progress.value = withDelay(
+      // Only the fade *out* is staggered. A ring appearing is one card reacting to its own state, and
+      // holding that back would just make the list feel slow.
+      unread ? 0 : delay,
+      withTiming(unread ? 1 : 0, { duration: RING_FADE_MS }),
+    );
+  }, [unread, index, progress]);
+
+  return useAnimatedStyle(() => ({
+    borderColor: interpolateColor(progress.value, [0, 1], [UNREAD_BORDER_CLEAR, UNREAD_BORDER]),
+  }));
+}
+
 function NotificationCard({
   notification,
   tokens,
   onPress,
+  index = 0,
 }: {
   notification: AppNotification;
   tokens: ColorTokens;
   onPress: () => void;
+  /** Position in the day, so the ring's fade can be staggered — see `useUnreadRing`. */
+  index?: number;
 }) {
+  // A constant 4px border keeps read↔unread the same size; only its colour changes.
+  const ring = useUnreadRing(!notification.read, index);
+  const [pressed, setPressed] = useState(false);
+
   return (
-    <Pressable
+    <AnimatedPressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
+      // Held in state rather than taken from `Pressable`'s render prop: an animated component needs a
+      // style array it can read, and a function style is not one.
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      style={[
         styles.card,
-        {
-          backgroundColor: tokens.card.background,
-          // A constant 4px border keeps read↔unread the same size (transparent when read).
-          borderColor: notification.read ? 'transparent' : UNREAD_BORDER,
-        },
+        { backgroundColor: tokens.card.background },
+        ring,
         pressed && styles.cardPressed,
       ]}
     >
       <CardFace notification={notification} tokens={tokens} />
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -272,16 +329,22 @@ function NotificationStack({
   items,
   tokens,
   onPress,
+  index = 0,
 }: {
   items: AppNotification[];
   tokens: ColorTokens;
   onPress: (n: AppNotification) => void;
+  /** Position in the day, so the ring's fade can be staggered — see `useUnreadRing`. */
+  index?: number;
 }) {
   const [expanded, setExpanded] = useState(false);
   const newest = items[0];
   const rest = items.slice(1);
   // Any unread among them marks the whole stack, or a card would go unnoticed under a read one.
   const anyUnread = items.some((n) => !n.read);
+  // Closed, the ring speaks for the whole pile; open, only for the card it is on.
+  const ring = useUnreadRing(expanded ? !newest.read : anyUnread, index);
+  const [pressed, setPressed] = useState(false);
 
   /**
    * How far open the group is, 0 to 1 — the pile, the reveal and the chevron all read from it.
@@ -308,6 +371,10 @@ function NotificationStack({
 
   const revealStyle = useAnimatedStyle(() => ({
     height: revealHeight * progress.value,
+    // `revealInner`'s bottom padding is clip room for the last card's shadow, not spacing — taken
+    // back out here so the group is no taller than its cards. Scaled by `progress` so a closed group,
+    // whose height is 0, doesn't drag the content below it upward by the same amount.
+    marginBottom: -cardShadowBleed * progress.value,
     // Trails the height slightly, so the cards are already in place by the time they are readable
     // rather than fading in over a gap that is still opening.
     opacity: interpolate(progress.value, [0, 0.4, 1], [0, 0, 1]),
@@ -352,19 +419,21 @@ function NotificationStack({
         {/* Closed, this card stands for the group and opening it is all its press does. Open, it is
             simply the newest notification again — arrow and all — or it would be the one card in the
             list you could never reach a second time. */}
-        <Pressable
+        <AnimatedPressable
           accessibilityRole="button"
           accessibilityLabel={
             expanded ? newest.title : `${newest.title}, ${items.length} notifications`
           }
           accessibilityState={{ expanded }}
           onPress={() => (expanded ? onPress(newest) : setExpanded(true))}
-          style={({ pressed }) => [
+          // Held in state rather than taken from `Pressable`'s render prop: an animated component
+          // needs a style array it can read, and a function style is not one.
+          onPressIn={() => setPressed(true)}
+          onPressOut={() => setPressed(false)}
+          style={[
             styles.card,
-            {
-              backgroundColor: tokens.card.background,
-              borderColor: (expanded ? !newest.read : anyUnread) ? UNREAD_BORDER : 'transparent',
-            },
+            { backgroundColor: tokens.card.background },
+            ring,
             pressed && styles.cardPressed,
           ]}
         >
@@ -373,7 +442,7 @@ function NotificationStack({
             tokens={tokens}
             count={expanded ? undefined : items.length}
           />
-        </Pressable>
+        </AnimatedPressable>
 
         {/* Holds the room the peeking cards need, and gives it back as they go. In flow, so the
             group takes its real height and the next card in the day sits clear of the pile. */}
@@ -382,12 +451,13 @@ function NotificationStack({
 
       <Animated.View style={[styles.reveal, revealStyle]}>
         <View onLayout={(e) => setRevealHeight(e.nativeEvent.layout.height)} style={styles.revealInner}>
-          {rest.map((n) => (
+          {rest.map((n, i) => (
             <NotificationCard
               key={n.id}
               notification={n}
               tokens={tokens}
               onPress={() => onPress(n)}
+              index={index + i + 1}
             />
           ))}
         </View>
@@ -551,8 +621,16 @@ const styles = StyleSheet.create({
    * the collapsed container and the group never looks shut.
    */
   reveal: {
-    width: '100%',
+    // `alignSelf: 'stretch'`, not `width: '100%'`. A percentage width resolves against the parent and
+    // is then *shifted* by the negative margins below, staying the same size — so the padding that
+    // pays them back inside came straight out of the cards, and they rendered 28pt narrow. Stretching
+    // sizes this to the parent *minus* its margins, which for negative ones means wider.
+    alignSelf: 'stretch',
     overflow: 'hidden',
+    // Widened past the column so the cards' side shadows fall inside the clip rather than onto its
+    // edge, which left a hard vertical line down each card. The bottom edge is handled differently —
+    // it is the animated height, so it takes padding on the inside instead; see `revealInner`.
+    marginHorizontal: -cardShadowBleed,
   },
   /**
    * The measured content. Carries the gap above itself, so that spacing is part of the height that
@@ -562,6 +640,13 @@ const styles = StyleSheet.create({
     width: '100%',
     gap: CARD_GAP,
     paddingTop: CARD_GAP,
+    // Pays back `reveal`'s negative margin, so the cards sit where they always did. Safe against the
+    // height measurement above, which only reads `layout.height`.
+    paddingHorizontal: cardShadowBleed,
+    // Room under the last card for its shadow, which the clip would otherwise cut into a hard line.
+    // Inside the measured element on purpose: `onLayout` reads this View's height, padding included,
+    // so the clip grows with it. `reveal` subtracts it again as a margin, so nothing moves.
+    paddingBottom: cardShadowBleed,
   },
   /**
    * One card peeking out from under the front one.
