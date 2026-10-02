@@ -1,18 +1,26 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
-  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 
 import ErrorIcon from '../../../../theme/icons/error.svg';
-import { fontFamily, tracking } from '../../../../theme/theme';
+import { REFUSAL_DISTANCE, refusalKnock } from './choicePress';
+import {
+  alertRed,
+  fontFamily,
+  getColorTokens,
+  layout as layoutTokens,
+  tracking,
+  type ThemeMode,
+} from '../../../../theme/theme';
 
-/** Failure red — design `color/red/400`, the same fixed semantic the speech recorder uses. It is
- *  deliberately not brand-tinted: "wrong" should read the same in every study's theme. */
-export const FAILED_COLOR = '#E84855';
+/** Failure red. Re-exported under the name the questionnaire's inputs ask for it by — see `alertRed`
+ *  for why it isn't brand-tinted. */
+export const FAILED_COLOR = alertRed;
 
 /** The error glyph (Figma 3977:1923, `clarity:error-standard-solid`). Drawn at 20 rather than its
  *  native 26 so it sits with the 14pt message rather than towering over it. */
@@ -21,17 +29,14 @@ const ERROR_ICON_SIZE = 20;
 /** How long the message takes to rise into place, and how far it travels doing it. */
 const MESSAGE_MS = 160;
 const MESSAGE_RISE = 6;
-
 /**
- * How far the row swings when a refusal is repeated, and over how long. Matches the text field's own
- * knock so every input refuses at the same speed.
+ * Longer going than coming.
  *
- * The row reserves this much margin either side: it fills the panel, and the panel sits inside
- * `StepSlider`'s clipping viewport, so without room to move into its edge would be sliced off.
+ * Arriving is news and wants to be prompt; leaving is an acknowledgement that the thing was fixed,
+ * and a message that vanishes the instant an option is tapped reads as a flicker beside the option's
+ * own fill animating in.
  */
-const SHAKE_DISTANCE = 6;
-const SHAKE_MS = 220;
-const SHAKE_STEP_MS = SHAKE_MS / 8;
+const MESSAGE_OUT_MS = 220;
 
 /**
  * Why an answer was refused — an icon and a line of red, rising into place beneath the input it
@@ -44,6 +49,7 @@ export function QuestionError({
   message,
   style,
   shakeKey,
+  mode,
 }: {
   /** The reason. Nothing renders when absent. */
   message?: string | null;
@@ -54,34 +60,65 @@ export function QuestionError({
    * one. Omit where the caller shakes something of its own instead (the text field shakes its card).
    */
   shakeKey?: number;
+  /**
+   * Active colour scheme, for the ink on the card.
+   *
+   * Optional: a caller that doesn't theme its inputs still gets a legible message, because the ink is
+   * checked against the card either way — see `ink`.
+   */
+  mode?: ThemeMode;
 }) {
-  // Driven manually rather than with an `entering` layout animation — those strand an invisible
-  // touch-blocking overlay on Android.
+  /**
+   * The message being drawn, which outlives the one being asked for.
+   *
+   * A message that simply unmounted on its way out took its own exit animation with it — the row was
+   * gone before the first frame of it ran. Holding the last text here lets it fade while the caller
+   * has already moved on; `shown` is cleared when the fade lands, which is what finally unmounts it.
+   */
+  const [shown, setShown] = useState<string | null>(message ?? null);
+  useEffect(() => {
+    if (message) setShown(message);
+  }, [message]);
+
+  // Driven manually rather than with an `entering`/`exiting` layout animation — those strand an
+  // invisible touch-blocking overlay on Android.
   const rise = useSharedValue(0);
   useEffect(() => {
     if (!message) {
-      // Straight to zero, so a message that comes back starts from the bottom again rather than
-      // picking up wherever the last fade-out had reached.
-      rise.value = 0;
+      // Out, then dropped. `runOnJS` because clearing the held text is React's business, not the UI
+      // thread's, and it must not happen until the last frame has been drawn.
+      rise.value = withTiming(0, { duration: MESSAGE_OUT_MS }, (finished) => {
+        if (finished) runOnJS(setShown)(null);
+      });
       return;
     }
+    // From the bottom each time: a message that comes back after being dismissed should arrive, not
+    // resume from wherever its fade-out had reached.
     rise.value = withTiming(1, { duration: MESSAGE_MS });
   }, [message, rise]);
 
   const shake = useSharedValue(0);
   useEffect(() => {
     if (!shakeKey || !message) return;
-    shake.value = withSequence(
-      withTiming(-SHAKE_DISTANCE, { duration: SHAKE_STEP_MS }),
-      withTiming(SHAKE_DISTANCE, { duration: SHAKE_STEP_MS * 2 }),
-      withTiming(-SHAKE_DISTANCE * 0.6, { duration: SHAKE_STEP_MS * 2 }),
-      withTiming(SHAKE_DISTANCE * 0.35, { duration: SHAKE_STEP_MS * 2 }),
-      withTiming(0, { duration: SHAKE_STEP_MS }),
-    );
+    shake.value = refusalKnock();
     // Only the count triggers it — re-running when the message itself changes would knock the row
     // for fixing something.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shakeKey, shake]);
+
+  /**
+   * The ink on the solid red card: white in light mode, near-black in dark.
+   *
+   * The theme's own banner ink — `card.task.background`, the same pairing `ToDoStatusNode` puts on
+   * its fixed status colours — taken as given rather than second-guessed.
+   *
+   * Worth knowing: white on this red measures 3.8:1, which clears AA for large text but not for the
+   * 14pt this is set at. The card's colour is what would fix that rather than the ink — a darker red
+   * (the palette's `red550`, #C0312D) puts white at about 5.5:1 — so if the contrast ever has to be
+   * answered for, change the theme's `alertRed`, not this. Note that moves the recording indicator
+   * and the broken-streak icon with it, which is the point of its being one colour.
+   */
+  const ink = getColorTokens(mode ?? 'light').card.task.background;
 
   const riseStyle = useAnimatedStyle(() => ({
     opacity: rise.value,
@@ -91,29 +128,40 @@ export function QuestionError({
     ],
   }));
 
-  if (!message) return null;
+  if (!shown) return null;
 
   return (
     <Animated.View style={[styles.row, style, riseStyle]}>
-      <ErrorIcon width={ERROR_ICON_SIZE} height={ERROR_ICON_SIZE} color={FAILED_COLOR} />
-      <Text style={styles.text}>{message}</Text>
+      <ErrorIcon width={ERROR_ICON_SIZE} height={ERROR_ICON_SIZE} color={ink} />
+      <Text style={[styles.text, { color: ink }]}>{shown}</Text>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
+  /**
+   * A tinted pill rather than bare text.
+   *
+   * The row is drawn over the page now, above the footer, with the question's own content scrolling
+   * underneath it — and red text alone on top of a radio list is unreadable at exactly the moment it
+   * matters most. Solid rather than tinted for the same reason: a translucent fill would carry
+   * whatever it happened to be over, and the message has to read the same on every page.
+   */
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
-    // Room for the knock — see `SHAKE_DISTANCE`.
-    marginHorizontal: SHAKE_DISTANCE,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: layoutTokens.radiusPill,
+    backgroundColor: FAILED_COLOR,
+    // Room for the knock — see `REFUSAL_DISTANCE`.
+    marginHorizontal: REFUSAL_DISTANCE,
   },
   text: {
     // Takes the width the icon leaves, so a longer reason wraps under itself rather than pushing the
     // glyph off the row.
     flex: 1,
-    color: FAILED_COLOR,
     fontSize: 14,
     lineHeight: 18,
     fontFamily: fontFamily.medium,

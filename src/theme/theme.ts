@@ -698,6 +698,9 @@ export const cardShadow =
 /** How far `cardShadow` reaches past its element. Clipping parents reserve this much room. */
 export const cardShadowBleed = 8;
 
+/** The one red that is never brand-tinted. Refusals, recording, a broken streak. */
+export const alertRed = palette.red400;
+
 /**
  * Task-status styling shared by the task cards (`TaskCardNode`, `CalendarTaskCard`) and the calendar
  * day-timeline markers (`CalendarTaskView`). Fixed brand colors (not brand-overridable, like

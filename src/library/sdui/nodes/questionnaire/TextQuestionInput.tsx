@@ -4,7 +4,6 @@ import Animated, {
   interpolateColor,
   useAnimatedStyle,
   useSharedValue,
-  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 import {
@@ -14,6 +13,7 @@ import {
   tracking,
   withAlpha,
 } from '../../../../theme/theme';
+import { REFUSAL_DISTANCE, refusalKnock } from './choicePress';
 import { FAILED_COLOR, QuestionError } from './QuestionError';
 
 interface TextQuestionInputProps {
@@ -68,20 +68,6 @@ const RING_ALPHA = 0.5;
 /** How long the ring takes to settle in or out. Matches `RadioInput`'s select, so the questionnaire's
  *  inputs all respond at the same speed. */
 const RING_MS = 180;
-
-/**
- * How far the field swings when an answer is refused. The swing decays rather than repeating evenly,
- * so it reads as a knock rather than a wobble.
- *
- * The field also reserves this much margin either side. It fills the panel, and the panel sits in
- * `StepSlider`'s viewport, which clips — so without room to move into, the card's edge was sliced off
- * mid-swing. The margin is constant, so it costs nothing when the field isn't shaking.
- */
-const SHAKE_DISTANCE = 6;
-/** Total length of the knock, divided into the eight equal legs the sequence below uses. Stated as a
- *  total because that's the number worth tuning — the legs just have to add up to it. */
-const SHAKE_MS = 220;
-const SHAKE_STEP_MS = SHAKE_MS / 8;
 
 /** Enough room to invite a few sentences, while still leaving the question above it visible. */
 const MIN_HEIGHT = 200;
@@ -190,13 +176,7 @@ export function TextQuestionInput({
   const shake = useSharedValue(0);
   useEffect(() => {
     if (submitAttempt === 0 || !warning) return;
-    shake.value = withSequence(
-      withTiming(-SHAKE_DISTANCE, { duration: SHAKE_STEP_MS }),
-      withTiming(SHAKE_DISTANCE, { duration: SHAKE_STEP_MS * 2 }),
-      withTiming(-SHAKE_DISTANCE * 0.6, { duration: SHAKE_STEP_MS * 2 }),
-      withTiming(SHAKE_DISTANCE * 0.35, { duration: SHAKE_STEP_MS * 2 }),
-      withTiming(0, { duration: SHAKE_STEP_MS }),
-    );
+    shake.value = refusalKnock();
     // `warning` is deliberately not a dependency: fixing the answer shouldn't shake the field.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submitAttempt, shake]);
@@ -254,8 +234,8 @@ const styles = StyleSheet.create({
   halo: {
     borderWidth: RING_WIDTH,
     borderRadius: RADIUS + RING_WIDTH,
-    // Room for the knock — see `SHAKE_DISTANCE`.
-    marginHorizontal: SHAKE_DISTANCE,
+    // Room for the knock — see `REFUSAL_DISTANCE`.
+    marginHorizontal: REFUSAL_DISTANCE,
   },
   field: {
     borderWidth: BORDER_WIDTH,
@@ -288,6 +268,9 @@ const styles = StyleSheet.create({
   warningRow: {
     // Starts where the red border does — past the field's own margin and its translucent halo, not
     // at the container's edge.
-    paddingLeft: SHAKE_DISTANCE + RING_WIDTH,
+    //
+    // A margin, not padding: the row carries a filled pill now, and padding would have inset its text
+    // while leaving the pill itself where it was.
+    marginLeft: REFUSAL_DISTANCE + RING_WIDTH,
   },
 });

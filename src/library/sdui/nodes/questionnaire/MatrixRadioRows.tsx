@@ -74,6 +74,15 @@ interface MatrixRadioRowsProps {
    * puts it on its content instead, so the frame it clips to is the screen and the shadow survives.
    */
   pageInset?: number;
+  /**
+   * How many times the participant has been refused — the screen's own counter.
+   *
+   * A refusal on a matrix page means a row is still unanswered, and the row is what they have to act
+   * on. The screen can't scroll to it: the block owns its scroller, so it moves itself, the same
+   * centring it uses when an answer lands. That keeps a refusal feeling the same here as it does on a
+   * single-input page, where the screen's panel scrolls to the message instead.
+   */
+  submitAttempt?: number;
 }
 
 /**
@@ -218,6 +227,7 @@ export function MatrixRadioRows({
   backgroundColor,
   bottomReserve = 0,
   pageInset = 0,
+  submitAttempt = 0,
 }: MatrixRadioRowsProps) {
   const scroller = useRef<ScrollView>(null);
   /**
@@ -276,6 +286,24 @@ export function MatrixRadioRows({
   const [active, setActive] = useState<string | undefined>(
     () => nextUnanswered(answers)?.field_name,
   );
+
+  /**
+   * Refused: take them to the row still wanting an answer.
+   *
+   * The screen fires the buzz and shows the message; this is the half only the block can do, since it
+   * owns the scroller. A block that fits the page skips it — every row is already in view, and the
+   * ring on the next one is the whole of the guidance it needs.
+   */
+  useEffect(() => {
+    if (submitAttempt === 0 || !scrolls) return;
+    const field = nextUnanswered(answers)?.field_name;
+    if (!field) return;
+    const frame = requestAnimationFrame(() => centreOn(field));
+    return () => cancelAnimationFrame(frame);
+    // Keyed on the attempt alone: pressing Next again on the same block has to move again, and
+    // `answers` changing is the participant answering, which `handleSelect` already handles.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submitAttempt]);
 
   const handleSelect = (question: Question, choice: SelectChoice) => {
     const fieldName = question.field_name;
