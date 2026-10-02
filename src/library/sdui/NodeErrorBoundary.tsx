@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { Node } from '../contracts/NodeSchema';
+import { fontFamily } from '../../theme/theme';
 
 interface Props {
   node: Pick<Node, 'id' | 'type'>;
@@ -57,18 +58,22 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 13,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     fontWeight: '700',
     color: '#856404',
     marginBottom: 4,
   },
   body: {
     fontSize: 12,
+    includeFontPadding: false,
     color: '#856404',
     fontFamily: 'monospace',
     marginBottom: 4,
   },
   error: {
     fontSize: 12,
+    includeFontPadding: false,
     color: '#721c24',
     fontFamily: 'monospace',
   },

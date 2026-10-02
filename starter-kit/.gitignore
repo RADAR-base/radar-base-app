@@ -18,6 +18,10 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
+# Firebase
+google-services.json
+GoogleService-Info.plist
+
 # Metro
 .metro-health-check*
 
@@ -36,5 +40,5 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-ios/build/
-ios/Pods/
+ios/
+android/

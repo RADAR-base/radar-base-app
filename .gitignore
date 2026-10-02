@@ -6,6 +6,8 @@
 /e2e/test-output/
 /.angular/
 .angular/
+.DS_Store
+
 
 # Node modules and dependency files
 /node_modules/
@@ -28,6 +30,3 @@ yarn-error.log*
 
 
 /lib
-
-starter-kit/ios
-starter-kit/android
