@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 import { StyleSheet, useColorScheme, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import {
-  getColorTokens,
   layout,
   resolveBackground,
   type ThemeColorOverrides,
@@ -60,7 +59,6 @@ export function RegistrationFlow({
 }: RegistrationFlowProps) {
   const deviceScheme = useColorScheme();
   const resolvedMode: ThemeMode = mode ?? (deviceScheme === 'dark' ? 'dark' : 'light');
-  const tokens = getColorTokens(resolvedMode, brandColors);
 
   const flow = useStepFlow(STEP_PROGRESS.length);
   const camera = useSlideOverlay(); // frontend camera view, pushed in from the right

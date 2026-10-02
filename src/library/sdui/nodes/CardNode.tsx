@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { cardShadow, layout } from '../../../theme/theme';
 import type { Node } from '../../contracts/NodeSchema';
 import type { NodeProps } from '../types';
