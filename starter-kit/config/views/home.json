@@ -86,8 +86,30 @@
             "unit": "bpm",
             "xAxis": "day",
             "values": [
-              62, 64, 61, 68, 72, 88, 95, 84, 79, 74, 70, 76, 90, 102, 96, 85, 80, 77, 73, 69, 66,
-              64, 63, 61
+              62,
+              64,
+              61,
+              68,
+              72,
+              88,
+              95,
+              84,
+              79,
+              74,
+              70,
+              76,
+              90,
+              102,
+              96,
+              85,
+              80,
+              77,
+              73,
+              69,
+              66,
+              64,
+              63,
+              61
             ]
           },
           {
@@ -97,7 +119,15 @@
             "title": "Steps",
             "metric": "steps_daily",
             "unit": "steps",
-            "values": [62, 81, 74, 98, 112, 86, 62]
+            "values": [
+              62,
+              81,
+              74,
+              98,
+              112,
+              86,
+              62
+            ]
           },
           {
             "id": "bars_steps_large",
@@ -107,7 +137,15 @@
             "description": "Your daily steps across the last week.",
             "metric": "steps_daily",
             "unit": "steps",
-            "values": [62, 81, 74, 9, 112, 86, 62]
+            "values": [
+              62,
+              81,
+              74,
+              9,
+              112,
+              86,
+              62
+            ]
           },
           {
             "id": "arc_readiness",
@@ -130,8 +168,8 @@
       },
       {
         "id": "card_custom_demo",
-        "type": "CardNode",
-        "isCanvas": true,
+        "type": "SectionNode",
+        "title": "Custom Plugin",
         "children": [
           {
             "id": "custom_runtime_demo",
