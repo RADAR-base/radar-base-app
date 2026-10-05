@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 import type { ActionPayload, NodeProps } from '../types';
+import { fontFamily } from '../../../theme/theme';
 
 /**
  * Tappable button. Supports two visual variants:
@@ -88,6 +89,8 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 15,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
     fontWeight: '600',
   },
 });

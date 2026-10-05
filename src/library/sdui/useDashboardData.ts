@@ -30,7 +30,7 @@ export interface DashboardDataState {
  *   3. `config.placeholder === 'random'` — synthesized values for previews.
  *   4. Empty array.
  *
- * Used by `VitalsChartNode` and available to custom nodes that need the same shape of
+ * Used by `GraphDataNode` and available to custom nodes that need the same shape of
  * "one or more numeric series with optional remote fetch" data resolution. Range
  * selection, smoothing, and theming are the consumer's responsibility.
  */

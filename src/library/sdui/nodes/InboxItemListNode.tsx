@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { Node } from '../../contracts/NodeSchema';
 import type { NodeProps } from '../types';
+import { fontFamily } from '../../../theme/theme';
 
 /**
  * Per-category inbox list (Tasks / Updates / Reminders). MVP renders a placeholder card
@@ -55,16 +56,21 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 15,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
     fontWeight: '600',
     marginBottom: 4,
   },
   body: {
     fontSize: 12,
+    includeFontPadding: false,
     fontFamily: 'monospace',
     marginBottom: 4,
   },
   placeholder: {
     fontSize: 12,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
     fontStyle: 'italic',
   },
 });

@@ -11,14 +11,12 @@ import {
   OAuthConfig,
 } from '../types';
 import { EVENTS } from './EventBus';
+import { BASE_URI_KEY } from './ConfigService';
 import type { AuthStatus } from '../types';
 
 const OAUTH_STATE_KEY = '@radarbase/oauth_pending_state';
 
 export class DefaultAuthService implements AuthService {
-  private readonly DEFAULT_MANAGEMENT_PORTAL_URI = '/managementportal';
-  private readonly DEFAULT_REFRESH_TOKEN_URI = '/oauth/token';
-
   private pendingState: string | null = null;
 
   constructor(
@@ -63,11 +61,23 @@ export class DefaultAuthService implements AuthService {
       if (!code) throw new Error('Authorization code is missing.');
       if (!state) throw new Error('State parameter is missing.');
 
-      // Restore pendingState from storage if lost (e.g. web page reload, app cold start)
+      // Restore pendingState from storage if lost (e.g. app cold start from deep link).
+      // Retry briefly — AsyncStorage may not be readable on the very first tick after
+      // the JS bundle loads, particularly when the app was launched via a deep link.
       if (!this.pendingState) {
         this.pendingState = await this.storage.get<string>(OAUTH_STATE_KEY);
       }
-      if (!this.pendingState) return; // No pending auth flow
+      if (!this.pendingState) {
+        // One retry after a short delay — gives storage time to initialise on cold start.
+        await new Promise(r => setTimeout(r, 500));
+        this.pendingState = await this.storage.get<string>(OAUTH_STATE_KEY);
+      }
+      if (!this.pendingState) {
+        this.logger.log(
+          `[AuthService] handleAuthCallback ignored — no pending OAuth state in memory or storage (callback state=${state})`,
+        );
+        return; // No pending auth flow
+      }
       if (this.pendingState !== state) {
         this.pendingState = null;
         await this.storage.set(OAUTH_STATE_KEY, null);
@@ -102,18 +112,25 @@ export class DefaultAuthService implements AuthService {
       }
 
       const tokens: TokenPair = await response.json();
+      // Debug enrolment: log shape only (never full secrets).
+      this.logger.log(
+        `[AuthService] token exchange ok — keys=[${Object.keys(tokens as object).join(', ')}] ` +
+          `access=${tokenDebug(tokens.access_token)} refresh=${tokenDebug(tokens.refresh_token)}`,
+      );
       if (!tokens.access_token) throw new Error('Token response missing access_token.');
       if (!tokens.refresh_token) throw new Error('Token response missing refresh_token.');
 
       // Store tokens and configure endpoints — single token call, no refresh needed
-      await this.token.setURI(this.oauthConfig.endpoint);
+      await this.config.setBaseUrl(this.oauthConfig.endpoint);
       await this.token.setTokenEndpoint(tokenEndpoint);
-      await this.token.register({ refresh_token: tokens.refresh_token, access_token: tokens.access_token });
+      await this.configureTokenClient();
+      await this.token.register({ refresh_token: tokens.refresh_token, access_token: tokens.access_token, expires_in: tokens.expires_in });
 
       await this.analytics.setUserProperties({ baseUrl: this.oauthConfig.endpoint });
       await this.analytics.logAuthenticationEvent('login', true);
       this.logger.log('Authentication completed successfully');
       this.emitAuthState('authenticated');
+      this.onPostAuth();
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Authentication failed.';
       this.emitAuthState('unauthenticated', msg);
@@ -122,22 +139,18 @@ export class DefaultAuthService implements AuthService {
   }
 
   // ---------------------------------------------------------------------------
-  // Existing auth methods (Management Portal, legacy Ory credential flows)
+  // QR code / credential-based auth (Ory Hydra)
   // ---------------------------------------------------------------------------
 
   async authenticate(credentials: string | Record<string, any>): Promise<TokenPair> {
     try {
       this.logger.log('Starting authentication process');
-      if (this.isManagementPortalAuth(credentials)) {
-        return this.authenticateWithManagementPortal(credentials as string);
-      } else if (this.isOryAuth(credentials)) {
-        return this.authenticateWithOry(credentials as Record<string, any> | string);
-      } else {
-        throw new Error('Invalid authentication credentials format');
-      }
+      this.emitAuthState('authenticating');
+      return await this.authenticateWithOry(credentials);
     } catch (error) {
       this.logger.error('Authentication failed', error);
       this.analytics.logAuthenticationEvent('login', false);
+      this.emitAuthState('unauthenticated', error instanceof Error ? error.message : 'Authentication failed');
       throw error;
     }
   }
@@ -146,9 +159,10 @@ export class DefaultAuthService implements AuthService {
     if (!baseUrl) throw new Error('Base URL is required for authentication');
 
     try {
-      await this.token.setURI(baseUrl);
+      await this.config.setBaseUrl(baseUrl);
       await this.analytics.setUserProperties({ baseUrl });
       await this.token.setTokenEndpoint(tokenEndpoint);
+      await this.configureTokenClient();
       await this.token.register({ refresh_token: refreshToken, access_token: accessToken });
       await this.registerAsSource();
 
@@ -162,6 +176,7 @@ export class DefaultAuthService implements AuthService {
       this.logger.log('Authentication completed successfully');
       this.analytics.logAuthenticationEvent('login', true);
       this.emitAuthState('authenticated');
+      this.onPostAuth();
       return tokens;
     } catch (error: any) {
       this.logger.error('Authentication completion failed', error);
@@ -175,11 +190,19 @@ export class DefaultAuthService implements AuthService {
     try {
       this.logger.log('Resetting authentication state');
       await this.token.clearTokens();
+      await this.storage.remove(BASE_URI_KEY);
+      await this.subjectConfig.clear?.();
       this.analytics.logAuthenticationEvent('logout', true);
       this.emitAuthState('unauthenticated');
     } catch (error: any) {
       this.logger.error('Failed to reset authentication state', error);
       throw error;
+    }
+  }
+
+  setEndpoint(url: string): void {
+    if (this.oauthConfig) {
+      (this.oauthConfig as { endpoint: string }).endpoint = url;
     }
   }
 
@@ -197,25 +220,24 @@ export class DefaultAuthService implements AuthService {
   // Private helpers
   // ---------------------------------------------------------------------------
 
+  /** Fire-and-forget post-auth tasks: init Kafka and flush any unsent cached data. */
+  private onPostAuth(): void {
+    this.config.init()
+      .then(() => this.config.sendCachedData())
+      .catch(e => this.logger.log(`Post-auth init/flush failed: ${e}`));
+  }
+
   private emitAuthState(status: AuthStatus, error?: string): void {
     this.bus.emit(EVENTS.AUTH_STATE_CHANGED, { status, error: error ?? null });
   }
 
-  private isManagementPortalAuth(credentials: string | Record<string, any>): boolean {
-    return typeof credentials === 'string' && credentials.includes('?');
-  }
-
-  private isOryAuth(credentials: string | Record<string, any>): boolean {
-    return typeof credentials === 'object' && !!(credentials.url || credentials.refreshToken);
-  }
-
-  private async authenticateWithManagementPortal(credentials: string): Promise<TokenPair> {
-    const { refreshToken, baseUrl } = await this.getRefreshTokenFromUrl(credentials);
-    if (!baseUrl) throw new Error('Base URL is missing from the response');
-    const url = new URL(baseUrl);
-    const formattedBaseUrl = url.origin;
-    const tokenEndpoint = `${formattedBaseUrl}${this.DEFAULT_MANAGEMENT_PORTAL_URI}${this.DEFAULT_REFRESH_TOKEN_URI}`;
-    return this.completeAuthentication(refreshToken, formattedBaseUrl, tokenEndpoint);
+  /** Keep TokenService's refresh client_id/secret in sync with the app's OAuth config. */
+  private async configureTokenClient(): Promise<void> {
+    if (!this.oauthConfig?.clientId) return;
+    await this.token.configureOAuthClient({
+      clientId: this.oauthConfig.clientId,
+      clientSecret: this.oauthConfig.clientSecret,
+    });
   }
 
   private async authenticateWithOry(credentials: string | Record<string, any>): Promise<TokenPair> {
@@ -235,20 +257,14 @@ export class DefaultAuthService implements AuthService {
     } else {
       if (!credentials.url) throw new Error('Base URL is missing from auth object');
       baseUrl = new URL(credentials.url).origin;
-      if (!credentials.refreshToken) throw new Error('Refresh token is missing from auth object');
-      refreshToken = credentials.refreshToken;
+      // QR data may use either snake_case (refresh_token) or camelCase (refreshToken).
+      const rt = credentials.refresh_token ?? credentials.refreshToken;
+      if (!rt) throw new Error('Refresh token is missing from auth object');
+      refreshToken = rt;
     }
 
     const tokenEndpoint = `${baseUrl}/hydra/oauth2/token`;
     return this.completeAuthentication(refreshToken, baseUrl, tokenEndpoint);
-  }
-
-  private async getRefreshTokenFromUrl(url: string): Promise<{ refreshToken: string; baseUrl: string }> {
-    const urlObj = new URL(url);
-    const token = urlObj.searchParams.get('refresh_token');
-    const baseUrl = urlObj.searchParams.get('base_url');
-    if (!token || !baseUrl) throw new Error('Invalid authentication URL: missing refresh_token or base_url');
-    return { refreshToken: token, baseUrl };
   }
 
   private async registerAsSource(): Promise<void> {
@@ -258,6 +274,14 @@ export class DefaultAuthService implements AuthService {
       this.logger.error('Failed to register as source', error);
     }
   }
+}
+
+/** Safe token summary for logs — presence + length only. */
+function tokenDebug(value: unknown): string {
+  if (value == null) return 'missing';
+  if (typeof value !== 'string') return `non-string(${typeof value})`;
+  if (!value) return 'empty';
+  return `present(len=${value.length})`;
 }
 
 function generateRandomState(): string {
