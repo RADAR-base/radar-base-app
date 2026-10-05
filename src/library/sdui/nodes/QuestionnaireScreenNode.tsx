@@ -342,15 +342,6 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
     answerValid.current = valid;
   }, []);
 
-  /**
-   * Held still while an input inside the panel is being dragged.
-   *
-   * Claiming the gesture isn't enough on its own: `onShouldBlockNativeResponder` is Android-only, and
-   * on iOS the enclosing `ScrollView` is a native view whose own pan recogniser can cancel the touches
-   * out from under the JS responder. Turning the scroller off for the length of the gesture is the
-   * only thing that reliably stops the page moving under the finger.
-   */
-
   const goNext = useCallback(() => {
     // Hold them here and show why, rather than carrying a bad answer forward.
     if (!canProceed || !answerValid.current) {
@@ -775,7 +766,8 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                 showsVerticalScrollIndicator={false}
                 // Set even on a View panel, where it is simply ignored — see `panelBehaviour`
                   // for which pages refuse to scroll and why. `&& !scrollLocked`: an input dragging
-                  // inside this panel holds it still for the length of the gesture.
+                  // inside this panel holds it still for the length of the gesture — see
+                  // `handleScrollLock`.
                   scrollEnabled={behaviour.scrollEnabled && !scrollLocked}
               >
                 {!question ? (
@@ -924,10 +916,10 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                           onValidityChange={isActive ? handleValidityChange : undefined}
                           // Only the active panel: a parked neighbour has no business freezing the
                           // page the participant is actually looking at.
+                          onScrollLock={isActive ? handleScrollLock : undefined}
                           // Only the text field draws this itself, lined up with its own card. Every
                           // other type gets the screen's pinned row below.
                           errorMessage={isActive ? requiredError : null}
-                        onScrollLock={isActive ? handleScrollLock : undefined}
                       />
                       {hideTitleHere ? (
                         <>
