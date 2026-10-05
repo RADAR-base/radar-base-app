@@ -342,17 +342,6 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
     answerValid.current = valid;
   }, []);
 
-  /**
-   * Held still while an input inside the panel is being dragged.
-   *
-   * Claiming the gesture isn't enough on its own: `onShouldBlockNativeResponder` is Android-only, and
-   * on iOS the enclosing `ScrollView` is a native view whose own pan recogniser can cancel the touches
-   * out from under the JS responder. Turning the scroller off for the length of the gesture is the
-   * only thing that reliably stops the page moving under the finger.
-   */
-  const [scrollLocked, setScrollLocked] = useState(false);
-  const handleScrollLock = useCallback((locked: boolean) => setScrollLocked(locked), []);
-
   const goNext = useCallback(() => {
     // Hold them here and show why, rather than carrying a bad answer forward.
     if (!canProceed || !answerValid.current) {
@@ -931,7 +920,6 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                           // Only the text field draws this itself, lined up with its own card. Every
                           // other type gets the screen's pinned row below.
                           errorMessage={isActive ? requiredError : null}
-                        onScrollLock={isActive ? handleScrollLock : undefined}
                       />
                       {hideTitleHere ? (
                         <>
