@@ -38,6 +38,13 @@ interface ScaleInputProps {
   accentColor?: string;
   /** The page's own background; the unselected chips are cut out of the track with it. */
   backgroundColor?: string;
+  /**
+   * Lets this control hold the page still while it is being dragged.
+   *
+   * The enclosing ScrollView reads a drag as a scroll and takes it, so the page slid away under the
+   * finger instead of the chip moving. Released on finger-up and on a cancelled gesture.
+   */
+  onScrollLock?: (locked: boolean) => void;
 }
 
 /** Figma 4015:2262. The track's padding, the gap between chips, and its pill radius. */
@@ -88,6 +95,15 @@ const LAND_SPRING = { damping: 14, stiffness: 110, mass: 0.9 } as const;
  * the control ignoring you.
  */
 const MAGNET = 0.55;
+
+/**
+ * How far a finger may wander and still count as a press rather than a drag.
+ *
+ * No touch is perfectly still — a tap registers a point or two of travel on the way up — and without
+ * this every press tipped into the drag path on that jitter, snapping the blob to the finger before
+ * springing it to the number. Which is what made the numbers feel hard to press.
+ */
+const TAP_SLOP = 6;
 const LAND_DIP = 0.88;
 const LAND_MS = 70;
 const LAND_SWELL = { damping: 9, stiffness: 220, mass: 0.6 } as const;
@@ -139,9 +155,6 @@ const VALUE_SETTLE = { damping: 9, stiffness: 260, mass: 0.5 } as const;
  */
 const STEP_HYSTERESIS = 0.7;
 
-/** How far a finger must travel before the row treats it as a drag rather than a tap on a chip. */
-const DRAG_SLOP = 4;
-
 /** The value's own type size, matched to the other sliders rather than the design's 96. */
 const VALUE_SIZE = 88;
 
@@ -179,11 +192,32 @@ export function ScaleInput({
   textColor,
   accentColor,
   backgroundColor,
+  onScrollLock,
 }: ScaleInputProps) {
+  // Read through a ref, as every other live value here is: the handlers below are built once, with an
+  // empty dependency list, so a caller passing an inline arrow must not rebuild them.
+  const onScrollLockRef = useRef(onScrollLock);
+  onScrollLockRef.current = onScrollLock;
+  // A page turn or submit mid-drag unmounts this with no release to fire, which would strand the page
+  // locked. Safe to call when nothing is locked.
+  useEffect(() => () => onScrollLockRef.current?.(false), []);
   const accent = accentColor ?? primaryColor;
 
   /** A tick per step crossed, however the value was moved. */
   const tick = useStepHaptics();
+
+  /**
+   * The live `onChange`, read through a ref.
+   *
+   * The gesture handlers below are built once — `PanResponder.create` sits in a `useMemo` with no
+   * dependencies, because everything else they touch is already a ref. `onChange` was the exception:
+   * it closes over the host's current question, so the handlers kept calling the *first* render's
+   * version and a dragged answer was recorded against whichever question was on screen when this
+   * mounted. Tapping worked because that path is an ordinary function in render, which is why the
+   * two disagreed.
+   */
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
   // `range` when the definition bounds the scale, its choices when they enumerate it — see
   // `questionScale` for why the definitions need both readings.
@@ -343,6 +377,24 @@ export function ScaleInput({
     }
   }
 
+  /** Which step a touch at `x` points along the row lands on. Pure — it moves nothing. */
+  function stepAtX(x: number): number {
+    if (pitchRef.current <= 0) return indexRef.current;
+    const free = Math.min(positionOf(stepsRef.current - 1), Math.max(positionOf(0), x));
+    const raw = (free - TRACK_PAD - chipRef.current / 2) / pitchRef.current;
+    return Math.min(stepsRef.current - 1, Math.max(0, Math.round(raw)));
+  }
+
+  /**
+   * Where the touch went down, and whether it has moved since.
+   *
+   * A press and a drag arrive through the same gesture — the row claims both at touch-down, so the
+   * chips can't tell them apart on their own. Letting go without moving is a press, and it gets the
+   * clean spring to the chosen number; anything else is a drag, and tracks the finger.
+   */
+  const startX = useRef(0);
+  const moved = useRef(false);
+
   /** Choose a step outright — the row's other gesture. */
   const select = (next: number) => {
     if (next === indexRef.current) return;
@@ -350,7 +402,7 @@ export function ScaleInput({
     setIndex(next);
     settledFor.current = `${next}:${pitch}:${chip}`;
     settle(next, true);
-    onChange(valuesRef.current[next]);
+    onChangeRef.current(valuesRef.current[next]);
   };
 
   const panResponder = useMemo(
@@ -365,25 +417,38 @@ export function ScaleInput({
          * every tap on a chip. Waiting for a few points of travel separates the two gestures this row
          * accepts: a tap belongs to the chip under it, a drag belongs to the row.
          */
-        onStartShouldSetPanResponderCapture: () => false,
-        onMoveShouldSetPanResponderCapture: (_e, gesture) => Math.abs(gesture.dx) > DRAG_SLOP,
+        onStartShouldSetPanResponderCapture: () => true,
+        onMoveShouldSetPanResponderCapture: () => true,
         onPanResponderTerminationRequest: () => false,
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: e => {
+          onScrollLockRef.current?.(true);
           dragging.current = true;
           setDragged(true);
           press.value = withTiming(1, { duration: PRESS_MS });
-          setChip(e.nativeEvent.locationX);
+          startX.current = e.nativeEvent.locationX;
+          moved.current = false;
           dragStart.current = offset.value;
         },
         onPanResponderMove: (_e, gesture) => {
-          // A delta from where the drag began: `locationX` is only meaningful while the finger is
+          // Still within the slop: a press that hasn't let go yet, so leave the blob where it is.
+          // Once it is a drag it stays one for the rest of the gesture.
+          if (!moved.current && Math.abs(gesture.dx) < TAP_SLOP) return;
+          // A delta from where the touch went down: `locationX` is only meaningful while the finger is
           // inside the view, and a drag past either end would otherwise jump.
-          setChip(dragStart.current + gesture.dx);
+          moved.current = true;
+          setChip(startX.current + gesture.dx);
         },
         onPanResponderRelease: () => {
+          onScrollLockRef.current?.(false);
           dragging.current = false;
           press.value = withTiming(0, { duration: PRESS_MS });
+          // A press, not a drag: nothing has moved yet, so spring straight to the number under the
+          // finger. This is what tapping a chip did before the row started claiming the gesture.
+          if (!moved.current) {
+            select(stepAtX(startX.current));
+            return;
+          }
           // The nearest step, not whatever hysteresis settled on: let go three-quarters of the way to
           // the next number and that is plainly the one you meant.
           const final = Math.min(stepsRef.current - 1, Math.max(0, Math.round(exactStep())));
@@ -393,12 +458,19 @@ export function ScaleInput({
           }
           settledFor.current = `${final}:${pitchRef.current}:${chipRef.current}`;
           settle(final, true);
-          onChange(valuesRef.current[final]);
+          onChangeRef.current(valuesRef.current[final]);
         },
         onPanResponderTerminate: () => {
+          // Released here too, or a cancelled gesture leaves the page locked for good.
+          onScrollLockRef.current?.(false);
           dragging.current = false;
           press.value = withTiming(0, { duration: PRESS_MS });
           settle(indexRef.current, true);
+          // Record what the handle is showing. A terminated gesture still leaves it settled on a
+          // step — the participant sees an answer — so returning without reporting it is what left
+          // the value on screen and nothing in `answers`, and a required question refusing to move
+          // on from a slider that plainly looked answered.
+          onChangeRef.current(valuesRef.current[indexRef.current]);
         },
       }),
     // Handlers read live values through refs, so they never need rebuilding.
@@ -555,6 +627,18 @@ export function ScaleInput({
             {Array.from({ length: steps }, (_, i) => (
               <Pressable
                 key={i}
+                /**
+                 * Drawn, not pressed.
+                 *
+                 * The track claims the gesture at touch-down — it has to, or the page's scroller takes
+                 * the drag — so this never receives a press anyway. Declining to be a touch target is
+                 * what makes the track the one, and `locationX` is measured from the element the touch
+                 * lands on: with the chips in the way a tap reported a few points from *their* left
+                 * edge and resolved to the first step whichever number was pressed.
+                 *
+                 * `onPress` stays for the accessibility layer, which activates it directly.
+                 */
+                pointerEvents="none"
                 onPress={() => select(i)}
                 accessibilityRole="radio"
                 accessibilityState={{ selected: i === index }}
