@@ -23,6 +23,16 @@ interface ArcSliderInputProps {
   choices?: SelectChoice[];
   value: number | undefined;
   onChange: (value: number) => void;
+  /**
+   * Asked to hold the page still for the duration of a drag, and to let it go again.
+   *
+   * This is the one scale whose panel still scrolls — `SCALE_TYPES` in `panelBehaviour` lists the
+   * other four, so they get a panel that refuses to move, but an arc page does not. Claiming the
+   * gesture is not enough on its own: `onShouldBlockNativeResponder` is Android-only, and on iOS the
+   * enclosing `ScrollView` can cancel the touches out from under the JS responder, which arrives as
+   * `onPanResponderTerminate` rather than as anything this can refuse.
+   */
+  onScrollLock?: (locked: boolean) => void;
   primaryColor: string;
   textColor: string;
   /** Manifest accent — the arc and the handle. Falls back to `primaryColor`. */
@@ -109,6 +119,7 @@ export function ArcSliderInput({
   choices,
   value,
   onChange,
+  onScrollLock,
   primaryColor,
   textColor,
   accentColor,
@@ -118,6 +129,21 @@ export function ArcSliderInput({
 
   /** A tick per step crossed, however the value was moved. */
   const tick = useStepHaptics();
+
+  /**
+   * The live `onChange`, read through a ref.
+   *
+   * The gesture handlers below are built once — `PanResponder.create` sits in a `useMemo` with no
+   * dependencies, because everything else they touch is already a ref. `onChange` was the exception:
+   * it closes over the host's current question, so the handlers kept calling the *first* render's
+   * version and a dragged answer was recorded against whichever question was on screen when this
+   * mounted. Tapping worked because that path is an ordinary function in render, which is why the
+   * two disagreed.
+   */
+  const onScrollLockRef = useRef(onScrollLock);
+  onScrollLockRef.current = onScrollLock;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
   // `range` when the definition bounds the scale, its choices when they enumerate it — see
   // `questionScale` for why the definitions need both readings.
@@ -244,6 +270,10 @@ export function ArcSliderInput({
     }
   }
 
+  // A page turn or submit mid-drag unmounts this with no release to fire, which would strand the
+  // page locked. Safe to call when nothing is locked.
+  useEffect(() => () => onScrollLockRef.current?.(false), []);
+
   const panResponder = useMemo(
     () =>
       PanResponder.create({
@@ -258,6 +288,7 @@ export function ArcSliderInput({
         onPanResponderTerminationRequest: () => false,
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: e => {
+          onScrollLockRef.current?.(true);
           dragging.current = true;
           setPressed(true);
           setDragged(true);
@@ -268,6 +299,7 @@ export function ArcSliderInput({
           setFromTouch(e.nativeEvent.locationX, e.nativeEvent.locationY);
         },
         onPanResponderRelease: () => {
+          onScrollLockRef.current?.(false);
           dragging.current = false;
           setPressed(false);
           press.value = withTiming(0, { duration: PRESS_MS });
@@ -284,13 +316,20 @@ export function ArcSliderInput({
           // handle there instantly, cutting this animation short.
           settledFor.current = `${final}:${stepsRef.current}`;
           settle(final, true);
-          onChange(valuesRef.current[final]);
+          onChangeRef.current(valuesRef.current[final]);
         },
         onPanResponderTerminate: () => {
+          // Released here too, or a cancelled gesture leaves the page locked for good.
+          onScrollLockRef.current?.(false);
           dragging.current = false;
           setPressed(false);
           press.value = withTiming(0, { duration: PRESS_MS });
           settle(indexRef.current, true);
+          // Record what the handle is showing. A terminated gesture still leaves it settled on a
+          // step — the participant sees an answer — so returning without reporting it is what left
+          // the value on screen and nothing in `answers`, and a required question refusing to move
+          // on from a slider that plainly looked answered.
+          onChangeRef.current(valuesRef.current[indexRef.current]);
         },
       }),
     // Handlers read live values through refs, so they never need rebuilding.

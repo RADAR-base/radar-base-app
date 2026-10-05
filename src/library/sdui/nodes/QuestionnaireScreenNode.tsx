@@ -130,6 +130,9 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   const [timestamps, setTimestamps] = useState<Record<string, QuestionTimestamp>>({});
   // Reported by the speech input; drives whether this screen keeps its footer (see `showFooter`).
   const [speechPhase, setSpeechPhase] = useState<SpeechPhase>('idle');
+  // An input dragging inside the panel holds it still for the length of the gesture.
+  const [scrollLocked, setScrollLocked] = useState(false);
+  const handleScrollLock = useCallback((locked: boolean) => setScrollLocked(locked), []);
   /**
    * Measured height of the review screen's heading, used to centre the controls on the *page* rather
    * than in the space the heading leaves below it.
@@ -771,8 +774,9 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                 scrollEventThrottle={16}
                 showsVerticalScrollIndicator={false}
                 // Set even on a View panel, where it is simply ignored — see `panelBehaviour`
-                // for which pages refuse to scroll and why.
-                scrollEnabled={behaviour.scrollEnabled}
+                  // for which pages refuse to scroll and why. `&& !scrollLocked`: an input dragging
+                  // inside this panel holds it still for the length of the gesture.
+                  scrollEnabled={behaviour.scrollEnabled && !scrollLocked}
               >
                 {!question ? (
                   <Text style={[styles.emptyText, { color: muted }]}>No questions available</Text>
@@ -923,6 +927,7 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                           // Only the text field draws this itself, lined up with its own card. Every
                           // other type gets the screen's pinned row below.
                           errorMessage={isActive ? requiredError : null}
+                        onScrollLock={isActive ? handleScrollLock : undefined}
                       />
                       {hideTitleHere ? (
                         <>
