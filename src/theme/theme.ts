@@ -191,8 +191,8 @@ const palette = {
   gray900a50: 'rgba(30, 30, 31, 0.5)',
   gray950:    '#111111',
   black:      '#000000',
+  red100:     '#F9C0BB',
   red400:     '#E84855',
-  red400a25:  'rgba(232, 72, 85, 0.25)',
   red550:     '#C0312D',
   orange450:  '#F9A825',
   orange50:   '#FEF3E2',
@@ -266,8 +266,8 @@ export const darkTheme: ColorTokens = {
       longstreakBadge: palette.amber500,
       activedaysIcon: palette.sky100,
       activedaysBadge: palette.blue650,
-      dataIcon: palette.red400,
-      dataBadge: palette.red400a25,
+      dataIcon: palette.red100,
+      dataBadge: palette.red400,
       unit: palette.gray550,
     },
     stats: {
@@ -388,10 +388,9 @@ export const lightTheme: ColorTokens = {
       longstreakBadge: palette.amber50,
       activedaysIcon: palette.blue650,
       activedaysBadge: palette.sky100,
-      // The one pair that doesn't invert between modes: the heart reads as a health signifier, so it
-      // stays red, and a 25% badge sits correctly on either ground. Same for the unit's grey.
       dataIcon: palette.red400,
-      dataBadge: palette.red400a25,
+      dataBadge: palette.red100,
+      // Fixed in both modes — iOS's own secondary grey, legible on either card.
       unit: palette.gray550,
     },
     stats: {
