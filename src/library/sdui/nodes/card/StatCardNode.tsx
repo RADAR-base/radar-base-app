@@ -315,9 +315,10 @@ const styles = StyleSheet.create({
    *  reading is the whole point of the card. `lineHeight` stays above the font size; see `valueLarge`. */
   valueLargeData: {
     fontSize: 90,
-    // Tighter than the 1.125 ratio above: digits have no descenders, so a box nearer the design's
-    // own 69 hugs them and keeps the pill below from being pushed off by dead space.
-    lineHeight: 76,
+    // Keeps `valueLarge`'s 1.125 ratio. The design's own 69 is a shorter box than the glyphs are
+    // tall, which clips the top of the digits here — the unit is held in place by the row's
+    // `baseline` alignment instead, not by squeezing this.
+    lineHeight: 102,
   },
   /** Gives `adjustsFontSizeToFit` a bounded width to shrink within — without it the digits keep
    *  their natural width and run past the card's edge instead. */
