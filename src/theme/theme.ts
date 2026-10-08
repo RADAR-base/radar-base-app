@@ -1,6 +1,5 @@
 import { Platform } from 'react-native';
 
-import type { ThemeManifest } from '../library/contracts/ManifestSchema';
 import { mix, readableTextColor, relativeLuminance, withAlpha } from './contrast';
 
 export {
@@ -654,20 +653,18 @@ export function getColorTokens(mode: ThemeMode, overrides?: ThemeColorOverrides)
  * The page background (the 60% brand color). In light mode it's the `brandColors.background` override
  * directly; in dark mode that same brand background is darkened to a near-black that keeps its hue, so
  * dark mode is derived from the brand (a warm dark for a peach brand) rather than a neutral default.
- * Falls back to the (mode-resolved) top-level `backgroundColor`, then the design-system default.
+ * Falls back to the design-system default for the mode.
  */
 export function resolveBackground(
-  theme?: {
-    brandColors?: { background?: string };
-    backgroundColor?: string;
-  },
+  theme?: { brandColors?: { background?: string } },
   mode: ThemeMode = 'light',
 ): string {
   const brandBg = theme?.brandColors?.background;
+  const base = getColorTokens(mode).background.primary;
   if (mode === 'dark') {
-    return brandBg ? mix(brandBg, '#000000', DARK_BG_DARKEN) : theme?.backgroundColor ?? '#111111';
+    return brandBg ? mix(brandBg, '#000000', DARK_BG_DARKEN) : base;
   }
-  return brandBg ?? theme?.backgroundColor ?? '#EDF1F5';
+  return brandBg ?? base;
 }
 
 /**
@@ -797,22 +794,6 @@ export function calendarRailColor(headerBackground: string, accent: string): str
   return mix(calendarChrome(headerBackground), accent, 0.5);
 }
 
-/**
- * Adapts the Figma color tokens to the SDUI engine's `ThemeManifest` shape
- * (see `library/contracts/ManifestSchema.ts`), for use as `app-manifest.json`'s
- * `theme` block or as a `CoreServiceOverrides` value.
- */
-export function toThemeManifest(mode: ThemeMode): ThemeManifest {
-  const tokens = getColorTokens(mode);
-  return {
-    primaryColor: tokens.button.background,
-    secondaryColor: tokens.background.secondary,
-    backgroundColor: tokens.background.primary,
-    surfaceColor: tokens.card.background,
-    textColor: tokens.text.primary,
-    textSecondaryColor: tokens.card.stats.description,
-  };
-}
 
 /**
  * Design-system-wide layout primitives — Figma's standard 9px spacing unit, -0.5
