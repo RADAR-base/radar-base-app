@@ -40,6 +40,9 @@ export interface ColorTokens {
       longstreakBadge: string;
       activedaysIcon: string;
       activedaysBadge: string;
+      dataIcon: string;
+      dataBadge: string;
+      unit: string;
     };
     stats: {
       background: string;
@@ -181,6 +184,7 @@ export interface ColorTokens {
 const palette = {
   white:      '#FFFFFF',
   gray100:    '#E5E5EA',
+  gray550:    '#8E8E93',
   gray800:    '#2E2E30',
   gray900:    '#1E1E1E',
   gray900_2:  '#1C1C1E',
@@ -188,6 +192,7 @@ const palette = {
   gray950:    '#111111',
   black:      '#000000',
   red400:     '#E84855',
+  red400a25:  'rgba(232, 72, 85, 0.25)',
   red550:     '#C0312D',
   orange450:  '#F9A825',
   orange50:   '#FEF3E2',
@@ -261,6 +266,9 @@ export const darkTheme: ColorTokens = {
       longstreakBadge: palette.amber500,
       activedaysIcon: palette.sky100,
       activedaysBadge: palette.blue650,
+      dataIcon: palette.red400,
+      dataBadge: palette.red400a25,
+      unit: palette.gray550,
     },
     stats: {
       background: palette.gray900,
@@ -380,6 +388,11 @@ export const lightTheme: ColorTokens = {
       longstreakBadge: palette.amber50,
       activedaysIcon: palette.blue650,
       activedaysBadge: palette.sky100,
+      // The one pair that doesn't invert between modes: the heart reads as a health signifier, so it
+      // stays red, and a 25% badge sits correctly on either ground. Same for the unit's grey.
+      dataIcon: palette.red400,
+      dataBadge: palette.red400a25,
+      unit: palette.gray550,
     },
     stats: {
       background: palette.white,
