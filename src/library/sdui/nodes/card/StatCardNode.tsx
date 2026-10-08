@@ -287,15 +287,20 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     letterSpacing: tracking.bold,
   },
-  /** Value and unit sit on a common bottom edge, so "BPM" rides the digits' baseline (Figma 4289:2376). */
+  /**
+   * Value and unit share a baseline, so "BPM" rides the digits (Figma 4289:2376).
+   *
+   * `baseline`, not `flex-end`: the latter aligns the two *line boxes*, and the value's box is far
+   * taller than its digits — which drops the unit a clear line below the number it belongs to.
+   */
   valueRowLarge: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'baseline',
     gap: 16,
   },
   valueUnitSmall: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'baseline',
     gap: 10,
     flexShrink: 1,
   },
@@ -305,15 +310,14 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.regular,
     includeFontPadding: false,
     letterSpacing: tracking.regular,
-    // Keeps the unit on the digits' baseline rather than the row's bottom, which `lineHeight: 14`
-    // would otherwise push it below.
-    paddingBottom: 2,
   },
   /** The data card's own size (Figma 4285:2240, `font/size/5xl`) — larger than the counts', since a
    *  reading is the whole point of the card. `lineHeight` stays above the font size; see `valueLarge`. */
   valueLargeData: {
     fontSize: 90,
-    lineHeight: 96,
+    // Tighter than the 1.125 ratio above: digits have no descenders, so a box nearer the design's
+    // own 69 hugs them and keeps the pill below from being pushed off by dead space.
+    lineHeight: 76,
   },
   /** Gives `adjustsFontSizeToFit` a bounded width to shrink within — without it the digits keep
    *  their natural width and run past the card's edge instead. */
