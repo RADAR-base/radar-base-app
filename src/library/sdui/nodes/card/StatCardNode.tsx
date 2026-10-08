@@ -6,6 +6,7 @@ import CheckinIcon from '../../../../theme/icons/checkin.svg';
 import CalendarIcon from '../../../../theme/icons/calendar.svg';
 import FireIcon from '../../../../theme/icons/fire.svg';
 import MedalIcon from '../../../../theme/icons/medal.svg';
+import HeartRateIcon from '../../../../theme/icons/heartrate.svg';
 import { tracking, fontFamily, getColorTokens, layout as layoutTokens, cardShadow } from '../../../../theme/theme';
 import { useLocalMetric, type LocalMetricName } from '../../useLocalMetric';
 import type { NodeProps } from '../../types';
@@ -15,12 +16,14 @@ type EngagementTokenKey =
   | 'checkinIcon'
   | 'activedaysBadge'
   | 'activedaysIcon'
+  | 'dataBadge'
+  | 'dataIcon'
   | 'streakBadge'
   | 'streakIcon'
   | 'longstreakBadge'
   | 'longstreakIcon';
 
-export type StatCardType = 'checkIn' | 'activeDays' | 'currentStreak' | 'longestStreak';
+export type StatCardType = 'checkIn' | 'activeDays' | 'currentStreak' | 'longestStreak' | 'data';
 export type StatCardSize = 'large' | 'small';
 
 const DEFAULT_LABEL: Record<StatCardType, string> = {
@@ -28,6 +31,7 @@ const DEFAULT_LABEL: Record<StatCardType, string> = {
   activeDays: 'Active Days',
   currentStreak: 'Current Streak',
   longestStreak: 'Longest Streak',
+  data: 'Data Name',
 };
 
 const ICON: Record<StatCardType, ComponentType<SvgProps>> = {
@@ -35,6 +39,7 @@ const ICON: Record<StatCardType, ComponentType<SvgProps>> = {
   activeDays: CalendarIcon,
   currentStreak: FireIcon,
   longestStreak: MedalIcon,
+  data: HeartRateIcon,
 };
 
 const ICON_SIZE: Record<StatCardType, { width: number; height: number }> = {
@@ -42,6 +47,7 @@ const ICON_SIZE: Record<StatCardType, { width: number; height: number }> = {
   activeDays: { width: 20, height: 20 },
   currentStreak: { width: 14, height: 20 },
   longestStreak: { width: 16, height: 22 },
+  data: { width: 21, height: 18 },
 };
 
 // Figma's "Stats" component set (node 1980:1637) gives checkIn the standard pill radius;
@@ -51,6 +57,7 @@ const BADGE_RADIUS: Record<StatCardType, number> = {
   activeDays: 18,
   currentStreak: 18,
   longestStreak: 18,
+  data: 18,
 };
 
 // ColorTokens' `card.engagement` field names don't follow the statsType strings
@@ -61,6 +68,7 @@ const BADGE_TOKEN: Record<StatCardType, EngagementTokenKey> = {
   activeDays: 'activedaysBadge',
   currentStreak: 'streakBadge',
   longestStreak: 'longstreakBadge',
+  data: 'dataBadge',
 };
 
 const ICON_TOKEN: Record<StatCardType, EngagementTokenKey> = {
@@ -68,6 +76,7 @@ const ICON_TOKEN: Record<StatCardType, EngagementTokenKey> = {
   activeDays: 'activedaysIcon',
   currentStreak: 'streakIcon',
   longestStreak: 'longstreakIcon',
+  data: 'dataIcon',
 };
 
 /**
@@ -81,6 +90,8 @@ const DEFAULT_METRIC: Record<StatCardType, LocalMetricName | ''> = {
   activeDays: 'active_days',
   currentStreak: 'current_streak',
   longestStreak: 'longest_streak',
+  // A reading, not an app-computed metric — the blueprint supplies it, like `checkIn`.
+  data: '',
 };
 
 /**
@@ -96,7 +107,8 @@ export function StatCardNode({ node, context }: NodeProps) {
   const statsType: StatCardType =
     node.statsType === 'activeDays' ||
     node.statsType === 'currentStreak' ||
-    node.statsType === 'longestStreak'
+    node.statsType === 'longestStreak' ||
+    node.statsType === 'data'
       ? node.statsType
       : 'checkIn';
   const size: StatCardSize = node.size === 'small' ? 'small' : 'large';
@@ -120,6 +132,8 @@ export function StatCardNode({ node, context }: NodeProps) {
       ? node.value
       : 0;
   const label = typeof node.label === 'string' ? node.label : DEFAULT_LABEL[statsType];
+  /** The reading's unit — "BPM", "steps". Only `data` draws one; the rest are plain counts. */
+  const unit = typeof node.unit === 'string' ? node.unit : '';
   const showKeepItUp = node.showKeepItUp !== false;
   const keepItUpLabel = typeof node.keepItUpLabel === 'string' ? node.keepItUpLabel : 'Keep it up!';
 
@@ -128,6 +142,14 @@ export function StatCardNode({ node, context }: NodeProps) {
   const badgeColor = engagement[BADGE_TOKEN[statsType]];
   const iconColor = engagement[ICON_TOKEN[statsType]];
   const textColor = statsType === 'activeDays' ? tokens.text.primary : engagement.text;
+  // Only the data card shrinks to fit: a reading can be three digits where a streak count is one or
+  // two, and `adjustsFontSizeToFit` is fiddly enough on Android not to switch on where nothing needs it.
+  const isData = statsType === 'data';
+  const unitText = unit ? (
+    <Text style={[styles.unit, { color: engagement.unit }]} numberOfLines={1}>
+      {unit}
+    </Text>
+  ) : null;
   const Icon = ICON[statsType];
   const iconSize = ICON_SIZE[statsType];
 
@@ -169,7 +191,21 @@ export function StatCardNode({ node, context }: NodeProps) {
 
       {size === 'large' ? (
         <View style={styles.valuePillWrapper}>
-          <Text style={[styles.valueLarge, { color: textColor }]}>{value}</Text>
+          <View style={styles.valueRowLarge}>
+            <Text
+              style={[
+                styles.valueLarge,
+                isData && styles.valueLargeData,
+                isData && styles.valueShrink,
+                { color: textColor },
+              ]}
+              numberOfLines={isData ? 1 : undefined}
+              adjustsFontSizeToFit={isData}
+            >
+              {value}
+            </Text>
+            {unitText}
+          </View>
           {showKeepItUp && (
             <View style={[styles.pill, { backgroundColor: badgeColor, alignSelf: 'flex-start' }]}>
               <Text style={[styles.pillText, { color: iconColor }]}>{keepItUpLabel}</Text>
@@ -178,7 +214,16 @@ export function StatCardNode({ node, context }: NodeProps) {
         </View>
       ) : (
         <View style={styles.valueRowSmall}>
-          <Text style={[styles.valueSmall, { color: textColor }]}>{value}</Text>
+          <View style={styles.valueUnitSmall}>
+            <Text
+              style={[styles.valueSmall, isData && styles.valueShrink, { color: textColor }]}
+              numberOfLines={isData ? 1 : undefined}
+              adjustsFontSizeToFit={isData}
+            >
+              {value}
+            </Text>
+            {unitText}
+          </View>
           {badge}
         </View>
       )}
@@ -241,6 +286,39 @@ const styles = StyleSheet.create({
     lineHeight: 72,
     fontWeight: 'bold',
     letterSpacing: tracking.bold,
+  },
+  /** Value and unit sit on a common bottom edge, so "BPM" rides the digits' baseline (Figma 4289:2376). */
+  valueRowLarge: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 16,
+  },
+  valueUnitSmall: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 10,
+    flexShrink: 1,
+  },
+  unit: {
+    fontSize: 10,
+    lineHeight: 14,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
+    letterSpacing: tracking.regular,
+    // Keeps the unit on the digits' baseline rather than the row's bottom, which `lineHeight: 14`
+    // would otherwise push it below.
+    paddingBottom: 2,
+  },
+  /** The data card's own size (Figma 4285:2240, `font/size/5xl`) — larger than the counts', since a
+   *  reading is the whole point of the card. `lineHeight` stays above the font size; see `valueLarge`. */
+  valueLargeData: {
+    fontSize: 90,
+    lineHeight: 96,
+  },
+  /** Gives `adjustsFontSizeToFit` a bounded width to shrink within — without it the digits keep
+   *  their natural width and run past the card's edge instead. */
+  valueShrink: {
+    flexShrink: 1,
   },
   valueRowSmall: {
     flexDirection: 'row',
