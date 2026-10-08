@@ -4,7 +4,7 @@ import { useCoreServices } from '../../../core/CoreServicesContext';
 import { EVENTS } from '../../../core/EventBus';
 import type { TaskView as Task } from '../../../types';
 import type { NodeProps } from '../types';
-import { fontFamily, cardShadow } from '../../../theme/theme';
+import { fontFamily, cardShadow, getColorTokens } from '../../../theme/theme';
 import NoTasksArt from '../../../theme/icons/notasks.svg';
 
 interface FilterShape {
@@ -88,8 +88,11 @@ export function SurveyTaskListNode({ node, context }: NodeProps) {
   const text = theme.textColor ?? '#1C3549';
   const textSecondary = theme.textSecondaryColor ?? '#8E8E93';
   const secondary = theme.secondaryColor ?? '#8FA764';
-  /** Every navy shape in the empty-state drawing; its pink and white details stay as authored. */
-  const artInk = theme.brandColors?.brand ?? theme.primaryColor;
+  /** Every navy shape in the empty-state drawing; its pink and white details stay as authored.
+   *  From the token, not the manifest: `background.secondary` is already brand-aware, so no fallback
+   *  chain to keep in step. `CalendarTaskView` colours the same drawing the same way. */
+  const artInk = getColorTokens(context.colorScheme ?? 'light', theme.brandColors).background
+    .secondary;
   const radius = theme.button?.borderRadius ?? 12;
   const pillBg = '#E8F0E0';
 
