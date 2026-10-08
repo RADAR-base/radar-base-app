@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { NodeProps } from '../types';
-import { fontFamily, cardShadow } from '../../../theme/theme';
+import { fontFamily, cardShadow, getColorTokens } from '../../../theme/theme';
 import { useLocalMetric } from '../useLocalMetric';
 
 /**
@@ -18,10 +18,11 @@ export function RelativeActivityTodayNode({ node, context }: NodeProps) {
   const currentStreak = useLocalMetric('current_streak')?.value ?? 0;
   const longestStreak = useLocalMetric('longest_streak')?.value ?? 0;
   const theme = context.theme;
-  const secondary = theme.secondaryColor ?? '#8FA764';
-  const text = theme.textColor ?? '#1C3549';
-  const textSec = theme.textSecondaryColor ?? '#8E8E93';
-  const surface = theme.surfaceColor ?? '#fff';
+  const tokens = getColorTokens(context.colorScheme ?? 'light', theme.brandColors);
+  const secondary = tokens.background.secondary;
+  const text = tokens.text.primary;
+  const textSec = tokens.card.stats.description;
+  const surface = tokens.card.background;
   const radius = theme.button?.borderRadius ?? 12;
 
   return (

@@ -4,7 +4,7 @@ import { useCoreServices } from '../../../core/CoreServicesContext';
 import { EVENTS } from '../../../core/EventBus';
 import type { TaskView as Task } from '../../../types';
 import type { NodeProps } from '../types';
-import { fontFamily, cardShadow } from '../../../theme/theme';
+import { fontFamily, cardShadow, getColorTokens } from '../../../theme/theme';
 
 interface FilterShape {
   status?: 'incomplete' | 'complete' | 'all';
@@ -79,10 +79,12 @@ export function SurveyTaskListNode({ node, context }: NodeProps) {
   };
 
   const theme = context.theme;
-  const surface = theme.surfaceColor ?? '#FFFFFF';
-  const text = theme.textColor ?? '#1C3549';
-  const textSecondary = theme.textSecondaryColor ?? '#8E8E93';
-  const secondary = theme.secondaryColor ?? '#8FA764';
+
+  const tokens = getColorTokens(context.colorScheme ?? 'light', theme.brandColors);
+  const surface = tokens.card.background;
+  const text = tokens.text.primary;
+  const textSecondary = tokens.card.stats.description;
+  const secondary = tokens.background.secondary;
   const radius = theme.button?.borderRadius ?? 12;
   const pillBg = '#E8F0E0';
 

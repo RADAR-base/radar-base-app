@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text } from 'react-native';
 import type { NodeProps } from '../types';
+import { getColorTokens } from '../../../theme/theme';
 
 type TextStyle = 'heading1' | 'heading2' | 'heading3' | 'body' | 'caption' | 'markdown';
 
@@ -16,8 +17,9 @@ export function TextNode({ node, context }: NodeProps) {
   const text = typeof node.text === 'string' ? node.text : '';
   const styleKey = (typeof node.style === 'string' ? node.style : 'body') as TextStyle;
   const theme = context.theme;
+  const tokens = getColorTokens(context.colorScheme ?? 'light', theme.brandColors);
   const color =
-    styleKey === 'caption' ? theme.textSecondaryColor ?? '#6D6D80' : theme.textColor ?? '#000';
+    styleKey === 'caption' ? tokens.card.stats.description : tokens.text.primary;
 
   return <Text style={[styles.base, presets[styleKey] ?? presets.body, { color }]}>{text}</Text>;
 }
