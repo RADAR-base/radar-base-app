@@ -14,7 +14,7 @@ import {
   withAlpha,
 } from '../../../../theme/theme';
 import { REFUSAL_DISTANCE, refusalKnock } from './choicePress';
-import { FAILED_COLOR, QuestionError } from './QuestionError';
+import { FAILED_COLOR } from './QuestionError';
 
 interface TextQuestionInputProps {
   validationType?: string;
@@ -38,8 +38,12 @@ interface TextQuestionInputProps {
    * shakes on each one, and a boolean that was already true would only ever shake once.
    */
   submitAttempt?: number;
-  /** Reports whether the current answer would pass, so the screen knows to hold them here. */
-  onValidityChange?: (valid: boolean) => void;
+  /**
+   * Reports whether the current answer would pass, so the screen knows to hold them here — and why,
+   * since the screen draws the message now and this field's format checks are the only reason it
+   * can't work out for itself.
+   */
+  onValidityChange?: (valid: boolean, reason?: string | null) => void;
   /**
    * Why the screen refused this question, if it did — it owns the required rule, since it is the one
    * gating `Next`. Merged with this field's own format checks below.
@@ -102,20 +106,13 @@ export function TextQuestionInput({
   const [validationWarning, setValidationWarning] = useState<string | null>(null);
   const [focused, setFocused] = useState(false);
 
-  /**
-   * Why the answer wouldn't pass, or null if it would.
-   *
-   * `validationWarning` is the half that shows as you type — a number outside its range says so
-   * immediately. The rest only surfaces on submit, which is why the two are separate: this is what
-   * the screen is told about, and what it shows once they press Next.
-   */
-  // This field only judges *format* — a number outside its range, and it says so as you type. Whether
-  // an empty answer is allowed is the screen's call, and arrives as `errorMessage`.
+  // This field only judges *format*. Whether an empty answer is allowed is the screen's call, and
+  // arrives back as `errorMessage`. Either way the screen draws the message; this drives the red ring.
   const invalidReason = validationWarning;
   const warning = errorMessage ?? (submitAttempt > 0 ? invalidReason : validationWarning);
 
   useEffect(() => {
-    onValidityChange?.(!invalidReason);
+    onValidityChange?.(!invalidReason, invalidReason);
   }, [invalidReason, onValidityChange]);
 
   const isNumeric = validationType === 'number' || validationType === 'integer';
@@ -218,10 +215,6 @@ export function TextQuestionInput({
           />
         </Animated.View>
       </Animated.View>
-      {/* Below the card, where it grows into empty space rather than displacing the field. Inset by
-          the halo's width so it starts on the red border's left edge — flush with the container it
-          belongs to, rather than with the translucent ring around it. */}
-      <QuestionError message={warning} style={styles.warningRow} />
     </View>
   );
 }
@@ -264,13 +257,5 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     // Multiline fields centre their text vertically on Android without this.
     textAlignVertical: 'top',
-  },
-  warningRow: {
-    // Starts where the red border does — past the field's own margin and its translucent halo, not
-    // at the container's edge.
-    //
-    // A margin, not padding: the row carries a filled pill now, and padding would have inset its text
-    // while leaving the pill itself where it was.
-    marginLeft: REFUSAL_DISTANCE + RING_WIDTH,
   },
 });
