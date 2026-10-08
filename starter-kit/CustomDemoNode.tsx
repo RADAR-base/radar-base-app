@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import type { NodeProps } from '@radarbase/app-kit';
+import { getColorTokens, type NodeProps } from '@radarbase/app-kit';
 
 /**
  * Example custom SDUI node. Registered against the manifest's `widgetsRegistry` entry
@@ -16,10 +16,12 @@ export default function CustomDemoNode({ node, context }: NodeProps) {
       ? node.message
       : 'This node was registered at runtime via the manifest widgetsRegistry.';
 
-  const accent = context.theme.primaryColor;
-  const surface = context.theme.surfaceColor ?? '#eaf7ff';
-  const text = context.theme.textColor ?? '#0a3d62';
-  const textSecondary = context.theme.textSecondaryColor ?? text;
+  // Tokens, not manifest fields: this tracks dark mode and the study's brandColors for free.
+  const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
+  const accent = tokens.button.background;
+  const surface = tokens.card.background;
+  const text = tokens.text.primary;
+  const textSecondary = tokens.card.stats.description;
 
   return (
     <View style={[styles.container, { backgroundColor: surface, borderColor: accent }]}>

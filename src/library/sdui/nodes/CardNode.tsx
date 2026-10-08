@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { cardShadow, layout } from '../../../theme/theme';
+import { cardShadow, layout, getColorTokens } from '../../../theme/theme';
 import type { Node } from '../../contracts/NodeSchema';
 import type { NodeProps } from '../types';
 
@@ -16,6 +16,7 @@ const CARD_RADIUS = layout.radiusCard;
 
 export function CardNode({ node, context, render }: NodeProps) {
   const theme = context.theme;
+  const tokens = getColorTokens(context.colorScheme ?? 'light', theme.brandColors);
   const flat = node.flat === true;
   const ph = typeof node.paddingHorizontal === 'number' ? node.paddingHorizontal : layout.cardPadding;
   const pv = typeof node.paddingVertical === 'number' ? node.paddingVertical : layout.cardPadding;
@@ -25,7 +26,7 @@ export function CardNode({ node, context, render }: NodeProps) {
       style={[
         !flat && cardShadowStyle,
         {
-          backgroundColor: theme.surfaceColor ?? '#fff',
+          backgroundColor: tokens.card.background,
           borderRadius: theme.button?.borderRadius ?? CARD_RADIUS,
           paddingHorizontal: ph,
           paddingVertical: pv,
