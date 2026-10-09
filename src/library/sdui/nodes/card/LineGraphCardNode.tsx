@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     width: '100%',
     // minHeight so enlarged text grows the card rather than being clipped by `overflow: hidden`
     // (the graph keeps its own size). See fontScaling.ts.
-    minHeight: 176,
+    minHeight: layoutTokens.cardHeightLarge,
     borderRadius: layoutTokens.radiusCard,
     padding: layoutTokens.cardPadding,
     gap: layoutTokens.gap,
