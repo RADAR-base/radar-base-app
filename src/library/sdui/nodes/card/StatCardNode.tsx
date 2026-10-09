@@ -6,6 +6,7 @@ import CheckinIcon from '../../../../theme/icons/checkin.svg';
 import CalendarIcon from '../../../../theme/icons/calendar.svg';
 import FireIcon from '../../../../theme/icons/fire.svg';
 import MedalIcon from '../../../../theme/icons/medal.svg';
+import HeartRateIcon from '../../../../theme/icons/heartrate.svg';
 import { tracking, fontFamily, getColorTokens, layout as layoutTokens, cardShadow } from '../../../../theme/theme';
 import { useLocalMetric, type LocalMetricName } from '../../useLocalMetric';
 import type { NodeProps } from '../../types';
@@ -15,12 +16,14 @@ type EngagementTokenKey =
   | 'checkinIcon'
   | 'activedaysBadge'
   | 'activedaysIcon'
+  | 'dataBadge'
+  | 'dataIcon'
   | 'streakBadge'
   | 'streakIcon'
   | 'longstreakBadge'
   | 'longstreakIcon';
 
-export type StatCardType = 'checkIn' | 'activeDays' | 'currentStreak' | 'longestStreak';
+export type StatCardType = 'checkIn' | 'activeDays' | 'currentStreak' | 'longestStreak' | 'data';
 export type StatCardSize = 'large' | 'small';
 
 const DEFAULT_LABEL: Record<StatCardType, string> = {
@@ -28,6 +31,7 @@ const DEFAULT_LABEL: Record<StatCardType, string> = {
   activeDays: 'Active Days',
   currentStreak: 'Current Streak',
   longestStreak: 'Longest Streak',
+  data: 'Data Name',
 };
 
 const ICON: Record<StatCardType, ComponentType<SvgProps>> = {
@@ -35,6 +39,7 @@ const ICON: Record<StatCardType, ComponentType<SvgProps>> = {
   activeDays: CalendarIcon,
   currentStreak: FireIcon,
   longestStreak: MedalIcon,
+  data: HeartRateIcon,
 };
 
 const ICON_SIZE: Record<StatCardType, { width: number; height: number }> = {
@@ -42,6 +47,7 @@ const ICON_SIZE: Record<StatCardType, { width: number; height: number }> = {
   activeDays: { width: 20, height: 20 },
   currentStreak: { width: 14, height: 20 },
   longestStreak: { width: 16, height: 22 },
+  data: { width: 21, height: 18 },
 };
 
 // Figma's "Stats" component set (node 1980:1637) gives checkIn the standard pill radius;
@@ -51,6 +57,7 @@ const BADGE_RADIUS: Record<StatCardType, number> = {
   activeDays: 18,
   currentStreak: 18,
   longestStreak: 18,
+  data: 18,
 };
 
 // ColorTokens' `card.engagement` field names don't follow the statsType strings
@@ -61,6 +68,7 @@ const BADGE_TOKEN: Record<StatCardType, EngagementTokenKey> = {
   activeDays: 'activedaysBadge',
   currentStreak: 'streakBadge',
   longestStreak: 'longstreakBadge',
+  data: 'dataBadge',
 };
 
 const ICON_TOKEN: Record<StatCardType, EngagementTokenKey> = {
@@ -68,6 +76,7 @@ const ICON_TOKEN: Record<StatCardType, EngagementTokenKey> = {
   activeDays: 'activedaysIcon',
   currentStreak: 'streakIcon',
   longestStreak: 'longstreakIcon',
+  data: 'dataIcon',
 };
 
 /**
@@ -81,6 +90,8 @@ const DEFAULT_METRIC: Record<StatCardType, LocalMetricName | ''> = {
   activeDays: 'active_days',
   currentStreak: 'current_streak',
   longestStreak: 'longest_streak',
+  // A reading, not an app-computed metric — the blueprint supplies it, like `checkIn`.
+  data: '',
 };
 
 /**
@@ -96,7 +107,8 @@ export function StatCardNode({ node, context }: NodeProps) {
   const statsType: StatCardType =
     node.statsType === 'activeDays' ||
     node.statsType === 'currentStreak' ||
-    node.statsType === 'longestStreak'
+    node.statsType === 'longestStreak' ||
+    node.statsType === 'data'
       ? node.statsType
       : 'checkIn';
   const size: StatCardSize = node.size === 'small' ? 'small' : 'large';
@@ -119,6 +131,14 @@ export function StatCardNode({ node, context }: NodeProps) {
     : typeof node.value === 'string' || typeof node.value === 'number'
       ? node.value
       : 0;
+  /** Which wearable / HealthKit stream a `data` card shows — "heart_rate", "steps", "sleep". */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const dataType = typeof node.dataType === 'string' ? node.dataType : '';
+  // TODO: resolve `dataType` to a live reading and take *both* the value and the unit from it. The
+  // unit belongs to the stream — heart rate is BPM wherever it comes from — so a study should name
+  // the data type and get the unit with it, not restate it. `node.unit` is the stand-in until that
+  // source exists (`BarChartCardNode` holds the same placeholder); drop it when this is wired.
+  const unit = typeof node.unit === 'string' ? node.unit : '';
   const label = typeof node.label === 'string' ? node.label : DEFAULT_LABEL[statsType];
   const showKeepItUp = node.showKeepItUp !== false;
   const keepItUpLabel = typeof node.keepItUpLabel === 'string' ? node.keepItUpLabel : 'Keep it up!';
@@ -128,6 +148,15 @@ export function StatCardNode({ node, context }: NodeProps) {
   const badgeColor = engagement[BADGE_TOKEN[statsType]];
   const iconColor = engagement[ICON_TOKEN[statsType]];
   const textColor = statsType === 'activeDays' ? tokens.text.primary : engagement.text;
+  // The only thing the data card does differently: a reading can be three digits where a streak count
+  // is one or two, so its value shrinks to fit rather than running past the card's edge.
+  // `adjustsFontSizeToFit` is fiddly enough on Android not to switch on where nothing needs it.
+  const isData = statsType === 'data';
+  const unitText = unit ? (
+    <Text style={[styles.unit, { color: engagement.unit }]} numberOfLines={1}>
+      {unit}
+    </Text>
+  ) : null;
   const Icon = ICON[statsType];
   const iconSize = ICON_SIZE[statsType];
 
@@ -147,13 +176,6 @@ export function StatCardNode({ node, context }: NodeProps) {
       style={[
         styles.card,
         size === 'large' ? styles.cardLarge : styles.cardSmall,
-        // A large card in a grid fills its column rather than stopping at `minHeight`.
-        //
-        // The column stretches to whatever is tallest across the grid, and a `DataWheelCardNode` is
-        // taller than this card's 195 (its ring alone is 142). Without this the stat card stops short
-        // and its bottom edge sits a few points above the wheel's beside it. Large only: two small
-        // cards sharing a column must keep their own 93 each, not split the column between them.
-        fillWidth && size === 'large' && styles.cardFill,
         {
           backgroundColor: tokens.card.background,
           width: fillWidth ? '100%' : 176,
@@ -169,7 +191,20 @@ export function StatCardNode({ node, context }: NodeProps) {
 
       {size === 'large' ? (
         <View style={styles.valuePillWrapper}>
-          <Text style={[styles.valueLarge, { color: textColor }]}>{value}</Text>
+          <View style={styles.valueRowLarge}>
+            <Text
+              style={[
+                styles.valueLarge,
+                isData && styles.valueShrink,
+                { color: textColor },
+              ]}
+              numberOfLines={isData ? 1 : undefined}
+              adjustsFontSizeToFit={isData}
+            >
+              {value}
+            </Text>
+            {unitText}
+          </View>
           {showKeepItUp && (
             <View style={[styles.pill, { backgroundColor: badgeColor, alignSelf: 'flex-start' }]}>
               <Text style={[styles.pillText, { color: iconColor }]}>{keepItUpLabel}</Text>
@@ -178,7 +213,16 @@ export function StatCardNode({ node, context }: NodeProps) {
         </View>
       ) : (
         <View style={styles.valueRowSmall}>
-          <Text style={[styles.valueSmall, { color: textColor }]}>{value}</Text>
+          <View style={styles.valueUnitSmall}>
+            <Text
+              style={[styles.valueSmall, isData && styles.valueShrink, { color: textColor }]}
+              numberOfLines={isData ? 1 : undefined}
+              adjustsFontSizeToFit={isData}
+            >
+              {value}
+            </Text>
+            {unitText}
+          </View>
           {badge}
         </View>
       )}
@@ -192,24 +236,14 @@ const styles = StyleSheet.create({
     borderRadius: layoutTokens.radiusCard,
     ...cardShadow,
   },
-  // 195 is deliberate, not arbitrary: two stacked small cards (93) plus the 9px gap
-  // between them (in CardSectionNode's grid layout) sum to exactly 195 — cardLarge's
-  // height — so the two grid columns line up evenly. 93 is itself the minimum that
-  // fits cardSmall's content (title + 9px gap + value row) inside a 16px padding on
-  // all sides without overflowing into (and visually shrinking) the bottom padding.
-  // `minHeight` (not fixed `height`) so the card renders identically at normal font size but grows
-  // instead of clipping when accessibility font scaling enlarges the title/value. See fontScaling.ts.
+  // Both heights, and the relationship between them, live in `layout` — see `cardHeightLarge`.
   cardLarge: {
-    minHeight: 195,
+    minHeight: layoutTokens.cardHeightLarge,
     justifyContent: 'flex-start',
   },
   cardSmall: {
-    minHeight: 93,
+    minHeight: layoutTokens.cardHeightSmall,
     justifyContent: 'space-between',
-  },
-  /** Grid-only — see the call site. `minHeight` above stays the floor when there is no slack. */
-  cardFill: {
-    flex: 1,
   },
   titleRow: {
     flexDirection: 'row',
@@ -242,6 +276,35 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     letterSpacing: tracking.bold,
   },
+  /**
+   * Value and unit share a baseline, so "BPM" rides the digits (Figma 4289:2376).
+   *
+   * `baseline`, not `flex-end`: the latter aligns the two *line boxes*, and the value's box is far
+   * taller than its digits — which drops the unit a clear line below the number it belongs to.
+   */
+  valueRowLarge: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 16,
+  },
+  valueUnitSmall: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 10,
+    flexShrink: 1,
+  },
+  unit: {
+    fontSize: 10,
+    lineHeight: 14,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
+    letterSpacing: tracking.regular,
+  },
+  /** Gives `adjustsFontSizeToFit` a bounded width to shrink within — without it the digits keep
+   *  their natural width and run past the card's edge instead. */
+  valueShrink: {
+    flexShrink: 1,
+  },
   valueRowSmall: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -250,6 +313,10 @@ const styles = StyleSheet.create({
   },
   valueSmall: {
     fontSize: 36,
+    // Matches the 36-tall badge beside it, so the row is exactly 36 and the card lands on
+    // `cardHeightSmall`. Left unset, the font's natural line box (~43) pushed the card to ~100 —
+    // which quietly broke the two-smalls-equal-one-large rule the grid is built on.
+    lineHeight: 36,
     fontWeight: 'bold',
     letterSpacing: layoutTokens.letterSpacing,
     // Center the digit's own line box against the 36-tall badge: `alignItems: 'center'` on
