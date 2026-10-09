@@ -172,7 +172,6 @@ export function DataWheelCardNode({ node, context }: NodeProps) {
         // In a grid (fillWidth), fill the column's stretched height so the wheel always lines up with
         // the two stacked StatCards opposite it — even when their content grows past the base 93 (e.g.
         // under font scaling). Standalone (no flex parent) this is a harmless no-op. See CardSectionNode.
-        fillWidth && styles.cardStackedFill,
         { backgroundColor: tokens.card.stats.background, width: fillWidth ? '100%' : 176 },
       ]}
     >
@@ -195,26 +194,21 @@ const styles = StyleSheet.create({
   // The ring above its value, which is how the card looks in a grid column whatever its `size` —
   // see `stacked`.
   //
-  // 195 is StatCardNode's `cardLarge` height (two stacked small StatCards: 93 + 9 gap + 93), so a
-  // wheel alone in one column lines up with the stat cards opposite it. It is a floor rather than
-  // the real height: padding 16*2 + title 16 + gap 12 + ring 142 comes to 202, so this card is the
-  // taller of the two and the column stretches to *it*. `StatCardNode` fills that stretch — see
-  // `cardFill` there — which is what keeps their bottom edges level.
+  // Lines up with the stat cards opposite it, by fitting their height rather than by stretching them
+  // to meet it: padding 16*2 + title 16 + gap 5 + ring 142 is exactly `cardHeightLarge`.
   cardStacked: {
     // minHeight, not height, so accessibility font scaling grows the card instead of clipping the
     // title/center value (the ring stays a fixed `RING_SIZE`). See fontScaling.ts.
-    minHeight: 195,
+    minHeight: layoutTokens.cardHeightLarge,
     alignItems: 'center',
-    // No inter-child gap: the ring's own flex box (`ringCenter`) centers it in the space below the
-    // header, so the title→ring and ring→bottom gaps come out equal.
-    gap: 12,
+    // 5, not 12: the ring is a fixed 142, so this gap is the only slack between the title and the
+    // card's bottom — and 12 pushed the card to 202, seven points past the height it has to match.
+    // `ringCenter` (flex: 1) still centers the ring in whatever space is left.
+    gap: 5,
   },
   // Grid-only: stretch to the column's full (row-matched) height so the wheel matches the two
   // stacked StatCards opposite it, whatever their combined height. `ringCenter` (flex:1) re-centers
   // the ring in the extra space.
-  cardStackedFill: {
-    flex: 1,
-  },
   cardLarge: {
     width: '100%',
   },
