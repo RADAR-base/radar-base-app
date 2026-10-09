@@ -142,8 +142,9 @@ export function StatCardNode({ node, context }: NodeProps) {
   const badgeColor = engagement[BADGE_TOKEN[statsType]];
   const iconColor = engagement[ICON_TOKEN[statsType]];
   const textColor = statsType === 'activeDays' ? tokens.text.primary : engagement.text;
-  // Only the data card shrinks to fit: a reading can be three digits where a streak count is one or
-  // two, and `adjustsFontSizeToFit` is fiddly enough on Android not to switch on where nothing needs it.
+  // The only thing the data card does differently: a reading can be three digits where a streak count
+  // is one or two, so its value shrinks to fit rather than running past the card's edge.
+  // `adjustsFontSizeToFit` is fiddly enough on Android not to switch on where nothing needs it.
   const isData = statsType === 'data';
   const unitText = unit ? (
     <Text style={[styles.unit, { color: engagement.unit }]} numberOfLines={1}>
@@ -195,7 +196,6 @@ export function StatCardNode({ node, context }: NodeProps) {
             <Text
               style={[
                 styles.valueLarge,
-                isData && styles.valueLargeData,
                 isData && styles.valueShrink,
                 { color: textColor },
               ]}
@@ -310,15 +310,6 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.regular,
     includeFontPadding: false,
     letterSpacing: tracking.regular,
-  },
-  /** The data card's own size (Figma 4285:2240, `font/size/5xl`) — larger than the counts', since a
-   *  reading is the whole point of the card. `lineHeight` stays above the font size; see `valueLarge`. */
-  valueLargeData: {
-    fontSize: 90,
-    // Keeps `valueLarge`'s 1.125 ratio. The design's own 69 is a shorter box than the glyphs are
-    // tall, which clips the top of the digits here — the unit is held in place by the row's
-    // `baseline` alignment instead, not by squeezing this.
-    lineHeight: 102,
   },
   /** Gives `adjustsFontSizeToFit` a bounded width to shrink within — without it the digits keep
    *  their natural width and run past the card's edge instead. */
