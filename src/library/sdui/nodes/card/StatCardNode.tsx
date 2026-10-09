@@ -131,9 +131,15 @@ export function StatCardNode({ node, context }: NodeProps) {
     : typeof node.value === 'string' || typeof node.value === 'number'
       ? node.value
       : 0;
-  const label = typeof node.label === 'string' ? node.label : DEFAULT_LABEL[statsType];
-  /** The reading's unit — "BPM", "steps". Only `data` draws one; the rest are plain counts. */
+  /** Which wearable / HealthKit stream a `data` card shows — "heart_rate", "steps", "sleep". */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const dataType = typeof node.dataType === 'string' ? node.dataType : '';
+  // TODO: resolve `dataType` to a live reading and take *both* the value and the unit from it. The
+  // unit belongs to the stream — heart rate is BPM wherever it comes from — so a study should name
+  // the data type and get the unit with it, not restate it. `node.unit` is the stand-in until that
+  // source exists (`BarChartCardNode` holds the same placeholder); drop it when this is wired.
   const unit = typeof node.unit === 'string' ? node.unit : '';
+  const label = typeof node.label === 'string' ? node.label : DEFAULT_LABEL[statsType];
   const showKeepItUp = node.showKeepItUp !== false;
   const keepItUpLabel = typeof node.keepItUpLabel === 'string' ? node.keepItUpLabel : 'Keep it up!';
 
