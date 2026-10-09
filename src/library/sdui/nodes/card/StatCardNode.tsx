@@ -170,13 +170,6 @@ export function StatCardNode({ node, context }: NodeProps) {
       style={[
         styles.card,
         size === 'large' ? styles.cardLarge : styles.cardSmall,
-        // A large card in a grid fills its column rather than stopping at `minHeight`.
-        //
-        // The column stretches to whatever is tallest across the grid, and a `DataWheelCardNode` is
-        // taller than this card's 195 (its ring alone is 142). Without this the stat card stops short
-        // and its bottom edge sits a few points above the wheel's beside it. Large only: two small
-        // cards sharing a column must keep their own 93 each, not split the column between them.
-        fillWidth && size === 'large' && styles.cardFill,
         {
           backgroundColor: tokens.card.background,
           width: fillWidth ? '100%' : 176,
@@ -237,24 +230,14 @@ const styles = StyleSheet.create({
     borderRadius: layoutTokens.radiusCard,
     ...cardShadow,
   },
-  // 195 is deliberate, not arbitrary: two stacked small cards (93) plus the 9px gap
-  // between them (in CardSectionNode's grid layout) sum to exactly 195 — cardLarge's
-  // height — so the two grid columns line up evenly. 93 is itself the minimum that
-  // fits cardSmall's content (title + 9px gap + value row) inside a 16px padding on
-  // all sides without overflowing into (and visually shrinking) the bottom padding.
-  // `minHeight` (not fixed `height`) so the card renders identically at normal font size but grows
-  // instead of clipping when accessibility font scaling enlarges the title/value. See fontScaling.ts.
+  // Both heights, and the relationship between them, live in `layout` — see `cardHeightLarge`.
   cardLarge: {
-    minHeight: 195,
+    minHeight: layoutTokens.cardHeightLarge,
     justifyContent: 'flex-start',
   },
   cardSmall: {
-    minHeight: 93,
+    minHeight: layoutTokens.cardHeightSmall,
     justifyContent: 'space-between',
-  },
-  /** Grid-only — see the call site. `minHeight` above stays the floor when there is no slack. */
-  cardFill: {
-    flex: 1,
   },
   titleRow: {
     flexDirection: 'row',
@@ -324,6 +307,10 @@ const styles = StyleSheet.create({
   },
   valueSmall: {
     fontSize: 36,
+    // Matches the 36-tall badge beside it, so the row is exactly 36 and the card lands on
+    // `cardHeightSmall`. Left unset, the font's natural line box (~43) pushed the card to ~100 —
+    // which quietly broke the two-smalls-equal-one-large rule the grid is built on.
+    lineHeight: 36,
     fontWeight: 'bold',
     letterSpacing: layoutTokens.letterSpacing,
     // Center the digit's own line box against the 36-tall badge: `alignItems: 'center'` on
