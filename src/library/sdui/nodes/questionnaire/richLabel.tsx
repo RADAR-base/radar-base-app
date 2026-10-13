@@ -1,6 +1,7 @@
 import React from 'react';
-import { Linking, StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import { fontFamily, tracking } from '../../../../theme/theme';
+import { EVENTS, eventBus } from '../../../../core/EventBus';
 import {
   ALLOWED_TAGS,
   BOLD_TAGS,
@@ -126,7 +127,10 @@ export function richLabel(
             small && styles.small,
             target && [styles.link, !!opts?.linkColor && { color: opts.linkColor }],
           ]}
-          onPress={target ? () => void Linking.openURL(target).catch(() => {}) : undefined}
+          // Raised rather than opened, so the shell can confirm before leaving the app.
+          onPress={
+            target ? () => eventBus.emit(EVENTS.OPEN_EXTERNAL_LINK, { url: target }) : undefined
+          }
         >
           {text}
         </Text>,
