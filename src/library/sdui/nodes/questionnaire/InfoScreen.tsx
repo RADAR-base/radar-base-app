@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AppState, Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AppState, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { Question, SelectChoice } from '../../../../types';
 import { fontFamily, layout as layoutTokens, tracking, withAlpha } from '../../../../theme/theme';
 import { richLabel, splitRichBlocks } from './richLabel';
+import { EVENTS, eventBus } from '../../../../core/EventBus';
 
 /** The heading for a page whose definition gives it none. */
 export const INFO_DEFAULT_TITLE = 'Information';
@@ -176,7 +177,7 @@ function VideoLink({ uri, title, tint }: { uri: string; title?: string; tint: st
     <TouchableOpacity
       accessibilityRole="button"
       accessibilityLabel={title ? `Play ${title}` : 'Play the instruction video'}
-      onPress={() => void Linking.openURL(uri).catch(() => {})}
+      onPress={() => eventBus.emit(EVENTS.OPEN_EXTERNAL_LINK, { url: uri })}
       style={[styles.video, { borderColor: withAlpha(tint, 0.3) }]}
     >
       <View style={[styles.videoBadge, { backgroundColor: tint }]}>
