@@ -34,7 +34,8 @@
             "deploymentTarget": "16.4"
           }
         }
-      ]
+      ],
+      "expo-video"
     ],
     "ios": {
       "supportsTablet": true,

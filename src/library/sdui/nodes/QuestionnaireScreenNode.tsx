@@ -18,6 +18,7 @@ import {
   SCALE_TYPES,
 } from './questionnaire/QuestionRenderer';
 import { speechContent } from './questionnaire/speechContent';
+import { infoTitle } from './questionnaire/InfoScreen';
 import { TaskCompletionScreen } from './questionnaire/TaskCompletionScreen';
 import {
   CollapsibleHeading,
@@ -709,11 +710,17 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
             // `speechContent`. Everything else keeps its own label.
             // A matrix block's title is the block's own heading, not the first row's label — each row
             // carries its label on its card, and the heading is the one thing they share.
+            // Info and descriptive pages take their title from `infoTitle`, so it never repeats the
+            // card's body.
+            const isInfoCard =
+              question?.field_type === 'info' || question?.field_type === 'descriptive';
             const questionTitle = isBlock
               ? matrixPageTitle(page)
               : isSpeechPanel
                 ? speechContent(question).heading
-                : question?.field_label?.trim() || question?.section_header;
+                : isInfoCard
+                  ? infoTitle(question)
+                  : question?.field_label?.trim() || question?.section_header;
             // Speech questions get a standing instruction when the study wrote no header of their
             // own; every other type shows a header only if one was authored. A matrix block has
             // already spent its header on the title above, so it shows none here.
@@ -854,7 +861,9 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                             textStyle={[styles.sectionHeader, { color: muted }]}
                           />
                         ) : (
-                          <Text style={[styles.title, { color: brand }]}>{questionTitle}</Text>
+                          questionTitle ? (
+                            <Text style={[styles.title, { color: brand }]}>{questionTitle}</Text>
+                          ) : null
                         )}
                       </View>
                     )}
@@ -919,6 +928,8 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                           pageInset={PAGE_PADDING}
                           // Only the active panel: a parked neighbour reporting its own validity
                           // would overwrite the answer this screen is actually gating on.
+                          // Parked panels stay mounted, so media needs telling it is off-screen.
+                          isActive={isActive}
                           submitAttempt={isActive ? submitAttempt : 0}
                           onValidityChange={isActive ? handleValidityChange : undefined}
                           // Only the active panel: a parked neighbour has no business freezing the

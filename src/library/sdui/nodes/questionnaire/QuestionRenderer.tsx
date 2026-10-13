@@ -76,6 +76,8 @@ interface QuestionRendererProps {
   /** How many times the participant has tried to move on — text inputs surface their errors, and
    *  shake, from here. */
   submitAttempt?: number;
+  /** Whether this is the panel on screen. Parked panels stay mounted, so media pauses on this. */
+  isActive?: boolean;
   /** Reports whether the current answer would pass, and why not — the screen draws the message. */
   onValidityChange?: (valid: boolean, reason?: string | null) => void;
   /**
@@ -141,6 +143,7 @@ export function QuestionRenderer({
   onAnswer,
   bottomReserve,
   pageInset,
+  isActive = true,
   submitAttempt,
   onValidityChange,
   onScrollLock,
@@ -358,6 +361,7 @@ export function QuestionRenderer({
       case 'audio':
         return (
           <SpeechInput
+            active={isActive}
             prompt={speechContent(question).passage}
             value={value}
             onChange={onChange}
@@ -406,6 +410,7 @@ export function QuestionRenderer({
       case 'descriptive': 
         return (
           <InfoScreen
+            active={isActive}
             label={question.field_label}
             sections={question.select_choices_or_calculations}
             primaryColor={primaryColor}
