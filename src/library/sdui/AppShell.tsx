@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   Easing,
@@ -49,6 +49,19 @@ import type { StorageService, OAuthConfig } from '../../types';
  * listener can ask on mount and subscribe only if it is genuinely early.
  */
 let chromeReadyLatch = false;
+
+/** The confirmation dialog's content, and whether it is showing. */
+interface ConfirmState {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  cancelLabel?: string;
+  icon?: 'linkOut';
+  showClose?: boolean;
+  destructive?: boolean;
+  onConfirm: () => void;
+  visible: boolean;
+}
 
 /** Whether every loading surface has gone. Pair with `EVENTS.APP_CHROME_READY` for the live edge. */
 export function isAppChromeReady(): boolean {
@@ -192,13 +205,34 @@ function AppShellInner({
   }, [inlineBlueprints, blueprintBaseUrl]);
 
   // Confirmation modals for destructive settings actions
-  const [confirmModal, setConfirmModal] = useState<{
-    title: string;
-    description: string;
-    confirmLabel: string;
-    destructive?: boolean;
-    onConfirm: () => void;
-  } | null>(null);
+  // Dismissed by flipping `visible` rather than clearing, so the exit animation can play.
+  const [confirmModal, setConfirmModal] = useState<ConfirmState | null>(null);
+  const showConfirm = (content: Omit<ConfirmState, 'visible'>) =>
+    setConfirmModal({ ...content, visible: true });
+  const dismissConfirm = () =>
+    setConfirmModal((current) => (current ? { ...current, visible: false } : null));
+
+  // A link in study-authored content was tapped: confirm before leaving the app.
+  useEffect(() => {
+    const open = (payload: unknown) => {
+      const url = (payload as { url?: string } | undefined)?.url;
+      if (!url) return;
+      showConfirm({
+        title: 'Leaving the app?',
+        description: `${appName ?? 'This app'} wants to open an external link or app.`,
+        confirmLabel: 'Continue',
+        cancelLabel: 'Close',
+        icon: 'linkOut',
+        showClose: false,
+        onConfirm: () => {
+          dismissConfirm();
+          void Linking.openURL(url).catch(() => {});
+        },
+      });
+    };
+    eventBus.on(EVENTS.OPEN_EXTERNAL_LINK, open);
+    return () => eventBus.off(EVENTS.OPEN_EXTERNAL_LINK, open);
+  }, [appName]);
 
   const doReset = () => {
     coreServices.dataPipeline.flush()
@@ -214,7 +248,7 @@ function AppShellInner({
   // Wire settings actions to services via EventBus
   useEffect(() => {
     const signOut = () => {
-      setConfirmModal({
+      showConfirm({
         title: 'Sign Out',
         description: 'Are you sure you want to sign out? You will need to log in again to access your study.',
         confirmLabel: 'Sign Out',
@@ -227,7 +261,7 @@ function AppShellInner({
       if (data.value) {
         notifications.requestPermission().catch(() => {});
       } else {
-        setConfirmModal({
+        showConfirm({
           title: 'Disable Notifications',
           description: 'You may miss important task reminders. Are you sure you want to turn off notifications?',
           confirmLabel: 'Turn Off',
@@ -241,7 +275,7 @@ function AppShellInner({
     };
 
     const reset = () => {
-      setConfirmModal({
+      showConfirm({
         title: 'Reset App Data',
         description: 'This will clear cached data and re-fetch your schedule from the server. Your completed tasks will not be affected.',
         confirmLabel: 'Reset',
@@ -402,12 +436,15 @@ function AppShellInner({
       {initError && <InitErrorToast message={initError} brandColors={theme} />}
       {confirmModal && (
         <ConfirmModal
-          visible
-          onClose={() => setConfirmModal(null)}
+          visible={confirmModal.visible}
+          onClose={dismissConfirm}
           onConfirm={confirmModal.onConfirm}
           title={confirmModal.title}
           description={confirmModal.description}
           confirmLabel={confirmModal.confirmLabel}
+          cancelLabel={confirmModal.cancelLabel}
+          icon={confirmModal.icon}
+          showClose={confirmModal.showClose}
           destructive={confirmModal.destructive}
           brandColors={theme}
         />
