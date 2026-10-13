@@ -18,6 +18,7 @@ import {
   SCALE_TYPES,
 } from './questionnaire/QuestionRenderer';
 import { speechContent } from './questionnaire/speechContent';
+import { infoTitle } from './questionnaire/InfoScreen';
 import { TaskCompletionScreen } from './questionnaire/TaskCompletionScreen';
 import {
   CollapsibleHeading,
@@ -338,8 +339,11 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
 
   /** Set by the current input. A ref, not state: `goNext` only reads it when pressed. */
   const answerValid = useRef(true);
-  const handleValidityChange = useCallback((valid: boolean) => {
+  /** Its reason, which the dock does draw — so this half has to be state. Only the text field sets it. */
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const handleValidityChange = useCallback((valid: boolean, reason?: string | null) => {
     answerValid.current = valid;
+    setFieldError(reason ?? null);
   }, []);
 
   const goNext = useCallback(() => {
@@ -352,6 +356,7 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
     }
     setSubmitAttempt(0);
     answerValid.current = true;
+    setFieldError(null);
     // Stamp info/descriptive types (no user input) so every shown question has a timestamp.
     if (currentQuestion?.field_name && timestamps[currentQuestion.field_name] == null) {
       setTimestamps((prev) => ({
@@ -378,6 +383,7 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   const goPrevious = useCallback(() => {
     setSubmitAttempt(0);
     answerValid.current = true;
+    setFieldError(null);
     if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1);
       setSpeechPhase('idle'); // See `goNext` — the phase belongs to the question being left.
@@ -479,6 +485,8 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   const canProceed = !isRequired || hasAnswer;
   /** Surfaced only once they've tried to leave — see `submitAttempt`. */
   const requiredError = submitAttempt > 0 && !canProceed ? REQUIRED_MESSAGE : null;
+  /** Being empty outranks being malformed: there is nothing to be wrong about yet. */
+  const pageError = requiredError ?? fieldError;
 
   /**
    * What every refused answer does, whatever kind of question it was.
@@ -702,11 +710,17 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
             // `speechContent`. Everything else keeps its own label.
             // A matrix block's title is the block's own heading, not the first row's label — each row
             // carries its label on its card, and the heading is the one thing they share.
+            // Info and descriptive pages take their title from `infoTitle`, so it never repeats the
+            // card's body.
+            const isInfoCard =
+              question?.field_type === 'info' || question?.field_type === 'descriptive';
             const questionTitle = isBlock
               ? matrixPageTitle(page)
               : isSpeechPanel
                 ? speechContent(question).heading
-                : question?.field_label?.trim() || question?.section_header;
+                : isInfoCard
+                  ? infoTitle(question)
+                  : question?.field_label?.trim() || question?.section_header;
             // Speech questions get a standing instruction when the study wrote no header of their
             // own; every other type shows a header only if one was authored. A matrix block has
             // already spent its header on the title above, so it shows none here.
@@ -847,7 +861,9 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                             textStyle={[styles.sectionHeader, { color: muted }]}
                           />
                         ) : (
-                          <Text style={[styles.title, { color: brand }]}>{questionTitle}</Text>
+                          questionTitle ? (
+                            <Text style={[styles.title, { color: brand }]}>{questionTitle}</Text>
+                          ) : null
                         )}
                       </View>
                     )}
@@ -912,6 +928,8 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                           pageInset={PAGE_PADDING}
                           // Only the active panel: a parked neighbour reporting its own validity
                           // would overwrite the answer this screen is actually gating on.
+                          // Parked panels stay mounted, so media needs telling it is off-screen.
+                          isActive={isActive}
                           submitAttempt={isActive ? submitAttempt : 0}
                           onValidityChange={isActive ? handleValidityChange : undefined}
                           // Only the active panel: a parked neighbour has no business freezing the
@@ -970,16 +988,12 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
         * looked right only because its container fills the screen, so its message was already pinned;
         * this gives every type that same behaviour instead of one type scrolling to find it.
         *
-        * `text` is the exception and draws its own, lined up with its card.
+        * Every type, text included — it used to draw its own under its card, which left the same
+        * message in two different places depending on the question.
         */}
-      {currentQuestion?.field_type !== 'text' && (
-        <View
-          style={[styles.errorDock, { bottom: FOOTER_RESERVE + bottomInset }]}
-          pointerEvents="none"
-        >
-          <QuestionError message={requiredError} shakeKey={submitAttempt} mode={mode} />
-        </View>
-      )}
+      <View style={[styles.errorDock, { bottom: FOOTER_RESERVE + bottomInset }]} pointerEvents="none">
+        <QuestionError message={pageError} shakeKey={submitAttempt} mode={mode} />
+      </View>
 
       {/* Footer: Exit (first) / Back (thereafter) + Next / Finish (last). The speech question shows only
           the back/exit half while idle, and no footer at all once recording starts. */}
