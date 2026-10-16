@@ -66,6 +66,7 @@ export class AppserverScheduleService extends ScheduleServiceBase {
     super.destroy();
     this.cachedProtocolVersion = null;
     this.assessmentMap.clear();
+    void this.storage.set(PROTOCOL_VERSION_KEY, null);
   }
 
   async fetchSchedule(): Promise<void> {
@@ -141,15 +142,13 @@ export class AppserverScheduleService extends ScheduleServiceBase {
       for (const assessment of protocol.protocols ?? []) {
         if (assessment.name) this.assessmentMap.set(assessment.name, assessment);
       }
+      await this.questionnaireData.loadDefinitions(protocol);
 
       if (versionChanged) {
-        await this.questionnaireData.loadDefinitions(protocol);
         this.cachedProtocolVersion = protocol.version;
         await this.storage.set(PROTOCOL_VERSION_KEY, protocol.version);
         await this.storage.set(PROTOCOL_CACHE_KEY, protocol);
         this.logger.log(`Protocol updated to version ${protocol.version}, loaded ${this.assessmentMap.size} assessments`);
-      } else {
-        this.logger.log(`Protocol version ${protocol.version} unchanged, skipping definition fetch`);
       }
 
     } catch (e) {

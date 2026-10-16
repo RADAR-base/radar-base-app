@@ -103,7 +103,7 @@ export {
   SurveyTaskListNode,
   TextNode,
   ViewNode,
-  GraphDataNode,
+
   HealthKitNode,
   RadioInput,
   CheckboxInput,
