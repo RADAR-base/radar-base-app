@@ -8,6 +8,8 @@ import { StatCardNode } from './card/StatCardNode';
 import { TaskCardNode } from './card/TaskCardNode';
 import { ToDoStatusNode } from './card/ToDoStatusNode';
 import { DataWheelCardNode } from './card/DataWheelCardNode';
+import { OnDemandCardNode } from './card/OnDemandCardNode';
+import { OnDemandTaskListNode } from './section/OnDemandTaskListNode';
 import { StreakCardNode } from './card/StreakCardNode';
 import { BarChartCardNode } from './card/BarChartCardNode';
 import { ArcDataCardNode } from './card/ArcDataCardNode';
@@ -62,6 +64,8 @@ export function registerBuiltInNodes(): void {
   registry.register('SurveyTaskListNode', SurveyTaskListNode);
   registry.register('QuestionnaireScreenNode', QuestionnaireScreenNode);
   registry.register('DataWheelCardNode', DataWheelCardNode);
+  registry.register('OnDemandCardNode', OnDemandCardNode);
+  registry.register('OnDemandTaskListNode', OnDemandTaskListNode);
   registry.register('StreakCardNode', StreakCardNode);
   registry.register('BarChartCardNode', BarChartCardNode);
   registry.register('ArcDataCardNode', ArcDataCardNode);
@@ -82,6 +86,8 @@ export {
   TaskCardNode,
   ToDoStatusNode,
   DataWheelCardNode,
+  OnDemandCardNode,
+  OnDemandTaskListNode,
   StreakCardNode,
   BarChartCardNode,
   ArcDataCardNode,
