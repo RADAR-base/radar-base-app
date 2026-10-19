@@ -1,6 +1,7 @@
 import type {
   Task,
   TaskState,
+  OnDemandTask,
   ProtocolConfig,
   AssessmentConfig,
   MultiLanguageText,
@@ -66,6 +67,23 @@ export class AppserverScheduleService extends ScheduleServiceBase {
     super.destroy();
     this.cachedProtocolVersion = null;
     this.assessmentMap.clear();
+  }
+
+  /** On-demand assessments come from the protocol; the server schedules no tasks for them. */
+  override getOnDemandTasks(): OnDemandTask[] {
+    return [...this.assessmentMap.values()]
+      .filter((a) => a.type?.toLowerCase() === 'on_demand')
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      .map((a) => ({
+        assessmentName: a.name,
+        title: a.name,
+        taskType: a.questionnaire?.type,
+        iconUrl: a.icon,
+        estimatedMinutes: a.estimatedCompletionTime,
+        nQuestions: a.nQuestions,
+        startText: resolveMLText(a.startText),
+        endText: resolveMLText(a.endText),
+      }));
   }
 
   async fetchSchedule(): Promise<void> {

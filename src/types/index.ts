@@ -473,6 +473,8 @@ export interface QuestionnaireMetadata {
 /** A single assessment entry in the top-level `protocols` array. */
 export interface AssessmentConfig {
   name: string;
+  /** `on_demand` for a task the participant starts themselves; `scheduled` or absent otherwise. */
+  type?: string;
   /** Optional study-supplied task icon URL (raster). Studies set this to brand their tasks with
    *  their own icon; when omitted the app shows the default type badge. Flows to `TaskInstance.icon`
    *  → `Task.iconUrl` → the card's `TaskIcon`. */
@@ -569,6 +571,18 @@ export interface Task {
   endText?: string;
 }
 
+/** A task the participant can start at any time (protocol `type: "on_demand"`). It never expires. */
+export interface OnDemandTask {
+  assessmentName: string;
+  title: string;
+  taskType?: string;
+  iconUrl?: string;
+  estimatedMinutes?: number;
+  nQuestions?: number;
+  startText?: string;
+  endText?: string;
+}
+
 export interface ScheduleService {
   init(): Promise<void>;
   /** Fetch the schedule from the appserver and cache locally. Falls back to cache on failure. */
@@ -577,6 +591,8 @@ export interface ScheduleService {
   getTasksForRange(startDate: Date, endDate: Date): Promise<Task[]>;
   getUpcomingTasks(limit?: number): Promise<Task[]>;
   getPendingCount(): Promise<number>;
+  /** The protocol's on-demand assessments, in protocol order. */
+  getOnDemandTasks(): OnDemandTask[];
   /** True when the task's timestamp has passed and its completion window is still open. */
   isTaskStartable(task: Task): boolean;
   /** True when the task's completion window has elapsed or the task is already completed. */
