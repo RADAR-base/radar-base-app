@@ -34,6 +34,7 @@ import { useSlideOverlay } from './useSlideOverlay';
 import { TabHeaderContext } from './TabHeaderContext';
 import { TabActiveContext } from './TabActiveContext';
 import { PageHeader } from './PageHeader';
+import { ON_DEMAND_VIEW, onDemandBlueprint } from './nodes/section/OnDemandTaskListNode';
 import { NotificationsProvider } from './useNotifications';
 import { TaskInstructionsScreen } from './TaskInstructionsScreen';
 import type { TaskCardType } from './nodes/card/TaskCardNode';
@@ -136,7 +137,14 @@ export function SDUIShell(props: SDUIShellProps) {
   }, [manifest, blueprintLoader]);
 
   const openSecondaryView = useCallback(
-    async (viewUrl: string) => {
+    async (viewUrl: string, params?: Record<string, unknown>) => {
+      // Built in, unless the manifest maps this name to a view of the study's own.
+      if (viewUrl === ON_DEMAND_VIEW && !manifest?.secondaryViews?.[viewUrl]) {
+        const text = (key: string) => (typeof params?.[key] === 'string' ? (params[key] as string) : '');
+        const blueprint = onDemandBlueprint(text('title'), text('description'));
+        setSecondaryStack((stack) => [...stack, { viewUrl, blueprint }]);
+        return;
+      }
       try {
         // Resolve logical names (e.g. "daily_questionnaire") to file paths via
         // the manifest's secondaryViews map; fall back to the raw viewUrl for direct paths.
@@ -157,8 +165,8 @@ export function SDUIShell(props: SDUIShellProps) {
   const dispatch = useMemo(
     () =>
       createActionDispatcher({
-        onOpenCustomView: (viewUrl) => {
-          void openSecondaryView(viewUrl);
+        onOpenCustomView: (viewUrl, params) => {
+          void openSecondaryView(viewUrl, params);
         },
         onNavigate: (tabId) => {
           setSecondaryStack([]);

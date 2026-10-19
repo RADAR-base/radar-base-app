@@ -1,6 +1,7 @@
 import { AppState, type NativeEventSubscription } from 'react-native';
 import type {
   DayVerdict,
+  OnDemandTask,
   StreakDay,
   StreakRisk,
   ScheduleService,
@@ -177,6 +178,11 @@ export abstract class ScheduleServiceBase implements ScheduleService {
       })
       .sort((a, b) => a.timestamp - b.timestamp)
       .slice(0, limit);
+  }
+
+  /** None by default; a subclass that knows the protocol supplies them. */
+  getOnDemandTasks(): OnDemandTask[] {
+    return [];
   }
 
   async getPendingCount(): Promise<number> {
