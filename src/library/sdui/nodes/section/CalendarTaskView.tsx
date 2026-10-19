@@ -7,8 +7,6 @@ import { useCoreServices } from '../../../../core/CoreServicesContext';
 import { EVENTS } from '../../../../core/EventBus';
 import type { TaskView as Task } from '../../../../types';
 import {
-  fontFamily,
-  tracking,
   getColorTokens,
   resolveBackground,
   taskStatusColors,
@@ -16,14 +14,15 @@ import {
   calendarRailColor,
   CALENDAR_DEFAULT_ACCENT,
   calendarRail,
+  textStyle,
 } from '../../../../theme/theme';
 import TimeMorning from '../../../../theme/icons/timemorning.svg';
 import TimeAfternoon from '../../../../theme/icons/timeafternoon.svg';
 import TimeEvening from '../../../../theme/icons/timeevening.svg';
 import StateDoneIcon from '../../../../theme/icons/statedone.svg';
 import StateMissedIcon from '../../../../theme/icons/statemissed.svg';
-import NoTasksArt from '../../../../theme/icons/notasks.svg';
 import { CalendarTaskCard, type CalendarTaskState } from '../card/CalendarTaskCard';
+import { NoTasksEmptyState } from './NoTasksEmptyState';
 import { inferTaskType, isExpired } from './TaskDayList';
 import type { SDUIContext } from '../../types';
 
@@ -34,51 +33,38 @@ const SLOT_ICON: Record<Slot, ComponentType<SvgProps>> = {
   Afternoon: TimeAfternoon,
   Evening: TimeEvening,
 };
-
-// Rail dots reuse each state's badge circle from the shared task-status palette; the not-ready
-// line/ring is the shared rail grey. (Both live in the theme so the card and rail stay in sync.)
-const DONE_CIRCLE = taskStatusColors.done.circle;
-const MISSED_CIRCLE = taskStatusColors.missed.circle;
+const STATE_ICON = { done: StateDoneIcon, missed: StateMissedIcon };
 const GREY = calendarRail.grey;
+const NODE = calendarRail.nodeSize;
+const LINE_WIDTH = calendarRail.lineWidth;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** One rail row: a slot header, or a card. Each carries the colour of the line through it. */
+type Entry = { key: string; railColor: string } & (
+  | { kind: 'header'; slot: Slot }
+  | { kind: 'card'; task: Task; state: CalendarTaskState; minutes: number }
+);
 
 export interface CalendarTaskViewProps {
   context: SDUIContext;
-  /** Which calendar day to show. Identity may change per render — the loader keys off the day's
-   *  normalized start-of-day timestamp, so a fresh `new Date()` won't reload-loop. */
+  /** Which calendar day to show. Keyed by its start-of-day, so a fresh `new Date()` won't reload-loop. */
   date: Date;
 }
 
 /**
- * The empty-day illustration's drawn size, and its own aspect (1445 x 1333).
- *
- * Sized in one place because the height has to follow the width — the asset is authored far larger
- * than it is ever drawn, and letting it size itself would fill the screen.
- */
-const EMPTY_ART_WIDTH = 180;
-const EMPTY_ART_ASPECT = 1445 / 1333;
-
-/**
- * The calendar day view: the full list of a day's tasks down the right, a time-of-day timeline down
- * the left. Unlike `TaskDayList` (home), this keeps **every** card for the day — completed and expired
- * included — grouped into Morning / Afternoon / Evening (only non-empty slots show). Each task's state
- * (available / done / missed / notReady) drives both its card and its rail circle; the connecting bar
- * is the theme navy where tasks are reachable and grey where they're not yet available.
+ * The calendar day view: every task for the day, done and expired included, grouped into
+ * Morning / Afternoon / Evening beside a timeline. The rail is navy where tasks are reachable and grey
+ * where they're not yet available.
  */
 export function CalendarTaskView({ context, date }: CalendarTaskViewProps) {
   const { schedule, eventBus } = useCoreServices();
-
-  const dayStamp = useMemo(() => {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
-  }, [date]);
-
+  const dayStamp = useMemo(() => new Date(date).setHours(0, 0, 0, 0), [date]);
   const [tasks, setTasks] = useState<Task[]>([]);
 
   const loadTasks = useCallback(async () => {
     try {
       const instances = await schedule.getTasksForDate(new Date(dayStamp));
-      setTasks(instances.map((i) => schedule.toTaskView(i)));
+      setTasks(instances.map(i => schedule.toTaskView(i)));
     } catch {
       setTasks([]);
     }
@@ -86,33 +72,32 @@ export function CalendarTaskView({ context, date }: CalendarTaskViewProps) {
 
   useEffect(() => {
     loadTasks();
-  }, [loadTasks]);
-
-  useEffect(() => {
-    const handler = () => loadTasks();
-    eventBus.on(EVENTS.SCHEDULE_UPDATED, handler);
-    return () => eventBus.off(EVENTS.SCHEDULE_UPDATED, handler);
+    eventBus.on(EVENTS.SCHEDULE_UPDATED, loadTasks);
+    return () => eventBus.off(EVENTS.SCHEDULE_UPDATED, loadTasks);
   }, [eventBus, loadTasks]);
 
-  // Re-evaluate state (available -> missed, notReady -> available) as wall-clock time passes; nothing
-  // else re-renders this purely because time moved. Same 15s cadence as `TaskDayList`.
+  // Re-render every 15s so states move on with the clock (available → missed, notReady → available).
   const [, tick] = useState(0);
   useEffect(() => {
-    const interval = setInterval(() => tick((n) => n + 1), 15_000);
+    const interval = setInterval(() => tick(n => n + 1), 15_000);
     return () => clearInterval(interval);
   }, []);
 
-  const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
-  // The rail's "reached" color — the same accent-over-chrome mix as the selected day in the picker
-  // above, so the two read as one control. A step lighter than the chrome itself, which a 6px line and
-  // small rings need to be visible on a dark page.
+  const scheme = context.colorScheme ?? 'light';
+  const tokens = getColorTokens(scheme, context.theme.brandColors);
+  // The rail's "reached" colour matches the selected day in the picker above.
   const accent = context.theme.brandColors?.accent ?? CALENDAR_DEFAULT_ACCENT;
   const navy = calendarRailColor(tokens.header.headerBackground, accent);
-  const pageBg = resolveBackground(context.theme, context.colorScheme ?? 'light');
-  // "Morning" / "Afternoon" / "Evening". These took the rail color, which works on a light page but
-  // put near-black chrome on a near-black page in dark mode — the labels were invisible. Keep the rail
-  // color where it reads, and fall back to whatever does otherwise.
+  const pageBg = resolveBackground(context.theme, scheme);
+  // The rail colour is unreadable on a dark page, so the slot labels fall back when needed.
   const slotLabel = readableTextColor(pageBg, { preferred: navy });
+
+  if (tasks.length === 0) {
+    // A plain line: the home list's "all caught up" card speaks for today, not any day paged to.
+    return (
+      <NoTasksEmptyState context={context} body="Looks like you have no tasks for this day." />
+    );
+  }
 
   const handlePress = (task: Task) => {
     if (task.status === 'completed') return;
@@ -125,91 +110,41 @@ export function CalendarTaskView({ context, date }: CalendarTaskViewProps) {
       taskType: inferTaskType(task.title, task.taskType),
       startText: task.startText,
       endText: task.endText,
-      duration: task.estimated_minutes > 0 ? `${task.estimated_minutes} min` : undefined,
+      duration: durationOf(task),
       expirationTime: formatExpiration(task),
       questionNumber: task.nQuestions ? `x${task.nQuestions}` : undefined,
       taskTimestamp: task.timestamp,
     });
   };
 
-  // Group into non-empty time-of-day slots, tasks sorted by their time within each.
-  const groups = SLOT_ORDER.map((slot) => ({
-    slot,
-    items: tasks.filter((t) => slotFor(t) === slot).sort((a, b) => dayMinutes(a) - dayMinutes(b)),
-  })).filter((g) => g.items.length > 0);
-
-  /**
-   * No tasks for this day.
-   *
-   * A line rather than the home list's `ToDoStatusNode` card. That card speaks for *today* — "you're
-   * all caught up", "we'll remind you when tomorrow's tasks are ready" — and none of it is true of an
-   * arbitrary day you have paged to: nothing was ever scheduled, and the day may not have happened
-   * yet. Rendering nothing at all was the other extreme, and left the selector sitting above blank
-   * space with no way to tell an empty day from one that failed to load.
-   */
-  if (tasks.length === 0) {
-    return (
-      <View style={styles.empty}>
-        <NoTasksArt
-          width={EMPTY_ART_WIDTH}
-          height={EMPTY_ART_WIDTH / EMPTY_ART_ASPECT}
-          // Every navy shape in the drawing takes this — body and dots alike. `background.secondary`
-          // is the token holding the brand-primary hue, so it is the illustration's own navy by
-          // default and the study's brand wherever one is set. The pink accents and the white/black
-          // details inside the shapes stay as authored.
-          color={tokens.background.secondary}
-          // Decorative: the two lines below say the same thing, and a screen reader announcing the
-          // drawing as well would only say it twice.
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-        />
-        <Text style={[styles.emptyTitle, { color: tokens.text.primary }]}>Nothing to see here</Text>
-        <Text style={[styles.emptyBody, { color: tokens.card.stats.description }]}>
-          Looks like you have no tasks for this day.
-        </Text>
-      </View>
-    );
-  }
-
-  // Flatten to a single ordered list of rail rows (a header, then its cards) so the timeline line runs
-  // continuously through headers and cards. Each row carries the color of the line passing through it.
-  type Entry =
-    | { key: string; kind: 'header'; slot: Slot; railColor: string }
-    | { key: string; kind: 'card'; task: Task; state: CalendarTaskState; railColor: string };
-
-  const entries: Entry[] = [];
-  for (const group of groups) {
-    const firstState = deriveState(group.items[0], dayStamp);
-    entries.push({
-      key: `h-${group.slot}`,
-      kind: 'header',
-      slot: group.slot,
-      railColor: firstState === 'notReady' ? GREY : navy,
-    });
-    for (const task of group.items) {
-      const state = deriveState(task, dayStamp);
-      entries.push({
-        key: `c-${task.id}`,
-        kind: 'card',
-        task,
-        state,
-        railColor: state === 'notReady' ? GREY : navy,
-      });
-    }
-  }
+  // One flat list of rows, so the rail runs unbroken through headers and cards.
+  const railColor = (state: CalendarTaskState) => (state === 'notReady' ? GREY : navy);
+  const rows = tasks
+    .map(task => ({ task, state: deriveState(task, dayStamp), minutes: dayMinutes(task) }))
+    .sort((a, b) => a.minutes - b.minutes);
+  const entries: Entry[] = SLOT_ORDER.flatMap(slot => {
+    const items = rows.filter(r => slotOf(r.minutes) === slot);
+    if (items.length === 0) return [];
+    return [
+      { key: `h-${slot}`, kind: 'header' as const, slot, railColor: railColor(items[0].state) },
+      ...items.map(r => ({
+        key: `c-${r.task.id}`,
+        kind: 'card' as const,
+        ...r,
+        railColor: railColor(r.state),
+      })),
+    ];
+  });
 
   return (
     <View style={styles.container}>
       {entries.map((entry, i) => {
-        const showTop = i > 0;
-        const showBottom = i < entries.length - 1;
+        const line = { backgroundColor: entry.railColor };
         return (
           <View style={styles.railRow} key={entry.key}>
             <View style={styles.railCol}>
-              {showTop && <View style={[styles.lineTop, { backgroundColor: entry.railColor }]} />}
-              {showBottom && (
-                <View style={[styles.lineBottom, { backgroundColor: entry.railColor }]} />
-              )}
+              {i > 0 && <View style={[styles.line, styles.lineTop, line]} />}
+              {i < entries.length - 1 && <View style={[styles.line, styles.lineBottom, line]} />}
               <View style={styles.node}>
                 {entry.kind === 'header' ? (
                   <SlotIcon slot={entry.slot} color={entry.railColor} />
@@ -236,12 +171,8 @@ export function CalendarTaskView({ context, date }: CalendarTaskViewProps) {
                     state={entry.state}
                     taskType={inferTaskType(entry.task.title, entry.task.taskType)}
                     taskName={entry.task.title}
-                    time={formatClock(entry.task, entry.state === 'done')}
-                    duration={
-                      entry.task.estimated_minutes > 0
-                        ? `${entry.task.estimated_minutes} min`
-                        : undefined
-                    }
+                    time={formatClock(entry.task, entry.minutes, entry.state === 'done')}
+                    duration={durationOf(entry.task)}
                     expirationTime={formatExpiration(entry.task)}
                     newTask={entry.state === 'available' && entry.task.isNew === true}
                     iconUrl={entry.task.iconUrl}
@@ -256,191 +187,91 @@ export function CalendarTaskView({ context, date }: CalendarTaskViewProps) {
   );
 }
 
+/** The icon's circle is `currentColor`, so it greys out with the rail before the slot is reached. */
 function SlotIcon({ slot, color }: { slot: Slot; color: string }) {
   const Icon = SLOT_ICON[slot];
-  // The time-of-day icons' circle is `currentColor`, so `color` greys them out for a not-yet-available
-  // slot (matching the grey rail), or paints them theme-navy when the slot is reached.
   return <Icon width={30} height={30} color={color} />;
 }
 
-function StateCircle({
-  state,
-  navy,
-  pageBg,
-}: {
-  state: CalendarTaskState;
-  navy: string;
-  pageBg: string;
-}) {
-  if (state === 'done') {
+function StateCircle(props: { state: CalendarTaskState; navy: string; pageBg: string }) {
+  const { state, navy, pageBg } = props;
+  if (state === 'done' || state === 'missed') {
+    const Icon = STATE_ICON[state];
+    const c = taskStatusColors[state];
     return (
-      <View style={[styles.circle, { backgroundColor: DONE_CIRCLE }]}>
-        <StateDoneIcon width={18} height={18} color={taskStatusColors.done.icon} />
+      <View style={[styles.circle, { backgroundColor: c.circle }]}>
+        <Icon width={18} height={18} color={c.icon} />
       </View>
     );
   }
-  if (state === 'missed') {
-    return (
-      <View style={[styles.circle, { backgroundColor: MISSED_CIRCLE }]}>
-        <StateMissedIcon width={18} height={18} color={taskStatusColors.missed.icon} />
-      </View>
-    );
-  }
-  // available / notReady: an open ring filled with the page background (hides the line behind it).
-  const border = state === 'available' ? navy : GREY;
-  return <View style={[styles.circle, styles.ring, { backgroundColor: pageBg, borderColor: border }]} />;
+  // An open ring filled with the page colour, which hides the line behind it.
+  const borderColor = state === 'available' ? navy : GREY;
+  return <View style={[styles.circle, styles.ring, { backgroundColor: pageBg, borderColor }]} />;
 }
 
-/** Local formatters — the calendar clock reads "9:00" (no leading zero), distinct from `TaskDayList`'s
- *  zero-padded 24-hour form. Expiry uses the same "24H 00M" shape as the home list. */
+const minutesOf = (d: Date) => d.getHours() * 60 + d.getMinutes();
+
 function dayMinutes(task: Task): number {
-  if (task.timestamp != null) {
-    const d = new Date(task.timestamp);
-    return d.getHours() * 60 + d.getMinutes();
-  }
+  if (task.timestamp != null) return minutesOf(new Date(task.timestamp));
   const m = task.dueTime?.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
-  if (m) {
-    let hour = parseInt(m[1], 10);
-    const min = parseInt(m[2], 10);
-    const ampm = m[3]?.toUpperCase();
-    if (ampm === 'PM' && hour < 12) hour += 12;
-    if (ampm === 'AM' && hour === 12) hour = 0;
-    return hour * 60 + min;
-  }
-  return 0;
+  if (!m) return 0;
+  const ampm = m[3]?.toUpperCase();
+  let hour = Number(m[1]);
+  if (ampm) hour = (hour % 12) + (ampm === 'PM' ? 12 : 0);
+  return hour * 60 + Number(m[2]);
 }
 
-function slotFor(task: Task): Slot {
-  const hour = Math.floor(dayMinutes(task) / 60);
-  if (hour < 12) return 'Morning';
-  if (hour < 17) return 'Afternoon';
-  return 'Evening';
+function slotOf(minutes: number): Slot {
+  return minutes < 12 * 60 ? 'Morning' : minutes < 17 * 60 ? 'Afternoon' : 'Evening';
+}
+
+const durationOf = (task: Task) =>
+  task.estimated_minutes > 0 ? `${task.estimated_minutes} min` : undefined;
+
+/** "9:00", no leading zero. A done card shows when it was finished, if that was recorded. */
+function formatClock(task: Task, minutes: number, done: boolean): string {
+  const total =
+    done && task.timeCompleted != null ? minutesOf(new Date(task.timeCompleted)) : minutes;
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 }
 
 /**
- * The clock time shown on a card. Normally the task's scheduled time ("Starts at 09:00"), but a
- * completed card reads "Done at …", which should be when the participant actually finished — that's
- * `timeCompleted`, stamped by `ScheduleService.completeTask` when the questionnaire reports done.
- * Falls back to the scheduled time for tasks completed before this was recorded.
- */
-function formatClock(task: Task, useCompletionTime = false): string {
-  const completed = useCompletionTime && task.timeCompleted != null
-    ? new Date(task.timeCompleted)
-    : null;
-  const total = completed
-    ? completed.getHours() * 60 + completed.getMinutes()
-    : dayMinutes(task);
-  const hour = Math.floor(total / 60);
-  const min = total % 60;
-  return `${hour}:${String(min).padStart(2, '0')}`;
-}
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-/**
- * The card state for a task on the day starting at `dayStart`. Completed always wins. Then we check
- * the task's actual completion window — a task scheduled at 9am with a 24h window is still available
- * until 9am the next day, even when viewing the previous day's calendar. Only tasks without a
- * completion window fall back to the day-based "past day = missed" rule.
+ * Completed wins; then the task's own completion window, which can run past midnight. Only a task
+ * without a window falls back to "a past day is missed".
  */
 function deriveState(task: Task, dayStart: number): CalendarTaskState {
   if (task.status === 'completed') return 'done';
   const now = Date.now();
-  // Check actual completion window first — respects windows that span past midnight
   if (isExpired(task)) return 'missed';
-  // Tasks without completion window info: fall back to day-based check
   if ((task.timestamp == null || task.completionWindow == null) && dayStart + DAY_MS <= now) {
     return 'missed';
   }
-  // Future day or future task within today
-  if (dayStart > now) return 'notReady';
-  if (task.timestamp != null && task.timestamp > now) return 'notReady';
+  if (dayStart > now || (task.timestamp != null && task.timestamp > now)) return 'notReady';
   return 'available';
 }
 
+/** Time left in the "24H 00M" shape the home list uses. */
 function formatExpiration(task: Task): string | undefined {
   if (!task.timestamp || !task.completionWindow) return undefined;
-  const msRemaining = task.timestamp + task.completionWindow - Date.now();
-  const totalMin = Math.round(Math.max(msRemaining, 0) / 60_000);
+  const totalMin = Math.round(
+    Math.max(task.timestamp + task.completionWindow - Date.now(), 0) / 60_000,
+  );
   if (totalMin < 60) return `${totalMin}M`;
   const hours = Math.floor(totalMin / 60);
-  const mins = totalMin % 60;
   if (hours >= 24) return `${Math.floor(hours / 24)}D`;
-  return `${hours}H ${String(mins).padStart(2, '0')}M`;
+  return `${hours}H ${String(totalMin % 60).padStart(2, '0')}M`;
 }
 
-// Rail geometry (dot diameter + connecting-line thickness) — shared via the theme.
-const NODE = calendarRail.nodeSize;
-const LINE_WIDTH = calendarRail.lineWidth;
-
 const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-  },
-  /**
-   * The empty day.
-   *
-   * Centred and given real height on purpose: the selector above it is the thing being operated, and
-   * a message hugging its bottom edge reads as a caption on the selector rather than as an answer
-   * about the day. Deliberately flat — no card, no shadow — since there is nothing here to raise.
-   */
-  empty: {
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 48,
-    gap: 6,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontFamily: fontFamily.semiBold,
-    includeFontPadding: false,
-    letterSpacing: tracking.bold,
-  },
-  emptyBody: {
-    fontSize: 13,
-    fontFamily: fontFamily.regular,
-    includeFontPadding: false,
-    letterSpacing: tracking.regular,
-    textAlign: 'center',
-  },
-  // No vertical gap between rows — the rail line must run unbroken through them. Card spacing comes
-  // from `cardContent`'s vertical padding instead, which the (stretched) rail column spans.
-  railRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    columnGap: 16,
-  },
-  railCol: {
-    width: NODE,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // Two half-segments meeting at the node's vertical center, so a row's top and bottom can differ in
-  // color (the navy→grey frontier) and the first/last row can drop the outer half.
-  // Centered under the node (`left` = half the leftover width) and square-ended so a row's bottom
-  // segment butts seamlessly against the next row's top segment.
-  lineTop: {
-    position: 'absolute',
-    top: 0,
-    left: (NODE - LINE_WIDTH) / 2,
-    height: '50%',
-    width: LINE_WIDTH,
-  },
-  lineBottom: {
-    position: 'absolute',
-    bottom: 0,
-    left: (NODE - LINE_WIDTH) / 2,
-    height: '50%',
-    width: LINE_WIDTH,
-  },
-  node: {
-    width: NODE,
-    height: NODE,
-    zIndex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  container: { width: '100%' },
+  // No gap between rows so the rail is unbroken; card spacing comes from `cardContent`'s padding.
+  railRow: { flexDirection: 'row', alignItems: 'stretch', columnGap: 16 },
+  railCol: { width: NODE, alignItems: 'center', justifyContent: 'center' },
+  // Two halves meeting at the node, so a row's top and bottom can differ in colour.
+  line: { position: 'absolute', left: (NODE - LINE_WIDTH) / 2, height: '50%', width: LINE_WIDTH },
+  lineTop: { top: 0 },
+  lineBottom: { bottom: 0 },
+  node: { width: NODE, height: NODE, zIndex: 1, alignItems: 'center', justifyContent: 'center' },
   circle: {
     width: NODE,
     height: NODE,
@@ -449,30 +280,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  ring: {
-    // Match the connecting line's thickness so the open ring reads as part of the same rail.
-    borderWidth: LINE_WIDTH-2,
-  },
-  headerContent: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingVertical: 6,
-  },
-  headerLabel: {
-    fontSize: 14,
-    lineHeight: 18,
-    fontFamily: fontFamily.light,
-    fontWeight: '300',
-    letterSpacing: tracking.light,
-    includeFontPadding: false,
-  },
-  cardContent: {
-    flex: 1,
-    minWidth: 0,
-    justifyContent: 'center',
-    paddingVertical: 8,
-  },
-  cardPressed: {
-    transform: [{ scale: 0.98 }],
-  },
+  ring: { borderWidth: LINE_WIDTH - 2 },
+  headerContent: { flex: 1, justifyContent: 'center', paddingVertical: 6 },
+  headerLabel: { ...textStyle(14, 18, 'light'), fontWeight: '300' },
+  cardContent: { flex: 1, minWidth: 0, justifyContent: 'center', paddingVertical: 8 },
+  cardPressed: { transform: [{ scale: 0.98 }] },
 });
