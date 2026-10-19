@@ -925,6 +925,19 @@ export const tracking = {
   bold: BASE_TRACKING + androidNudge(0.2),
 } as const;
 
+/** An Inter text style with its matching tracking and no Android font padding. */
+export const textStyle = (
+  fontSize: number,
+  lineHeight: number,
+  weight: keyof typeof fontFamily,
+) => ({
+  fontSize,
+  lineHeight,
+  fontFamily: fontFamily[weight],
+  letterSpacing: tracking[weight],
+  includeFontPadding: false,
+});
+
 /**
  * Shared layout constants for the header nodes (`HeaderNode` / `HeaderBarNode` /
  * `HeaderTextNode`), transcribed from Figma. Re-exports the relevant `layout` primitives
