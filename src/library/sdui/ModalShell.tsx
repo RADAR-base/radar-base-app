@@ -4,8 +4,10 @@ import {
   Modal,
   Platform,
   Pressable,
+  type StyleProp,
   StyleSheet,
   useColorScheme,
+  type ViewStyle,
 } from 'react-native';
 import Animated, {
   interpolate,
@@ -37,6 +39,8 @@ export interface ModalShellProps {
   brandColors?: ThemeColorOverrides;
   /** Lift the card clear of the keyboard, for a dialog holding a text field. */
   avoidKeyboard?: boolean;
+  /** Overrides on the card itself, for a dialog whose design differs (padding, gap, surface). */
+  surfaceStyle?: StyleProp<ViewStyle>;
 }
 
 /** The chrome every dialog shares: the `Modal`, dimmed backdrop, pop animation and card. */
@@ -46,6 +50,7 @@ export function ModalShell({
   children,
   brandColors,
   avoidKeyboard = false,
+  surfaceStyle,
 }: ModalShellProps) {
   const deviceScheme = useColorScheme();
   const mode: ThemeMode = deviceScheme === 'dark' ? 'dark' : 'light';
@@ -82,7 +87,10 @@ export function ModalShell({
   const card = (
     <Animated.View style={[styles.cardWrap, cardStyle]}>
       {/* Swallows the press so tapping inside the card doesn't dismiss it. */}
-      <Pressable style={[styles.card, { backgroundColor: surface }, cardShadow]} onPress={() => {}}>
+      <Pressable
+        style={[styles.card, { backgroundColor: surface }, cardShadow, surfaceStyle]}
+        onPress={() => {}}
+      >
         {children}
       </Pressable>
     </Animated.View>

@@ -90,6 +90,7 @@ export {
   TaskCardNode,
   ToDoStatusNode,
   DataWheelCardNode,
+  CalendarContributionCardNode,
   CardSectionNode,
   TaskListSectionNode,
   ConnectDevicesMenuNode,

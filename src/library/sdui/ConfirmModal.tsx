@@ -116,7 +116,7 @@ export function ConfirmModal({
   );
 }
 
-function CloseIcon({
+export function CloseIcon({
   size = 36,
   circleColor,
   iconColor,
