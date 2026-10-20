@@ -125,6 +125,8 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   const endText = typeof node.endText === 'string' && node.endText.trim() ? node.endText : undefined;
 
   const [allQuestions, setAllQuestions] = useState<Question[]>([]);
+  // Whether the first look for questions has finished, so an empty task isn't mistaken for a loading one.
+  const [questionsLoaded, setQuestionsLoaded] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [timestamps, setTimestamps] = useState<Record<string, QuestionTimestamp>>({});
@@ -159,17 +161,29 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   // Load questions — fetched from the QuestionnaireDataService by assessment name, else the blueprint's
   // inline `questions`. (Same resolution as `QuestionnaireNode`.)
   useEffect(() => {
-    (async () => {
+    let found = false;
+    const load = async () => {
+      if (found) return;
       if (assessmentName && questionnaireData) {
         const qs = await questionnaireData.getQuestions(assessmentName);
         if (qs.length > 0) {
+          found = true;
           setAllQuestions(qs);
+          setQuestionsLoaded(true);
           return;
         }
       }
-      if (Array.isArray(node.questions)) setAllQuestions(node.questions as Question[]);
-    })();
-  }, [assessmentName, questionnaireData, node.questions]);
+      if (Array.isArray(node.questions) && node.questions.length > 0) {
+        found = true;
+        setAllQuestions(node.questions as Question[]);
+      }
+      setQuestionsLoaded(true);
+    };
+    void load();
+    // Definitions can land after the screen opens; the schedule fetch that loads them ends with this.
+    eventBus.on(EVENTS.SCHEDULE_UPDATED, load);
+    return () => eventBus.off(EVENTS.SCHEDULE_UPDATED, load);
+  }, [assessmentName, questionnaireData, node.questions, eventBus]);
 
   // Apply REDCap branching logic to get the questions actually shown.
   const visibleQuestions = useMemo(
@@ -563,7 +577,8 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
     if (settledIndex !== currentIndex) return;
     setShowFooter(targetShowFooter);
   }, [targetShowFooter, settledIndex, currentIndex]);
-  const showNext = !isSpeech;
+  // Not on an empty task: with no pages, Next would submit an empty questionnaire.
+  const showNext = !isSpeech && total > 0;
 
   /**
    * Whether Next may be *pressed*, decided by the page being landed on rather than the settled one.
@@ -659,6 +674,15 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
             back slides the previous in from the left (StepSlider derives the direction from the index
             change). The header above and footer below stay put. Title is the question text; the input
             is reused from QuestionRenderer (with its own header suppressed so it isn't shown twice). */}
+        {questionsLoaded && total === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={[styles.title, { color: brand }]}>This task isn’t ready yet</Text>
+            <Text style={[styles.emptyStateText, { color: muted }]}>
+              Its questions haven’t downloaded. Check your connection, then sync from the home page
+              and try again.
+            </Text>
+          </View>
+        ) : (
         <StepSlider index={currentIndex} duration={SLIDE_DURATION} count={total}>
           {(stepIndex) => {
             const page = pages[stepIndex];
@@ -939,6 +963,7 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
             );
           }}
         </StepSlider>
+        )}
       </View>
 
       {/*
@@ -1194,6 +1219,18 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.bold,
     fontWeight: '700',
     letterSpacing: tracking.bold,
+    includeFontPadding: false,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 9,
+    paddingHorizontal: PAGE_PADDING,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontFamily: fontFamily.regular,
     includeFontPadding: false,
   },
   emptyText: {

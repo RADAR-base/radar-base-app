@@ -48,6 +48,8 @@ async function retryWithBackoff<T>(
 
 export class DefaultQuestionnaireDataService implements QuestionnaireDataService {
   private definitions: Map<string, Question[]> = new Map();
+  /** Whether the on-disk cache has been read. `definitions.size` can't say: bundled entries fill it too. */
+  private cacheRestored = false;
   private fetchStrategy: FetchStrategy = 'appserver';
 
   constructor(
@@ -59,22 +61,20 @@ export class DefaultQuestionnaireDataService implements QuestionnaireDataService
     private readonly remoteConfig: RemoteConfigService,
   ) { }
 
-  async loadDefinitions(protocol: ProtocolConfig, language = 'en'): Promise<void> {
+  async loadDefinitions(
+    protocol: ProtocolConfig,
+    language = 'en',
+    options?: { refetch?: boolean },
+  ): Promise<void> {
     // Resolve fetch strategy from remote config
     await this.resolveFetchStrategy();
 
-    // Restore cached definitions
-    const cached = await this.storage.get<Record<string, Question[]>>(STORAGE_KEY);
-    if (cached) {
-      for (const [name, questions] of Object.entries(cached)) {
-        this.definitions.set(name, questions);
-      }
-    }
+    await this.restoreCachedDefinitions();
 
     // Fetch definitions for each assessment that has a questionnaire config
     for (const assessment of protocol.protocols) {
       if (!assessment.questionnaire?.repository) continue;
-      if (this.definitions.has(assessment.name)) continue;
+      if (!options?.refetch && this.definitions.has(assessment.name)) continue;
 
       try {
         const questions = await retryWithBackoff(() =>
@@ -107,19 +107,24 @@ export class DefaultQuestionnaireDataService implements QuestionnaireDataService
     this.logger.log(`QuestionnaireDataService: loaded ${this.definitions.size} definitions`);
   }
 
+  /** Folds the on-disk cache into `definitions`, once. */
+  private async restoreCachedDefinitions(): Promise<void> {
+    if (this.cacheRestored) return;
+    this.cacheRestored = true;
+    const cached = await this.storage.get<Record<string, Question[]>>(STORAGE_KEY);
+    if (!cached) return;
+    for (const [name, questions] of Object.entries(cached)) {
+      this.definitions.set(name, questions);
+    }
+  }
+
   registerBundled(assessmentName: string, questions: Question[]): void {
     this.definitions.set(assessmentName, formatQuestionHeaders(questions));
   }
 
   async getQuestions(assessmentName: string): Promise<Question[]> {
-    if (this.definitions.size === 0) {
-      const cached = await this.storage.get<Record<string, Question[]>>(STORAGE_KEY);
-      if (cached) {
-        for (const [name, questions] of Object.entries(cached)) {
-          this.definitions.set(name, questions);
-        }
-      }
-    }
+    // Not held yet: the cache may still have it.
+    if (!this.definitions.has(assessmentName)) await this.restoreCachedDefinitions();
     return this.definitions.get(assessmentName) ?? [];
   }
 
@@ -142,6 +147,7 @@ export class DefaultQuestionnaireDataService implements QuestionnaireDataService
 
   async clear(): Promise<void> {
     this.definitions.clear();
+    this.cacheRestored = false;
     await this.storage.set(STORAGE_KEY, null);
   }
 
