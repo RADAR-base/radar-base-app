@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   InteractionManager,
+  Platform,
   StyleSheet,
   Text,
   useColorScheme,
@@ -542,6 +543,11 @@ function getUsername(context: SDUIContext): string | undefined {
 
 /* ─── Bottom Tab Bar ──────────────────────────────────────────────────── */
 
+/** How far into the bottom safe area the pill drops on iOS, leaving it just above the home indicator. */
+const IOS_NAVBAR_DROP = 18;
+/** The least gap under the pill, for iPhones with no home indicator. */
+const IOS_NAVBAR_MIN_GAP = 12;
+
 function BottomTabBar({
   manifest,
   activeTabId,
@@ -554,6 +560,12 @@ function BottomTabBar({
   // Edge-to-edge: the shell draws behind the system navigation bar / home indicator. The navbar
   // should sit directly above the device's bottom safe area.
   const insets = useSafeAreaInsets();
+  // iOS: low on the screen, as its apps place their tab bars. Android keeps the full inset, which is
+  // its system navigation bar.
+  const bottomGap =
+    Platform.OS === 'ios'
+      ? Math.max(insets.bottom - IOS_NAVBAR_DROP, IOS_NAVBAR_MIN_GAP)
+      : insets.bottom;
 
   const navbarNode: Node = {
     id: 'shell-navbar',
@@ -571,7 +583,7 @@ function BottomTabBar({
     <View
       style={[
         styles.tabBarOuter,
-        { paddingBottom: insets.bottom },
+        { paddingBottom: bottomGap },
       ]}
     >
       <NavbarNode node={navbarNode} context={context} render={noopRender} />
