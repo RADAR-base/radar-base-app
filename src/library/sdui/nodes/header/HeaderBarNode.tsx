@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   Easing,
@@ -14,6 +14,7 @@ import SettingsIcon from '../../../../theme/icons/settings.svg';
 import { tracking, fontFamily, getColorTokens, headerLayout } from '../../../../theme/theme';
 import { useUnreadNotificationCount } from '../../useNotifications';
 import { useSyncService } from '../../../../core/CoreServicesContext';
+import { EVENTS, eventBus } from '../../../../core/EventBus';
 import type { NodeProps } from '../../types';
 
 /** "Last Synced: HH:MM" for the given time, zero-padded. */
@@ -68,6 +69,24 @@ export function HeaderBarNode({ node, context }: NodeProps) {
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(
     () => syncService.getLastSyncedAt(),
   );
+  // The saved time is read from storage asynchronously, so it may not be there on first render.
+  useEffect(() => {
+    let live = true;
+    void syncService.loadLastSyncedAt().then((saved) => {
+      if (live && saved) setLastSyncedAt((current) => current ?? saved);
+    });
+    return () => {
+      live = false;
+    };
+  }, [syncService]);
+  // The app also syncs on its own (on open, on returning to it), so follow those too.
+  useEffect(() => {
+    const onSynced = (payload?: { at?: Date | null }) => {
+      if (payload?.at) setLastSyncedAt(payload.at);
+    };
+    eventBus.on(EVENTS.DATA_SYNCED, onSynced);
+    return () => eventBus.off(EVENTS.DATA_SYNCED, onSynced);
+  }, []);
   const [syncing, setSyncing] = useState(false);
   const lastSyncedText = lastSyncedAt ? syncLabelFor(lastSyncedAt) : 'Last Sync';
   const syncSpin = useSharedValue(0);

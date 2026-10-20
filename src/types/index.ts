@@ -619,6 +619,10 @@ export interface SyncService {
   unregister(name: string): void;
   sync(): Promise<SyncResult>;
   getLastSyncedAt(): Date | null;
+  /** The last sync time once the saved value has been read back; `getLastSyncedAt` can be too early. */
+  loadLastSyncedAt(): Promise<Date | null>;
+  /** Record that the app has just refreshed from the server outside a manual sync. */
+  markSynced(at?: Date): void;
 }
 
 export interface DataPipelineService {

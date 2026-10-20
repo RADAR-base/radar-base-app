@@ -76,12 +76,13 @@ export class AppserverScheduleService extends ScheduleServiceBase {
     await this.fetchProtocol();
 
     // 2. Fetch task schedule from appserver
-    await this.fetchTaskSchedule();
+    const fromServer = await this.fetchTaskSchedule();
 
     await this.pruneTrackingSets();
     await this.persist();
     await this.refreshStates();
-    this.bus.emit(EVENTS.SCHEDULE_UPDATED, { reason: 'schedule_fetched' });
+    // `fromServer` is false when the fetch failed and the cached schedule was kept.
+    this.bus.emit(EVENTS.SCHEDULE_UPDATED, { reason: 'schedule_fetched', fromServer });
   }
 
   // ---------------------------------------------------------------------------
@@ -173,7 +174,8 @@ export class AppserverScheduleService extends ScheduleServiceBase {
   // Schedule fetch — loads task instances and enriches with assessment metadata
   // ---------------------------------------------------------------------------
 
-  private async fetchTaskSchedule(): Promise<void> {
+  /** Resolves true when the schedule came from the server, false when it fell back to the cache. */
+  private async fetchTaskSchedule(): Promise<boolean> {
     try {
       const fetched = await retryWithBackoff(() => {
         const fetchFromServer = this.appServer.getSchedule()
@@ -187,8 +189,10 @@ export class AppserverScheduleService extends ScheduleServiceBase {
       console.log(
         `[AppserverScheduleService] fetchSchedule: ${fetched.length} task(s) fetched`,
       );
+      return true;
     } catch (e) {
       this.logger.log('Failed to fetch schedule from appserver after retries, using cache: ' + e);
+      return false;
     }
   }
 }
