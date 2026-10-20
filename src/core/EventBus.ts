@@ -77,6 +77,9 @@ export const EVENTS = {
   /** Tapping a task on the home screen requests its instructions page (payload: task details). */
   OPEN_TASK_INSTRUCTIONS: 'openTaskInstructions',
 
+  /** A link in study-authored content was tapped; the shell confirms before opening. Payload: `{ url }`. */
+  OPEN_EXTERNAL_LINK: 'openExternalLink',
+
   /** Every loading surface the shell can raise has gone, and the participant is looking at the app. */
   APP_CHROME_READY: 'appChromeReady',
   

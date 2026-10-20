@@ -249,6 +249,8 @@ function PromptFade({ color, edge }: { color: string; edge: 'top' | 'bottom' }) 
 }
 
 export interface SpeechInputProps {
+  /** Whether this is the panel on screen. Playback stops when it isn't. Defaults to true. */
+  active?: boolean;
   /** Passage to read aloud. Hidden when absent. */
   prompt?: string;
   value?: SpeechRecording;
@@ -303,6 +305,7 @@ export interface SpeechInputProps {
  * timer all work, but no audio is captured (useful for development or preview).
  */
 export function SpeechInput({
+  active = true,
   prompt,
   value,
   onChange,
@@ -345,6 +348,13 @@ export function SpeechInput({
       audioService?.stopPlayback().catch(() => {});
     };
   }, [audioService]);
+
+  // Parked panels stay mounted, so also stop when this page is no longer the one on screen.
+  useEffect(() => {
+    if (active) return;
+    audioService?.stopPlayback().catch(() => {});
+    setIsPlaying(false);
+  }, [active, audioService]);
 
   // How many bars fit. Seeded from the window rather than starting at zero: `onLayout` only reports
   // after the first paint, so waiting for it rendered an empty waveform for a frame and the bars
