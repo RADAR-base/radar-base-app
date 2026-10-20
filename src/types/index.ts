@@ -615,6 +615,8 @@ export interface QuestionnaireDataService {
   getQuestions(assessmentName: string): Promise<Question[]>;
   /** Submit completed questionnaire result. */
   submitResult(result: QuestionnaireResult): Promise<void>;
+  /** Re-fetch every definition, ignoring what is cached — the header's refresh runs this. */
+  refresh(): Promise<void>;
   /** Clear in-memory definitions and persisted cache. Called on sign-out. */
   clear(): Promise<void>;
 }
@@ -664,6 +666,10 @@ export interface SyncService {
   unregister(name: string): void;
   sync(): Promise<SyncResult>;
   getLastSyncedAt(): Date | null;
+  /** The last sync time once the saved value has been read back; `getLastSyncedAt` can be too early. */
+  loadLastSyncedAt(): Promise<Date | null>;
+  /** Record that the app has just refreshed from the server outside a manual sync. */
+  markSynced(at?: Date): void;
 }
 
 export interface DataPipelineService {

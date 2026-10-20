@@ -49,6 +49,11 @@ async function retryWithBackoff<T>(
 export class DefaultQuestionnaireDataService implements QuestionnaireDataService {
   private definitions: Map<string, Question[]> = new Map();
   private fetchStrategy: FetchStrategy = 'appserver';
+  /** The last protocol and language loaded, so `refresh()` can repeat that load. */
+  private lastProtocol: ProtocolConfig | null = null;
+  private lastLanguage = 'en';
+  /** Set only for the duration of a `refresh()`, which is what lets the loop past its cache check. */
+  private refreshing = false;
 
   constructor(
     private readonly storage: StorageService,
@@ -60,6 +65,11 @@ export class DefaultQuestionnaireDataService implements QuestionnaireDataService
   ) { }
 
   async loadDefinitions(protocol: ProtocolConfig, language = 'en'): Promise<void> {
+    // Kept so `refresh()` can re-run this without the caller having to hold the protocol itself —
+    // the sync button is pressed from a header that knows nothing about protocols.
+    this.lastProtocol = protocol;
+    this.lastLanguage = language;
+
     // Resolve fetch strategy from remote config
     await this.resolveFetchStrategy();
 
@@ -67,14 +77,18 @@ export class DefaultQuestionnaireDataService implements QuestionnaireDataService
     const cached = await this.storage.get<Record<string, Question[]>>(STORAGE_KEY);
     if (cached) {
       for (const [name, questions] of Object.entries(cached)) {
-        this.definitions.set(name, questions);
+        // Repaired on the way out: a definition cached before the decoding fix is never refetched
+          // (see the `has` check in `loadDefinitions`), so this is its only chance to heal.
+          this.definitions.set(name, repairUtf8Deep(questions));
       }
     }
 
     // Fetch definitions for each assessment that has a questionnaire config
     for (const assessment of protocol.protocols) {
       if (!assessment.questionnaire?.repository) continue;
-      if (this.definitions.has(assessment.name)) continue;
+      // Already held is already good enough on a normal load — the definitions rarely change and a
+      // refetch per launch would cost a request each. `refresh()` is the way to say otherwise.
+      if (!this.refreshing && this.definitions.has(assessment.name)) continue;
 
       try {
         const questions = await retryWithBackoff(() =>
@@ -111,12 +125,34 @@ export class DefaultQuestionnaireDataService implements QuestionnaireDataService
     this.definitions.set(assessmentName, formatQuestionHeaders(questions));
   }
 
+  /**
+   * Re-fetch every definition, ignoring what is already held.
+   *
+   * Registered as a sync step, so the header's refresh reaches questionnaire text as well as the
+   * schedule. Without it a definition is fetched once and kept for the life of the install: a study
+   * that fixes a typo, adds a translation, or corrects mis-encoded copy has no way to reach a
+   * participant who already has the old version.
+   *
+   * A no-op before the first `loadDefinitions` — there is no protocol yet to say what to fetch.
+   */
+  async refresh(): Promise<void> {
+    if (!this.lastProtocol) return;
+    this.refreshing = true;
+    try {
+      await this.loadDefinitions(this.lastProtocol, this.lastLanguage);
+    } finally {
+      this.refreshing = false;
+    }
+  }
+
   async getQuestions(assessmentName: string): Promise<Question[]> {
     if (this.definitions.size === 0) {
       const cached = await this.storage.get<Record<string, Question[]>>(STORAGE_KEY);
       if (cached) {
         for (const [name, questions] of Object.entries(cached)) {
-          this.definitions.set(name, questions);
+          // Repaired on the way out: a definition cached before the decoding fix is never refetched
+          // (see the `has` check in `loadDefinitions`), so this is its only chance to heal.
+          this.definitions.set(name, repairUtf8Deep(questions));
         }
       }
     }
