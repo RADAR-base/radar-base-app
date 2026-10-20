@@ -39,6 +39,8 @@ const DETAIL_WHEEL = 132;
 const SLICE_GAP_DEG = 4;
 /** The device ring's segments (Figma 4393:2963): slots around the ring, shared out between devices. */
 const DEVICE_SEGMENTS = 18;
+/** The info dialog's example wheels: as tall as their text, up to this width. */
+const INFO_WHEEL_MAX = 88;
 /** Share of a slot left empty between neighbouring segments. */
 const SEGMENT_GAP = 0.12;
 /** A segment's corner radius, as a share of its width. */
@@ -643,9 +645,9 @@ function ContributionInfoModal({
 }
 
 /**
- * One explanation with its example wheel, sized to the height of the title and description beside it
- * (the Figma wheel stretches to its row). A larger wheel only narrows the text, never shortens it, so
- * starting from 0 the size settles in a pass or two.
+ * One explanation with its example wheel, sized to the height of the text beside it (the Figma wheel
+ * stretches to its row). The wheel's column is a fixed width, so the text never rewraps around it:
+ * sizing the column to the wheel made the text taller, which grew the wheel again, without end.
  */
 function InfoRow({
   title,
@@ -660,16 +662,17 @@ function InfoRow({
   muted: string;
   renderWheel: (size: number) => React.ReactNode;
 }) {
-  const [size, setSize] = useState(0);
+  const [textHeight, setTextHeight] = useState(0);
+  const size = Math.min(textHeight, INFO_WHEEL_MAX);
   return (
     <View style={styles.infoRow}>
-      <View style={{ width: size, height: size }}>{size > 0 && renderWheel(size)}</View>
+      <View style={styles.infoWheelSlot}>{size > 0 && renderWheel(size)}</View>
       <View style={styles.infoRowText}>
         <View
           style={styles.infoRowHeading}
           onLayout={e => {
             const height = Math.round(e.nativeEvent.layout.height);
-            setSize(current => (Math.abs(current - height) > 1 ? height : current));
+            setTextHeight(current => (Math.abs(current - height) > 1 ? height : current));
           }}
         >
           <Text style={[styles.infoRowTitle, { color: text }]}>{title}</Text>
@@ -810,6 +813,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 32,
+  },
+  infoWheelSlot: {
+    width: INFO_WHEEL_MAX,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   infoRowText: {
     flex: 1,
