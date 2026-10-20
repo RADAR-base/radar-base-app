@@ -61,7 +61,11 @@ export class DefaultQuestionnaireDataService implements QuestionnaireDataService
     private readonly remoteConfig: RemoteConfigService,
   ) { }
 
-  async loadDefinitions(protocol: ProtocolConfig, language = 'en'): Promise<void> {
+  async loadDefinitions(
+    protocol: ProtocolConfig,
+    language = 'en',
+    options?: { refetch?: boolean },
+  ): Promise<void> {
     // Resolve fetch strategy from remote config
     await this.resolveFetchStrategy();
 
@@ -70,7 +74,7 @@ export class DefaultQuestionnaireDataService implements QuestionnaireDataService
     // Fetch definitions for each assessment that has a questionnaire config
     for (const assessment of protocol.protocols) {
       if (!assessment.questionnaire?.repository) continue;
-      if (this.definitions.has(assessment.name)) continue;
+      if (!options?.refetch && this.definitions.has(assessment.name)) continue;
 
       try {
         const questions = await retryWithBackoff(() =>

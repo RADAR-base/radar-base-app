@@ -142,14 +142,17 @@ export class AppserverScheduleService extends ScheduleServiceBase {
         if (assessment.name) this.assessmentMap.set(assessment.name, assessment);
       }
 
+      // Always run: it skips what it already holds, so this only downloads definitions that are
+      // missing (a failed first fetch, or the cache cleared at sign-out). A new version refetches all.
+      await this.questionnaireData.loadDefinitions(protocol, undefined, { refetch: versionChanged });
+
       if (versionChanged) {
-        await this.questionnaireData.loadDefinitions(protocol);
         this.cachedProtocolVersion = protocol.version;
         await this.storage.set(PROTOCOL_VERSION_KEY, protocol.version);
         await this.storage.set(PROTOCOL_CACHE_KEY, protocol);
         this.logger.log(`Protocol updated to version ${protocol.version}, loaded ${this.assessmentMap.size} assessments`);
       } else {
-        this.logger.log(`Protocol version ${protocol.version} unchanged, skipping definition fetch`);
+        this.logger.log(`Protocol version ${protocol.version} unchanged, filled in any missing definitions`);
       }
 
     } catch (e) {
