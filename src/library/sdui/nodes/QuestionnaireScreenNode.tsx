@@ -5,6 +5,7 @@ import { useCoreServices } from '../../../core/CoreServicesContext';
 import { EVENTS } from '../../../core/EventBus';
 import type { Question, QuestionnaireResult, QuestionTimestamp } from '../../../types';
 import {
+  DEFAULT_ACCENT,
   fontFamily,
   tracking,
   getColorTokens,
@@ -95,11 +96,6 @@ const FOOTER_RISE = 12;
 /** Space between the two footer buttons — the page's standard gap. */
 const FOOTER_GAP = 9;
 
-/**
- * Accent used when the manifest sets none — Figma's `color/sky/200`, the fill the radio and
- * scroll-hint designs are drawn with. A study that sets `brandColors.accent` overrides it.
- */
-const DEFAULT_ACCENT = '#7EC8E8';
 
 
 /**

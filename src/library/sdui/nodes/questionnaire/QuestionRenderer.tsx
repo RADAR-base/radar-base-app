@@ -12,6 +12,7 @@ import { SliderInput } from './SliderInput';
 import { VerticalSliderInput } from './VerticalSliderInput';
 import { ScaleInput } from './ScaleInput';
 import { TextQuestionInput } from './TextQuestionInput';
+import { DateTimeQuestionInput, dateTimeKind } from './DateTimeQuestionInput';
 import { InfoScreen } from './InfoScreen';
 import { SpeechInput, type SpeechPhase } from './SpeechInput';
 import { speechContent } from './speechContent';
@@ -346,7 +347,29 @@ export function QuestionRenderer({
           />
         );
 
-      case 'text':
+      case 'text': {
+        // REDCap stores dates and times as validated text; draw those with the native picker.
+        const dateKind = dateTimeKind(question.text_validation_type_or_show_slider_number);
+        if (dateKind) {
+          return (
+            <DateTimeQuestionInput
+              kind={dateKind}
+              value={value != null ? String(value) : undefined}
+              onChange={onChange}
+              textValidationMin={question.text_validation_min}
+              textValidationMax={question.text_validation_max}
+              primaryColor={primaryColor}
+              textColor={textColor}
+              textSecondaryColor={textSecondaryColor}
+              accentColor={accentColor}
+              surfaceColor={surfaceColor}
+              mode={mode}
+              submitAttempt={submitAttempt}
+              onValidityChange={onValidityChange}
+              errorMessage={errorMessage}
+            />
+          );
+        }
         return (
           <TextQuestionInput
             validationType={question.text_validation_type_or_show_slider_number}
@@ -364,6 +387,7 @@ export function QuestionRenderer({
             errorMessage={errorMessage}
           />
         );
+      }
 
       // Speech / voice task. Without this it fell through to `default` and rendered a text box.
       // The passage to read aloud is carried by the choices' `label`s (same place `info` keeps its
