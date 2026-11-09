@@ -698,6 +698,9 @@ export const cardShadow =
 /** How far `cardShadow` reaches past its element. Clipping parents reserve this much room. */
 export const cardShadowBleed = 8;
 
+/** The welcome gradient's default accent. `background.tertiary` is too close to the mint page colour to read. */
+export const welcomeMeshTertiary = palette.pink200;
+
 /** The one red that is never brand-tinted. Refusals, recording, a broken streak. */
 export const alertRed = palette.red400;
 
