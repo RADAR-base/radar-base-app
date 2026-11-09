@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { Node } from '../../contracts/NodeSchema';
 import type { NodeProps } from '../types';
-import { fontFamily } from '../../../theme/theme';
+import { fontFamily, getColorTokens } from '../../../theme/theme';
 
 /**
  * Tabbed coordinator for multiple `InboxItemListNode` children. Each child is shown as
@@ -13,6 +13,7 @@ export function InboxItemListCoordinatorNode({ node, context, render }: NodeProp
   const [activeId, setActiveId] = useState<string | null>(children[0]?.id ?? null);
   const active = useMemo(() => children.find((c) => c.id === activeId) ?? children[0], [children, activeId]);
   const theme = context.theme;
+  const tokens = getColorTokens(context.colorScheme ?? 'light', theme.brandColors);
 
   if (children.length === 0) {
     return null;
@@ -31,13 +32,13 @@ export function InboxItemListCoordinatorNode({ node, context, render }: NodeProp
               onPress={() => setActiveId(child.id)}
               style={[
                 styles.tab,
-                isActive && { backgroundColor: theme.primaryColor },
+                isActive && { backgroundColor: tokens.button.background },
               ]}
             >
               <Text
                 style={[
                   styles.tabLabel,
-                  { color: isActive ? '#fff' : theme.textColor ?? '#000' },
+                  { color: isActive ? '#fff' : tokens.text.primary },
                 ]}
               >
                 {label}

@@ -84,8 +84,7 @@ function packGrid(children: Node[]): [Node[], Node[]] {
  * around different content (stat cards side-by-side vs. task pills stacked). Rather than
  * hardcoding either arrangement, this maps whatever `children` the blueprint config
  * gives it — same generic-slot model as `SectionNode` — and just supplies the Figma
- * chrome (title style, "See All" pill, spacing) themed from `theme.ts`'s color tokens
- * instead of `SectionNode`'s manifest-driven `theme.textColor`.
+ * chrome (title style, "See All" pill, spacing) themed from `theme.ts`'s color tokens.
  *
  * `layout: "horizontal"` scrolls children in a row (e.g. the stat cards example);
  * `"vertical"` (default) stacks them full-width with a 9px gap (e.g. the task list

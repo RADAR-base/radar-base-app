@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { NodeProps } from '../types';
-import { fontFamily, cardShadow } from '../../../theme/theme';
+import { fontFamily, cardShadow, getColorTokens } from '../../../theme/theme';
 
 /**
  * Device connection status indicator. Matches the Figma header sync style
@@ -46,10 +46,12 @@ export function ConnectDevicesMenuNode({ node, context }: NodeProps) {
   };
 
   const theme = context.theme;
-  const surface = theme.surfaceColor ?? '#FFFFFF';
-  const text = theme.textColor ?? '#1C3549';
-  const textSecondary = theme.textSecondaryColor ?? '#8E8E93';
-  const secondary = theme.secondaryColor ?? '#8FA764';
+
+  const tokens = getColorTokens(context.colorScheme ?? 'light', theme.brandColors);
+  const surface = tokens.card.background;
+  const text = tokens.text.primary;
+  const textSecondary = tokens.card.stats.description;
+  const secondary = tokens.background.secondary;
   const radius = theme.button?.borderRadius ?? 12;
 
   return (

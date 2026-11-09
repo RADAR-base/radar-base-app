@@ -99,7 +99,6 @@ export function SDUIShell(props: SDUIShellProps) {
     const loader = new ManifestLoader({
       source: props.manifestSource,
       fallback: props.manifestFallback,
-      mode: colorScheme,
       onValidationError: (err) => console.warn('[SDUI] Manifest validation failed:', err),
     });
     loader
@@ -116,10 +115,8 @@ export function SDUIShell(props: SDUIShellProps) {
     return () => {
       cancelled = true;
     };
-    // Re-parses on colorScheme change so unconfigured theme fields — including the
-    // shell's own background below — track dark/light instead of being stuck with
-    // whatever mode was active on first load.
-  }, [props.manifestSource, props.manifestFallback, colorScheme]);
+    // Not keyed on colorScheme: nothing in the manifest depends on the mode any more.
+  }, [props.manifestSource, props.manifestFallback]);
 
   // Pre-warm the blueprint cache for tabs and secondary views once the manifest loads, so the
   // first switch/open is instant (no loader flash).
@@ -187,7 +184,8 @@ export function SDUIShell(props: SDUIShellProps) {
   const context: SDUIContext = {
     template: props.templateContext ?? {},
     dispatch,
-    theme: manifest.theme,
+    // An omitted `theme` block is simply an empty one — every field in it is optional.
+    theme: manifest.theme ?? {},
     colorScheme,
     eventBus: props.eventBus,
   };

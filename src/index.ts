@@ -255,7 +255,6 @@ export {
   darkTheme,
   lightTheme,
   getColorTokens,
-  toThemeManifest,
   resolveBackground,
   readableTextColor,
   mix,

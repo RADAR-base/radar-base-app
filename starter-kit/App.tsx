@@ -40,7 +40,10 @@ export default function App() {
   const scheme = useColorScheme();
   const bootBackground = getColorTokens(
     scheme === 'dark' ? 'dark' : 'light',
-    (appConfig.theme as Record<string, unknown>)?.brandColors as ThemeColorOverrides,
+    // Read through a loose type: `theme` is optional in the manifest, and a study that omits it
+    // would otherwise fail to compile rather than simply falling back to the default palette.
+    ((appConfig as Record<string, unknown>).theme as Record<string, unknown> | undefined)
+      ?.brandColors as ThemeColorOverrides,
   ).background.primary;
   if (!fontsLoaded) return <View style={[styles.root, { backgroundColor: bootBackground }]} />;
 

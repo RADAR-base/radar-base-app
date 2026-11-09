@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { Node } from '../../contracts/NodeSchema';
 import type { NodeProps } from '../types';
-import { fontFamily } from '../../../theme/theme';
+import { fontFamily, getColorTokens } from '../../../theme/theme';
 
 /**
  * Per-category inbox list (Tasks / Updates / Reminders). MVP renders a placeholder card
@@ -13,19 +13,20 @@ export function InboxItemListNode({ node, context }: NodeProps) {
   const title = typeof node.title === 'string' ? node.title : 'Inbox';
   const filter = isRecord(node.filter) ? node.filter : {};
   const theme = context.theme;
+  const tokens = getColorTokens(context.colorScheme ?? 'light', theme.brandColors);
 
   return (
     <View
       style={[
         styles.container,
-        { backgroundColor: theme.surfaceColor ?? '#fff' },
+        { backgroundColor: tokens.card.background },
       ]}
     >
-      <Text style={[styles.title, { color: theme.textColor ?? '#000' }]}>{title}</Text>
-      <Text style={[styles.body, { color: theme.textSecondaryColor ?? '#6D6D80' }]}>
+      <Text style={[styles.title, { color: tokens.text.primary }]}>{title}</Text>
+      <Text style={[styles.body, { color: tokens.card.stats.description }]}>
         Filters: {summarizeFilter(filter)}
       </Text>
-      <Text style={[styles.placeholder, { color: theme.textSecondaryColor ?? '#6D6D80' }]}>
+      <Text style={[styles.placeholder, { color: tokens.card.stats.description }]}>
         Inbox data provider not yet wired (Phase 4).
       </Text>
     </View>
