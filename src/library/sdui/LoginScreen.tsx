@@ -4,19 +4,11 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  useColorScheme,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
-import {
-  getColorTokens,
-  layout,
-  mix,
-  resolveBackground,
-  type ThemeColorOverrides,
-  type ThemeMode,
-} from '../../theme/theme';
+import { layout, welcomeMeshTertiary, type ThemeColorOverrides } from '../../theme/theme';
 import { useAuth } from '../../core/useAuth';
 import { useAuthService, useAnalyticsService, useRemoteConfigService } from '../../core/CoreServicesContext';
 import { useSlideOverlay } from './useSlideOverlay';
@@ -55,20 +47,13 @@ export function LoginScreen({
   // Pushes the enrolment page in from the right; the welcome screen slides left in lockstep.
   const enrolment = useSlideOverlay();
 
-  // The gradient mesh is brand-derived. In light mode it uses the brand colors directly; in dark mode
-  // it uses the *same* darkened brand the rest of the app uses (via getColorTokens / resolveBackground),
-  // so the welcome screen isn't a bright peach panel against the near-black dark app.
-  const deviceScheme = useColorScheme();
-  const mode: ThemeMode = deviceScheme === 'dark' ? 'dark' : 'light';
-  const dark = mode === 'dark';
-  const brand = brandColors?.brand;
-  const accent = brandColors?.accent;
-  const background = brandColors?.background;
-  const themeObj = { brandColors } as { brandColors?: ThemeColorOverrides };
-  const meshPrimary = dark ? getColorTokens('dark', brandColors).header.headerBackground : brand;
-  const meshSecondary = dark && accent ? mix(accent, '#000000', 0.8) : accent;
-  const meshTertiary = dark ? resolveBackground(themeObj, 'dark') : background;
-  const meshFallback = dark ? resolveBackground(themeObj, 'dark') : '#482fc4';
+  // The gradient always uses the light colours, whatever the device theme: the dark values sit too
+  // close together to read as a gradient at all.
+  // Background and brand are the two main colours; the accent is the smaller highlight on top.
+  const meshPrimary = brandColors?.background;
+  const meshSecondary = brandColors?.brand;
+  const meshTertiary = brandColors?.accent ?? welcomeMeshTertiary;
+  const meshFallback = '#482fc4';
 
   const onQrCodeScanned = async (data: string) => {
     if (error) clearError();
@@ -92,12 +77,10 @@ export function LoginScreen({
     <View style={[styles.root, { backgroundColor: meshFallback }]}>
       <Animated.View style={[StyleSheet.absoluteFill, enrolment.baseStyle]}>
         <GradientMeshBackground
-          mode={mode}
+          mode="light"
           primaryColor={meshPrimary}
           secondaryColor={meshSecondary}
           tertiaryColor={meshTertiary}
-          frosted
-          frostTint={dark ? 'rgba(0, 0, 0, 0.28)' : undefined}
           paused={enrolment.visible}
         />
         <KeyboardAvoidingView
