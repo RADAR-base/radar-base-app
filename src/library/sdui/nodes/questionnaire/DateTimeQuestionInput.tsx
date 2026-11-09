@@ -390,14 +390,14 @@ export function DateTimeQuestionInput({
                 <RollingText text={String(selected.getDate())} style={[styles.numeral, primary]} />
                 <View style={styles.stack}>
                   <RollingParts
-                    parts={formatParts(selected, MONTH_FORMAT)}
-                    style={[styles.primaryLine, primary]}
-                  />
-                  <RollingParts
                     parts={[
                       ...formatParts(selected, WEEKDAY_FORMAT),
                       ...(kind === 'datetime' ? [{ type: 'literal', value: ' · ' }, ...time] : []),
                     ]}
+                    style={[styles.primaryLine, primary]}
+                  />
+                  <RollingParts
+                    parts={formatParts(selected, MONTH_FORMAT)}
                     style={[styles.secondaryLine, secondary]}
                   />
                 </View>
@@ -454,7 +454,7 @@ const styles = StyleSheet.create({
   label: { flex: 1, ...textStyle(14, 20, 'medium') },
   placeholder: textStyle(20, 28, 'light'),
   hero: { flexDirection: 'row', alignItems: 'flex-end', gap: 10 },
-  numeral: { ...textStyle(44, 48, 'light'), letterSpacing: -1 },
+  numeral: { ...textStyle(44, 48, 'semiBold'), fontWeight: '600', letterSpacing: -1 },
   unit: textStyle(18, 30, 'regular'),
   parts: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end' },
   stack: { flex: 1, paddingBottom: 4 },
