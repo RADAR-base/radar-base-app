@@ -3,9 +3,8 @@ import type { Question } from '../../../../types';
 /**
  * The matrix field type.
  *
- * `matrix-radio` is a block of rows that share a screen, read and answered whole. There is only the
- * one design for it now — `MatrixRadioRows` — so the type no longer selects between presentations,
- * it simply says "these rows belong together".
+ * `matrix-radio` is a block of rows that share a screen, read and answered whole, in `MatrixRadioRows`.
+ * Every row is a level bar (`MatrixLevelBar`); a yes/no row fills only its answer.
  */
 export const MATRIX_LIST_TYPE = 'matrix-radio';
 
