@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
 import type { ThemeManifest } from '../library/contracts/ManifestSchema';
-import { mix, readableTextColor, relativeLuminance, withAlpha } from './contrast';
+import { contrastRatio, mix, readableTextColor, relativeLuminance, withAlpha } from './contrast';
 
 export {
   readableTextColor,
@@ -148,10 +148,8 @@ export interface ColorTokens {
     good: string;
   };
   /**
-   * `BarChartCardNode`'s weekly-bar colors (node 2250:2687). Fixed brand hues taken
-   * straight from the Figma palette (teal/600 bar fill over a 25% teal track, sky/600
-   * average marker, green/200 current-day label) — no light/dark variant, same hex in
-   * both themes like `dataWheel`.
+   * `BarChartCardNode`'s weekly-bar colors (node 2250:2687). The bar and its 25% track are the
+   * accent; the average marker and current-day label are fixed hues.
    */
   barChart: {
     bar: string;
@@ -161,9 +159,8 @@ export interface ColorTokens {
     currentDay: string;
   };
   /**
-   * `LineGraphCardNode`'s plot colors (node 3049:792). Fixed brand hues — the green line and
-   * the gradient beneath it, plus the navy drag crosshair/dot — same in both themes like
-   * `dataWheel`/`barChart`. The scrub tooltip reuses `card.hint`.
+   * `LineGraphCardNode`'s plot colors (node 3049:792). The line and the gradient beneath it are
+   * the accent; the drag crosshair/dot are navy. The scrub tooltip reuses `card.hint`.
    */
   graph: {
     line: string;
@@ -203,9 +200,9 @@ const palette = {
   teal150:    '#C8F0E2',
   teal50:     '#EEF8F4',
   teal650:    '#1D9E75',
-  teal650a25: 'rgba(29, 158, 117, 0.25)',
   teal900:    '#04342C',
   cyan300:    '#7EC8E8',
+  cyan300a25: 'rgba(126, 200, 232, 0.25)',
   slate200:   '#C5D1DC',
   slate350:   '#8FA6B8',
   slate50:    '#E8EDF2',
@@ -347,15 +344,15 @@ export const darkTheme: ColorTokens = {
     good: palette.lime450,
   },
   barChart: {
-    bar: palette.teal650,
-    barTrack: palette.teal650a25,
+    bar: palette.cyan300,
+    barTrack: palette.cyan300a25,
     average: palette.blue650_2,
     averageLabel: palette.white,
     currentDay: palette.lime450,
   },
   graph: {
-    line: palette.teal650,
-    area: palette.teal650,
+    line: palette.cyan300,
+    area: palette.cyan300,
     dot: palette.navy750,
     crosshair: palette.navy750,
   },
@@ -463,15 +460,15 @@ export const lightTheme: ColorTokens = {
     good: palette.lime450,
   },
   barChart: {
-    bar: palette.teal650,
-    barTrack: palette.teal650a25,
+    bar: palette.cyan300,
+    barTrack: palette.cyan300a25,
     average: palette.blue650_2,
     averageLabel: palette.white,
     currentDay: palette.lime450,
   },
   graph: {
-    line: palette.teal650,
-    area: palette.teal650,
+    line: palette.cyan300,
+    area: palette.cyan300,
     dot: palette.navy750,
     crosshair: palette.navy750,
   },
@@ -487,7 +484,7 @@ export type ThemeMode = 'light' | 'dark';
 export interface ThemeColorOverrides {
   /** 60/30/10 brand trio. `brand` (30%) is the dominant color — navy panels, header, buttons;
    *  it repaints the `navy750` (light) / `navy900` (dark) slot. `accent` (10%) is the pop —
-   *  highlights, active states, charts — repainting the `teal650` slot. `background` (60%) is the
+   *  highlights, active states, charts — repainting the `cyan300` slot. `background` (60%) is the
    *  page background, applied directly by the shell (not a palette swap). */
   brand?: string;
   accent?: string;
@@ -511,8 +508,8 @@ export interface ThemeColorOverrides {
  */
 type BrandSlot = 'primary' | 'secondary' | 'tertiary';
 const BRAND_SLOTS: Record<ThemeMode, Record<BrandSlot, (keyof typeof palette)[]>> = {
-  light: { primary: ['navy750', 'navy900'], secondary: ['blue600'], tertiary: ['teal650'] },
-  dark: { primary: ['navy900', 'navy700'], secondary: ['navy750'], tertiary: ['teal650'] },
+  light: { primary: ['navy750', 'navy900'], secondary: ['blue600'], tertiary: ['cyan300'] },
+  dark: { primary: ['navy900', 'navy700'], secondary: ['navy750'], tertiary: ['cyan300'] },
 };
 
 /**
@@ -530,12 +527,12 @@ const BRAND_ALPHA_SLOTS: Record<
   light: [
     { entry: 'navy750a30', slot: 'primary', alpha: 0.3 },
     { entry: 'navy750a80', slot: 'primary', alpha: 0.8 },
-    { entry: 'teal650a25', slot: 'tertiary', alpha: 0.25 },
+    { entry: 'cyan300a25', slot: 'tertiary', alpha: 0.25 },
   ],
   dark: [
     { entry: 'navy700a30', slot: 'primary', alpha: 0.3 },
     { entry: 'navy700a80', slot: 'primary', alpha: 0.8 },
-    { entry: 'teal650a25', slot: 'tertiary', alpha: 0.25 },
+    { entry: 'cyan300a25', slot: 'tertiary', alpha: 0.25 },
   ],
 };
 
@@ -578,6 +575,27 @@ function withReadableText(t: ColorTokens): ColorTokens {
   };
 }
 
+/** Minimum contrast for chart marks against their card (WCAG 1.4.11, non-text). */
+const CHART_MIN_CONTRAST = 3;
+
+/** Darken `color` toward black until it reaches `ratio` against `background`. */
+export function ensureContrast(color: string, background: string, ratio: number): string {
+  let out = color;
+  for (let t = 0.05; contrastRatio(out, background) < ratio && t <= 1; t += 0.05) {
+    out = mix(color, '#000000', t);
+  }
+  return out;
+}
+
+/** A light accent (the default sky) is too faint for bars and lines on a light card, so deepen just those. */
+function withChartContrast(t: ColorTokens): ColorTokens {
+  const surface = t.card.stats.background;
+  const bar = ensureContrast(t.barChart.bar, surface, CHART_MIN_CONTRAST);
+  const line = ensureContrast(t.graph.line, surface, CHART_MIN_CONTRAST);
+  if (bar === t.barChart.bar && line === t.graph.line) return t;
+  return { ...t, barChart: { ...t.barChart, bar }, graph: { ...t.graph, line } };
+}
+
 /** How far the card fills are blended toward the brand `accent` — a faint "branded surface" wash that
  *  keeps card text and colored card content (pills, charts, badges) readable. Bump for more punch. */
 const CARD_ACCENT_TINT = 0.25;
@@ -613,7 +631,7 @@ function tintCardSurfaces(t: ColorTokens, accent: string): ColorTokens {
 
 export function getColorTokens(mode: ThemeMode, overrides?: ThemeColorOverrides): ColorTokens {
   const base = mode === 'dark' ? darkTheme : lightTheme;
-  if (!overrides) return withReadableText(base);
+  if (!overrides) return withChartContrast(withReadableText(base));
 
   // `brand`/`accent` are the intent-named aliases for the `primary`/`tertiary` palette slots;
   // `background` isn't a palette swap (the shell applies it as the page background).
@@ -647,7 +665,7 @@ export function getColorTokens(mode: ThemeMode, overrides?: ThemeColorOverrides)
   // Give card surfaces a faint wash of the brand accent (10% color = the manifest's "pop"), so cards
   // read as branded without accent overwhelming them. Only when an accent is actually set.
   const accent = resolved.tertiary;
-  return accent ? tintCardSurfaces(readable, accent) : readable;
+  return withChartContrast(accent ? tintCardSurfaces(readable, accent) : readable);
 }
 
 /**
@@ -783,8 +801,11 @@ export function calendarChrome(headerBackground: string): string {
   return headerBackground;
 }
 
-/** Accent the calendar falls back to when the manifest sets none (cyan/300). */
-export const CALENDAR_DEFAULT_ACCENT = '#7EC8E8';
+/** The accent when the manifest sets none: sky (cyan/300), the inputs' selected-state blue. */
+export const DEFAULT_ACCENT = palette.cyan300;
+
+/** Accent the calendar falls back to when the manifest sets none. */
+export const CALENDAR_DEFAULT_ACCENT = DEFAULT_ACCENT;
 
 /**
  * The timeline rail's "reached" colour — the accent blended half-and-half over the calendar chrome.
