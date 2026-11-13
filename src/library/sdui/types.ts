@@ -32,6 +32,13 @@ export interface SDUIContext {
   dispatch: (action: ActionPayload) => void | Promise<void>;
   /** Theme block from the manifest, made available to nodes that want to style themselves. */
   theme: ThemeManifest;
+  /**
+   * Active color scheme, sourced from the device's system setting (`useColorScheme()`).
+   * Nodes that theme themselves from `theme/theme.ts`'s `ColorTokens` (e.g. the header
+   * nodes) should key off this rather than hardcoding `lightTheme`. Defaults to `'light'`
+   * when omitted, e.g. in tests that construct a bare `SDUIContext`.
+   */
+  colorScheme?: 'light' | 'dark';
   /** Optional EventBus pass-through for nodes that want to emit custom events. */
   eventBus?: {
     emit: (event: string, data?: unknown) => void;

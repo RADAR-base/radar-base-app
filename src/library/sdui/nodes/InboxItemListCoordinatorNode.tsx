@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { Node } from '../../contracts/NodeSchema';
 import type { NodeProps } from '../types';
+import { fontFamily } from '../../../theme/theme';
 
 /**
  * Tabbed coordinator for multiple `InboxItemListNode` children. Each child is shown as
@@ -67,6 +68,8 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontSize: 13,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
     fontWeight: '600',
   },
 });

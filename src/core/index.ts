@@ -1,21 +1,45 @@
 // Core Services - Migrated from RADAR-Questionnaire
 export { apiService } from './ApiService';
 export { dataService } from './DataService';
+export { createAsyncStorageService } from './AsyncStorageService';
 export { eventBus, EVENTS } from './EventBus';
 export { appServerServiceFactory, DefaultAppServerService } from './AppServerService';
 
 // New Services - Migrated from RADAR-Questionnaire
 export { tokenServiceFactory, DefaultTokenService } from './TokenService';
-export { analyticsServiceFactory, DefaultAnalyticsService } from './AnalyticsService';
+export { analyticsServiceFactory, DefaultAnalyticsService, FirebaseAnalyticsService } from './AnalyticsService';
+export type { AnalyticsServiceDeps } from './AnalyticsService';
+export { remoteConfigServiceFactory, DefaultRemoteConfigService, FirebaseRemoteConfigService } from './RemoteConfigService';
+export type { RemoteConfigServiceDeps } from './RemoteConfigService';
 export { cacheServiceFactory, DefaultCacheService } from './CacheService';
 export { kafkaServiceFactory, DefaultKafkaService } from './KafkaService';
-export { configServiceFactory, DefaultConfigService } from './ConfigService';
+export { configServiceFactory, DefaultConfigService, BASE_URI_KEY } from './ConfigService';
 export { authServiceFactory, DefaultAuthService } from './AuthService';
 export { useAuth } from './useAuth';
 export type { UseAuthResult } from './useAuth';
-export { notificationServiceFactory, DefaultNotificationService } from './NotificationService';
-export { scheduleServiceFactory, DefaultScheduleService } from './ScheduleService';
+export { notificationServiceFactory, DefaultNotificationService, FirebaseNotificationService } from './NotificationService';
+export type { NotificationServiceDeps, NotificationMessage, ScheduledNotification } from './NotificationService';
+export { ScheduleServiceBase } from './ScheduleService';
+export { AppserverScheduleService, scheduleServiceFactory } from './AppserverScheduleService';
 export { questionnaireDataServiceFactory, DefaultQuestionnaireDataService } from './QuestionnaireDataService';
+export { dataPipelineFactory, DefaultDataPipeline } from './pipeline';
+export { SchemaType, ConverterFactory } from './pipeline';
+export { audioRecordServiceFactory, DefaultAudioRecordService, ExpoAudioRecordService } from './AudioRecordService';
+export type { AudioRecordConfig } from './AudioRecordService';
+export { healthKitServiceFactory, DefaultHealthKitService, KingstinctHealthKitService } from './HealthKitService';
+export type { HealthKitServiceDeps, HealthKitConfig } from './HealthKitService';
+export {
+  subjectConfigServiceFactory,
+  ManagementPortalSubjectConfigService,
+  subjectIdFromAccessToken,
+} from './SubjectConfigService';
+export type { ManagementPortalSubject } from './SubjectConfigService';
+export { syncServiceFactory, DefaultSyncService } from './SyncService';
+export type { SyncServiceDeps } from './SyncService';
+
+// Service container + lifecycle
+export { createServices } from './ServiceContainer';
+export type { ServiceBag, ServiceOverrides } from './ServiceContainer';
 
 // Re-export types for convenience
 export type {
@@ -29,5 +53,7 @@ export type {
   NotificationActionType,
   ScheduleService,
   QuestionnaireDataService,
+  DataPipelineService,
+  SyncService,
   Subject,
 } from '../types';

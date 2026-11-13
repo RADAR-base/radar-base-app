@@ -45,6 +45,16 @@ export class BlueprintLoader {
     return promise;
   }
 
+  /**
+   * Synchronously return an already-cached blueprint, or `undefined` if it hasn't been loaded yet.
+   * Lets callers render a previously-loaded view immediately instead of going through the async
+   * `load()` (which always resolves on a later microtask, causing a one-frame loader flash on
+   * re-visits — e.g. switching back and forth between tabs).
+   */
+  peek(viewPath: string): ScreenBlueprint | undefined {
+    return this.cache.get(viewPath);
+  }
+
   /** Bypass the cache and force a fresh load. */
   async reload(viewPath: string): Promise<ScreenBlueprint> {
     this.cache.delete(viewPath);
@@ -95,5 +105,35 @@ export function createBundledBlueprintSource(
       throw new Error(`No bundled blueprint registered for viewPath "${viewPath}".`);
     }
     return blueprint;
+  };
+}
+
+/**
+ * Blueprint source that fetches view JSONs from a remote server. View paths from the
+ * manifest are resolved relative to `baseUrl`:
+ *   `{baseUrl}/{viewPath}`  e.g.  `https://api.example.com/config/views/home.json`
+ *
+ * An optional `fallback` source (typically bundled blueprints) is tried when the
+ * network request fails, enabling offline-first behaviour.
+ */
+export function createRemoteBlueprintSource(
+  baseUrl: string,
+  fallback?: BlueprintSource,
+): BlueprintSource {
+  const base = baseUrl.replace(/\/$/, '');
+  return async (viewPath) => {
+    try {
+      const url = `${base}/${viewPath}`;
+      const response = await fetch(url, {
+        headers: { Accept: 'application/json' },
+      });
+      if (!response.ok) {
+        throw new Error(`Blueprint fetch failed: ${response.status} ${response.statusText} (${url})`);
+      }
+      return await response.json();
+    } catch (err) {
+      if (fallback) return fallback(viewPath);
+      throw err;
+    }
   };
 }

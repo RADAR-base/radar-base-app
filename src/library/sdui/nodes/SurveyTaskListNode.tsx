@@ -2,8 +2,10 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useCoreServices } from '../../../core/CoreServicesContext';
 import { EVENTS } from '../../../core/EventBus';
-import type { Task } from '../../../types';
+import type { TaskView as Task } from '../../../types';
 import type { NodeProps } from '../types';
+import { fontFamily, cardShadow, getColorTokens } from '../../../theme/theme';
+import NoTasksArt from '../../../theme/icons/notasks.svg';
 
 interface FilterShape {
   status?: 'incomplete' | 'complete' | 'all';
@@ -13,8 +15,8 @@ interface FilterShape {
 const TASK_ICONS: Record<string, { symbol: string; bg: string }> = {
   default: { symbol: '\u{1F4CB}', bg: '#D6E4F0' },
   mood: { symbol: '\u{1F60A}', bg: '#D6E4F0' },
-  blood: { symbol: '\u2764', bg: '#F0D6D6' },
-  pressure: { symbol: '\u2764', bg: '#F0D6D6' },
+  blood: { symbol: '❤', bg: '#F0D6D6' },
+  pressure: { symbol: '❤', bg: '#F0D6D6' },
   medication: { symbol: '\u{1F48A}', bg: '#D6F0D6' },
   voice: { symbol: '\u{1F3A4}', bg: '#E0D6F0' },
   phq: { symbol: '\u{1F4DD}', bg: '#E0D6F0' },
@@ -29,6 +31,10 @@ const TASK_ICONS: Record<string, { symbol: string; bg: string }> = {
  *   - Duration pill: estimated completion time
  *   - Repeat pill: derived from task repetition count (if available)
  */
+/** The empty-state illustration's drawn size, and its own aspect (1445 x 1333). */
+const EMPTY_ART_WIDTH = 140;
+const EMPTY_ART_ASPECT = 1445 / 1333;
+
 export function SurveyTaskListNode({ node, context }: NodeProps) {
   const { schedule, eventBus } = useCoreServices();
   const variant = node.variant === 'multiCard' ? 'multiCard' : 'singleCard';
@@ -43,7 +49,7 @@ export function SurveyTaskListNode({ node, context }: NodeProps) {
   const loadTasks = useCallback(async () => {
     try {
       const instances = await schedule.getTasksForDate(new Date());
-      const sduiTasks = instances.map(i => schedule.toSDUITask(i));
+      const sduiTasks = instances.map(i => schedule.toTaskView(i));
       setTasks(filterTasks(sduiTasks, filter, variant));
     } catch {
       setTasks([]);
@@ -82,6 +88,11 @@ export function SurveyTaskListNode({ node, context }: NodeProps) {
   const text = theme.textColor ?? '#1C3549';
   const textSecondary = theme.textSecondaryColor ?? '#8E8E93';
   const secondary = theme.secondaryColor ?? '#8FA764';
+  /** Every navy shape in the empty-state drawing; its pink and white details stay as authored.
+   *  From the token, not the manifest: `background.secondary` is already brand-aware, so no fallback
+   *  chain to keep in step. `CalendarTaskView` colours the same drawing the same way. */
+  const artInk = getColorTokens(context.colorScheme ?? 'light', theme.brandColors).background
+    .secondary;
   const radius = theme.button?.borderRadius ?? 12;
   const pillBg = '#E8F0E0';
 
@@ -152,6 +163,15 @@ export function SurveyTaskListNode({ node, context }: NodeProps) {
 
       {tasks.length === 0 && (
         <View style={[styles.emptyState, { backgroundColor: surface, borderRadius: radius }]}>
+          {/* Decorative: the line below already says it, and announcing the drawing too would only
+              say it twice. */}
+          <NoTasksArt
+            width={EMPTY_ART_WIDTH}
+            height={EMPTY_ART_WIDTH / EMPTY_ART_ASPECT}
+            color={artInk}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          />
           <Text style={[styles.emptyText, { color: textSecondary }]}>
             No tasks scheduled for today
           </Text>
@@ -271,14 +291,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 const styles = StyleSheet.create({
-  description: { fontSize: 13, marginBottom: 10 },
+  description: { fontSize: 13, marginBottom: 10, fontFamily: fontFamily.regular, includeFontPadding: false },
   listContainer: {
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
+    ...cardShadow,
   },
   taskItem: {
     flexDirection: 'row',
@@ -300,12 +316,16 @@ const styles = StyleSheet.create({
   },
   iconText: {
     fontSize: 18,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
   },
   taskContent: {
     flex: 1,
   },
   taskTitle: {
     fontSize: 15,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
     fontWeight: '600',
     marginBottom: 6,
   },
@@ -325,6 +345,8 @@ const styles = StyleSheet.create({
   },
   pillText: {
     fontSize: 9,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
     fontWeight: '600',
   },
   timeBadge: {
@@ -350,18 +372,19 @@ const styles = StyleSheet.create({
   },
   timeBadgeText: {
     fontSize: 10,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     fontWeight: '700',
   },
   emptyState: {
     padding: 24,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    gap: 12,
+    ...cardShadow,
   },
   emptyText: {
     fontSize: 13,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
   },
 });

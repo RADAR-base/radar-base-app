@@ -1,21 +1,34 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
+import { cardShadow, layout } from '../../../theme/theme';
 import type { Node } from '../../contracts/NodeSchema';
 import type { NodeProps } from '../types';
 
 /**
- * Elevated surface holding one or more child nodes. Rounded corners and
- * soft shadow matching the Figma card style.
+ * Rounded container with the theme's surface color. Holds one or more child nodes.
+ *
+ * Blueprint props:
+ *   - `flat` (boolean) — when true, no elevation/shadow
+ *   - `paddingHorizontal` (number) — overrides default horizontal padding
+ *   - `paddingVertical` (number) — overrides default vertical padding
  */
+const CARD_RADIUS = layout.radiusCard;
+
 export function CardNode({ node, context, render }: NodeProps) {
   const theme = context.theme;
+  const flat = node.flat === true;
+  const ph = typeof node.paddingHorizontal === 'number' ? node.paddingHorizontal : layout.cardPadding;
+  const pv = typeof node.paddingVertical === 'number' ? node.paddingVertical : layout.cardPadding;
+
   return (
     <View
       style={[
-        styles.card,
+        !flat && cardShadowStyle,
         {
           backgroundColor: theme.surfaceColor ?? '#fff',
-          borderRadius: theme.button?.borderRadius ?? 12,
+          borderRadius: theme.button?.borderRadius ?? CARD_RADIUS,
+          paddingHorizontal: ph,
+          paddingVertical: pv,
         },
       ]}
     >
@@ -28,14 +41,4 @@ function asNodeArray(value: unknown): Node[] | undefined {
   return Array.isArray(value) ? (value as Node[]) : undefined;
 }
 
-const styles = StyleSheet.create({
-  card: {
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-});
+const cardShadowStyle = cardShadow;

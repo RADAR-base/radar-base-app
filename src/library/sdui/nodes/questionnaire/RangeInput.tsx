@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { QuestionRange } from '../../../../types';
+import { fontFamily } from '../../../../theme/theme';
 
 interface RangeInputProps {
   range: QuestionRange;
@@ -56,7 +57,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 6,
   },
-  rangeLabel: { fontSize: 12 },
+  rangeLabel: { fontSize: 12, fontFamily: fontFamily.regular, includeFontPadding: false },
   buttonsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -73,5 +74,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 8,
   },
-  buttonText: { fontSize: 14, fontWeight: '600' },
+  buttonText: { fontSize: 14, fontWeight: '600', fontFamily: fontFamily.semiBold, includeFontPadding: false },
 });
