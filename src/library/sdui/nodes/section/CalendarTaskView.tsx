@@ -22,6 +22,7 @@ import TimeAfternoon from '../../../../theme/icons/timeafternoon.svg';
 import TimeEvening from '../../../../theme/icons/timeevening.svg';
 import StateDoneIcon from '../../../../theme/icons/statedone.svg';
 import StateMissedIcon from '../../../../theme/icons/statemissed.svg';
+import NoTasksArt from '../../../../theme/icons/notasks.svg';
 import { CalendarTaskCard, type CalendarTaskState } from '../card/CalendarTaskCard';
 import { inferTaskType, isExpired } from './TaskDayList';
 import type { SDUIContext } from '../../types';
@@ -46,6 +47,15 @@ export interface CalendarTaskViewProps {
    *  normalized start-of-day timestamp, so a fresh `new Date()` won't reload-loop. */
   date: Date;
 }
+
+/**
+ * The empty-day illustration's drawn size, and its own aspect (1445 x 1333).
+ *
+ * Sized in one place because the height has to follow the width — the asset is authored far larger
+ * than it is ever drawn, and letting it size itself would fill the screen.
+ */
+const EMPTY_ART_WIDTH = 180;
+const EMPTY_ART_ASPECT = 1445 / 1333;
 
 /**
  * The calendar day view: the full list of a day's tasks down the right, a time-of-day timeline down
@@ -128,10 +138,37 @@ export function CalendarTaskView({ context, date }: CalendarTaskViewProps) {
     items: tasks.filter((t) => slotFor(t) === slot).sort((a, b) => dayMinutes(a) - dayMinutes(b)),
   })).filter((g) => g.items.length > 0);
 
-  // No tasks for this day: render nothing (just the calendar selector above it). The calendar view
-  // deliberately doesn't use the home list's ToDoStatus empty-state card.
+  /**
+   * No tasks for this day.
+   *
+   * A line rather than the home list's `ToDoStatusNode` card. That card speaks for *today* — "you're
+   * all caught up", "we'll remind you when tomorrow's tasks are ready" — and none of it is true of an
+   * arbitrary day you have paged to: nothing was ever scheduled, and the day may not have happened
+   * yet. Rendering nothing at all was the other extreme, and left the selector sitting above blank
+   * space with no way to tell an empty day from one that failed to load.
+   */
   if (tasks.length === 0) {
-    return null;
+    return (
+      <View style={styles.empty}>
+        <NoTasksArt
+          width={EMPTY_ART_WIDTH}
+          height={EMPTY_ART_WIDTH / EMPTY_ART_ASPECT}
+          // Every navy shape in the drawing takes this — body and dots alike. `background.secondary`
+          // is the token holding the brand-primary hue, so it is the illustration's own navy by
+          // default and the study's brand wherever one is set. The pink accents and the white/black
+          // details inside the shapes stay as authored.
+          color={tokens.background.secondary}
+          // Decorative: the two lines below say the same thing, and a screen reader announcing the
+          // drawing as well would only say it twice.
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        />
+        <Text style={[styles.emptyTitle, { color: tokens.text.primary }]}>Nothing to see here</Text>
+        <Text style={[styles.emptyBody, { color: tokens.card.stats.description }]}>
+          Looks like you have no tasks for this day.
+        </Text>
+      </View>
+    );
   }
 
   // Flatten to a single ordered list of rail rows (a header, then its cards) so the timeline line runs
@@ -339,6 +376,33 @@ const LINE_WIDTH = calendarRail.lineWidth;
 const styles = StyleSheet.create({
   container: {
     width: '100%',
+  },
+  /**
+   * The empty day.
+   *
+   * Centred and given real height on purpose: the selector above it is the thing being operated, and
+   * a message hugging its bottom edge reads as a caption on the selector rather than as an answer
+   * about the day. Deliberately flat — no card, no shadow — since there is nothing here to raise.
+   */
+  empty: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+    gap: 6,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
+    letterSpacing: tracking.bold,
+  },
+  emptyBody: {
+    fontSize: 13,
+    fontFamily: fontFamily.regular,
+    includeFontPadding: false,
+    letterSpacing: tracking.regular,
+    textAlign: 'center',
   },
   // No vertical gap between rows — the rail line must run unbroken through them. Card spacing comes
   // from `cardContent`'s vertical padding instead, which the (stretched) rail column spans.
