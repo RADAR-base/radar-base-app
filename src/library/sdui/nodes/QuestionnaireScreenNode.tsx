@@ -338,8 +338,11 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
 
   /** Set by the current input. A ref, not state: `goNext` only reads it when pressed. */
   const answerValid = useRef(true);
-  const handleValidityChange = useCallback((valid: boolean) => {
+  /** Its reason, which the dock does draw — so this half has to be state. Only the text field sets it. */
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const handleValidityChange = useCallback((valid: boolean, reason?: string | null) => {
     answerValid.current = valid;
+    setFieldError(reason ?? null);
   }, []);
 
   const goNext = useCallback(() => {
@@ -352,6 +355,7 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
     }
     setSubmitAttempt(0);
     answerValid.current = true;
+    setFieldError(null);
     // Stamp info/descriptive types (no user input) so every shown question has a timestamp.
     if (currentQuestion?.field_name && timestamps[currentQuestion.field_name] == null) {
       setTimestamps((prev) => ({
@@ -378,6 +382,7 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   const goPrevious = useCallback(() => {
     setSubmitAttempt(0);
     answerValid.current = true;
+    setFieldError(null);
     if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1);
       setSpeechPhase('idle'); // See `goNext` — the phase belongs to the question being left.
@@ -479,6 +484,8 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   const canProceed = !isRequired || hasAnswer;
   /** Surfaced only once they've tried to leave — see `submitAttempt`. */
   const requiredError = submitAttempt > 0 && !canProceed ? REQUIRED_MESSAGE : null;
+  /** Being empty outranks being malformed: there is nothing to be wrong about yet. */
+  const pageError = requiredError ?? fieldError;
 
   /**
    * What every refused answer does, whatever kind of question it was.
@@ -970,16 +977,12 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
         * looked right only because its container fills the screen, so its message was already pinned;
         * this gives every type that same behaviour instead of one type scrolling to find it.
         *
-        * `text` is the exception and draws its own, lined up with its card.
+        * Every type, text included — it used to draw its own under its card, which left the same
+        * message in two different places depending on the question.
         */}
-      {currentQuestion?.field_type !== 'text' && (
-        <View
-          style={[styles.errorDock, { bottom: FOOTER_RESERVE + bottomInset }]}
-          pointerEvents="none"
-        >
-          <QuestionError message={requiredError} shakeKey={submitAttempt} mode={mode} />
-        </View>
-      )}
+      <View style={[styles.errorDock, { bottom: FOOTER_RESERVE + bottomInset }]} pointerEvents="none">
+        <QuestionError message={pageError} shakeKey={submitAttempt} mode={mode} />
+      </View>
 
       {/* Footer: Exit (first) / Back (thereafter) + Next / Finish (last). The speech question shows only
           the back/exit half while idle, and no footer at all once recording starts. */}
