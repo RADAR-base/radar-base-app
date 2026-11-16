@@ -50,6 +50,10 @@
         ]
       },
       {
+        "id": "ondemand",
+        "type": "OnDemandCardNode"
+      },
+      {
         "id": "section_todo",
         "type": "SectionNode",
         "title": "To Do",

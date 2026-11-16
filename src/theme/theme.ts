@@ -65,6 +65,14 @@ export interface ColorTokens {
       background: string;
       text: string;
     };
+    /** `OnDemandCardNode` (Figma 4297:3002). The dark values are derived; Figma shows light only. */
+    onDemand: {
+      background: string;
+      title: string;
+      description: string;
+      badge: string;
+      arrow: string;
+    };
   };
   header: {
     text: string;
@@ -180,6 +188,7 @@ export interface ColorTokens {
  */
 const palette = {
   white:      '#FFFFFF',
+  gray50:     '#F6F5F8',
   gray100:    '#E5E5EA',
   gray800:    '#2E2E30',
   gray900:    '#1E1E1E',
@@ -285,6 +294,13 @@ export const darkTheme: ColorTokens = {
     hint: {
       background: palette.navy900_2,
       text: palette.sky150,
+    },
+    onDemand: {
+      background: palette.navy750_2,
+      title: palette.white,
+      description: palette.sky150,
+      badge: palette.navy900_2,
+      arrow: palette.sky150,
     },
   },
   header: {
@@ -404,6 +420,13 @@ export const lightTheme: ColorTokens = {
     hint: {
       background: palette.sky50,
       text: palette.navy750_2,
+    },
+    onDemand: {
+      background: palette.sky150_2,
+      title: palette.white,
+      description: palette.gray50,
+      badge: palette.white,
+      arrow: palette.gray950,
     },
   },
   header: {
@@ -903,6 +926,19 @@ export const tracking = {
   semiBold: BASE_TRACKING + androidNudge(0.1),
   bold: BASE_TRACKING + androidNudge(0.2),
 } as const;
+
+/** An Inter text style with its matching tracking and no Android font padding. */
+export const textStyle = (
+  fontSize: number,
+  lineHeight: number,
+  weight: keyof typeof fontFamily,
+) => ({
+  fontSize,
+  lineHeight,
+  fontFamily: fontFamily[weight],
+  letterSpacing: tracking[weight],
+  includeFontPadding: false,
+});
 
 /**
  * Shared layout constants for the header nodes (`HeaderNode` / `HeaderBarNode` /
