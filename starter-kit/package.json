@@ -15,6 +15,7 @@
     "@kingstinct/react-native-healthkit": "^7.3.1",
     "@radarbase/app-kit": "file:..",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/datetimepicker": "9.1.0",
     "@react-native-firebase/analytics": "^23.8.8",
     "@react-native-firebase/app": "^23.2.2",
     "@react-native-firebase/messaging": "^23.8.8",
