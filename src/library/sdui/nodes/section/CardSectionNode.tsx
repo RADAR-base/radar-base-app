@@ -230,7 +230,10 @@ const styles = StyleSheet.create({
   },
   grid: {
     flexDirection: 'row',
-    alignItems: 'stretch',
+    // Each column ends where its own content ends. `stretch` made both as tall as the taller one,
+    // and whichever card was flexible then absorbed the whole difference — a lone large card beside
+    // a two-card column grew by ~100pt and pulled its own contents apart to fill it.
+    alignItems: 'flex-start',
     gap: layoutTokens.gap,
     width: '100%',
   },
