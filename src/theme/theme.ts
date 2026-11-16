@@ -65,6 +65,15 @@ export interface ColorTokens {
       background: string;
       text: string;
     };
+    /** `CalendarContributionCardNode` (Figma 4309:4595). The dark values are derived. */
+    contribution: {
+      label: string;
+      info: string;
+      /** The unfilled ring, and any task or device slice not yet contributed. */
+      track: string;
+      /** The device (inner) ring. */
+      device: string;
+    };
   };
   header: {
     text: string;
@@ -180,7 +189,10 @@ export interface ColorTokens {
  */
 const palette = {
   white:      '#FFFFFF',
+  whitea15:   'rgba(255, 255, 255, 0.15)',
   gray100:    '#E5E5EA',
+  gray600:    '#6C6C6C',
+  gray700a20: 'rgba(74, 74, 74, 0.2)',
   gray800:    '#2E2E30',
   gray900:    '#1E1E1E',
   gray900_2:  '#1C1C1E',
@@ -285,6 +297,12 @@ export const darkTheme: ColorTokens = {
     hint: {
       background: palette.navy900_2,
       text: palette.sky150,
+    },
+    contribution: {
+      label: palette.slate200,
+      info: palette.sky150,
+      track: palette.whitea15,
+      device: palette.sky300,
     },
   },
   header: {
@@ -404,6 +422,12 @@ export const lightTheme: ColorTokens = {
     hint: {
       background: palette.sky50,
       text: palette.navy750_2,
+    },
+    contribution: {
+      label: palette.gray600,
+      info: palette.navy750_2,
+      track: palette.gray700a20,
+      device: palette.navy750,
     },
   },
   header: {
