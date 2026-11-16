@@ -5,7 +5,6 @@ import {
   tracking,
   fontFamily,
   getColorTokens,
-  layout,
   type ThemeColorOverrides,
   type ThemeMode,
 } from '../../theme/theme';
@@ -57,7 +56,7 @@ export function EnrolmentCompleteView({
         <RegistrationCompleteIllustration width={illoWidth} height={illoHeight} color={heading} />
         <Text style={[styles.heading, { color: heading }]}>Enrolment Complete</Text>
         <Text style={[styles.description, { color: bodyText }]}>
-          You're all set!{'\n'}Press Start to begin your study tasks.
+          You&apos;re all set!{'\n'}Press Start to begin your study tasks.
           {'\n\n'}By enrolling in the study, you agree to the collection and use of information in
           relation to our Privacy Policy.
         </Text>
