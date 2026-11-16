@@ -8,20 +8,19 @@ import { z } from 'zod';
 
 export const ThemeSchema = z
   .object({
-    primaryColor: z.string(),
-    secondaryColor: z.string().optional(),
-    backgroundColor: z.string().optional(),
-    surfaceColor: z.string().optional(),
-    textColor: z.string().optional(),
-    textSecondaryColor: z.string().optional(),
-    fontFamily: z.string().optional(),
-    fontSize: z.number().optional(),
+    /**
+     * The button corner a study may still set.
+     *
+     * The one survivor of the per-colour fields that used to live here — kept because
+     * `HeaderTextNode` deliberately prefers it over the token, so a study may be relying on it.
+     * Everything else a study wants to change goes through `brandColors` below.
+     */
     button: z.object({ borderRadius: z.number() }).partial().optional(),
     /**
      * Optional brand overrides, following the 60/30/10 rule. `brand` (30%) is the dominant color
      * (navy panels/header/buttons), `accent` (10%) the pop (highlights, charts), `background` (60%)
      * the page background. `brand`/`accent` repaint a palette slot and cascade via `getColorTokens`;
-     * `background` is applied by the shell. `primary`/`secondary`/`tertiary` are legacy aliases.
+     * `background` is applied by the shell.
      * Omitted colors keep the theme default.
      */
     brandColors: z
@@ -92,7 +91,8 @@ export const ManifestSchema = z
     clinicalTemplate: z.string().nullable().optional(),
     /** Base URL for fetching blueprint JSONs remotely. View paths are resolved relative to this. */
     blueprintBaseUrl: z.string().optional(),
-    theme: ThemeSchema,
+    /** Optional: every field in it is. Omit it entirely and the design system decides. */
+    theme: ThemeSchema.optional(),
     // Optional: the dashboard header can instead live in each tab's blueprint as a leading
     // `HeaderNode` (rendered inline by `ViewNode`, so it scrolls with the page). When a manifest
     // still declares `header`, `SDUIShell` keeps drawing it as a pinned header for back-compat.

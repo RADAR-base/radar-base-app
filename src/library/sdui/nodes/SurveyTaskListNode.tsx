@@ -84,15 +84,15 @@ export function SurveyTaskListNode({ node, context }: NodeProps) {
   };
 
   const theme = context.theme;
-  const surface = theme.surfaceColor ?? '#FFFFFF';
-  const text = theme.textColor ?? '#1C3549';
-  const textSecondary = theme.textSecondaryColor ?? '#8E8E93';
-  const secondary = theme.secondaryColor ?? '#8FA764';
+
+  const tokens = getColorTokens(context.colorScheme ?? 'light', theme.brandColors);
+  const surface = tokens.card.background;
+  const text = tokens.text.primary;
+  const textSecondary = tokens.card.stats.description;
+  const secondary = tokens.background.secondary;
   /** Every navy shape in the empty-state drawing; its pink and white details stay as authored.
-   *  From the token, not the manifest: `background.secondary` is already brand-aware, so no fallback
-   *  chain to keep in step. `CalendarTaskView` colours the same drawing the same way. */
-  const artInk = getColorTokens(context.colorScheme ?? 'light', theme.brandColors).background
-    .secondary;
+   *  `CalendarTaskView` colours the same drawing the same way. */
+  const artInk = tokens.background.secondary;
   const radius = theme.button?.borderRadius ?? 12;
   const pillBg = '#E8F0E0';
 
