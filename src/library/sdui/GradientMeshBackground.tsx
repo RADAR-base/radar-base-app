@@ -7,65 +7,48 @@ import { getColorTokens, type ThemeMode } from "../../theme/theme";
 const source = Skia.RuntimeEffect.Make(`
 uniform float u_time;
 uniform vec2  u_resolution;
-uniform vec3  u_primary;     // theme.ts background.primary,   normalized to 0..1
-uniform vec3  u_secondary;   // theme.ts background.secondary, normalized to 0..1
-uniform vec3  u_tertiary;    // theme.ts background.tertiary,  normalized to 0..1
+uniform vec3  u_primary;     // the lighter ground, normalized to 0..1
+uniform vec3  u_secondary;   // the brand colour its shapes are cut from
+uniform vec3  u_tertiary;    // the accent that glows where the two meet
 
 // --- tunables ---------------------------------------------------------------
-const float SPEED        = 0.5;   // swirl speed of the phase fields
-const float RG_MID       = 1.0;   // red/green mid level of the raw pattern
-const float RG_CONTRAST  = 1.0;   // red/green swing around that mid level
-const float B_PHASE      = 1.0;   // fixed phase feeding the blue channel
-const float TERTIARY_MIX = 0.1;   // how strongly tertiary accents show on top (0..1)
-const float NOISE_AMOUNT = 0.1;  // film-grain strength; also hides gradient banding
-const vec3  BLUE         = vec3(0.10, 0.30, 0.80);  // target hue for the blue tint
-const float BLUE_TINT    = 0.4;  // pull the whole mesh toward BLUE: 0 = off, 1 = fully blue
+const float SPEED        = 0.6;  // how fast the shapes drift
+const float SCALE        = 0.85;  // lower = larger shapes
+const float WARP         = 0.6;   // how far the shapes bend out of straight bands
+const float EDGE_LO      = 0.3;   // primary -> secondary crossover; closer together = harder edge
+const float EDGE_HI      = 0.7;
+const float HALO_WIDTH   = 0.26;  // reach of the tertiary glow either side of that edge
+const float TERTIARY_MIX = 0.85;  // strength of the glow at its centre (0..1)
+const float NOISE_AMOUNT = 0.08;  // film-grain strength; also hides gradient banding
+const float GRAIN_SIZE   = 0.25;   // grain cell, in points
 // ----------------------------------------------------------------------------
 
-// Cheap per-pixel hash -> film grain / dither that breaks up banding on smooth gradients.
-float grainHash(vec2 p, float t) {
-  return fract(sin(dot(p, vec2(12.9898, 78.233)) + t) * 43758.5453);
+float grainHash(vec2 p) {
+  return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
 vec4 main(vec2 fragCoord) {
-  // Shadertoy is bottom-left origin, Skia is top-left -> flip Y to match
+  // Bottom-left origin, as the maths below expects; Skia is top-left.
   vec2 frag = vec2(fragCoord.x, u_resolution.y - fragCoord.y);
-
-  float iTime = u_time / 1000.0;               // useClock is ms; iTime is seconds
+  float t = u_time / 1000.0 * SPEED;           // useClock is ms
 
   float mr = min(u_resolution.x, u_resolution.y);
-  vec2 uv = (frag * 2.0 - u_resolution) / mr;  // centered, aspect-correct coords
+  vec2 q = (frag * 2.0 - u_resolution) / mr * SCALE;  // centered, aspect-correct coords
 
-  // Two coupled phase fields: 'a' accumulates cosines, 'd' sines, and each feeds the other
-  // every iteration -> large swirling values that vary with position and time.
-  float d = -iTime * SPEED;
-  float a = 0.0;
-  for (float i = 0.0; i < 8.0; i++) {
-    a += cos(i - d - a * uv.x);
-    d += sin(uv.y * i + a);
+  // A few low-frequency warps bend the plane into large, slow-moving blobs.
+  for (float i = 1.0; i < 4.0; i++) {
+    q.x += WARP / i * sin(i * 1.3 * q.y + t + 0.3 * i);
+    q.y += WARP / i * cos(i * 1.3 * q.x + t * 0.8 + 0.7 * i);
   }
-  d += iTime * SPEED;
+  float n = 0.5 + 0.5 * sin(q.x + q.y);
 
-  // Develop the phase fields into a flowing pattern; its channels are used below as the
-  // blend signals that mix the three theme colors (not as color themselves).
-  vec3 pat = vec3(cos(uv * vec2(d, a)) * RG_CONTRAST + RG_MID, cos(a + d) * 0.5 + 0.5);
-  pat = cos(pat * cos(vec3(d, a, B_PHASE)) * 0.5 + 0.5);
+  // Two regions, with the accent as a soft band along the boundary between them.
+  vec3 col = mix(u_primary, u_secondary, smoothstep(EDGE_LO, EDGE_HI, n));
+  float halo = smoothstep(0.0, 1.0, 1.0 - abs(n - 0.5) / HALO_WIDTH);
+  col = mix(col, u_tertiary, halo * TERTIARY_MIX);
 
-  // Two decorrelated flow signals from the pattern (each remapped to 0..1) drive the blend.
-  float f1 = pat.r * 0.5 + 0.5;   // field A: primary <-> secondary base
-  float f2 = pat.b * 0.5 + 0.5;   // field B: where tertiary accents pool
-
-  // Blend all three theme background tokens: a primary/secondary base with tertiary on top.
-  vec3 col = mix(u_primary, u_secondary, f1);
-  col = mix(col, u_tertiary, f2 * TERTIARY_MIX);
-
-  // Push the whole mesh toward blue. Raise BLUE_TINT for more, set to 0.0 to disable.
-  col = mix(col, BLUE, BLUE_TINT);
-
-  // Film-grain noise: a per-pixel dither on top. Re-seeded each frame by iTime so it shimmers;
-  // pass 0.0 instead of iTime for static grain. Also suppresses banding on the gradient.
-  float grain = grainHash(fragCoord, iTime) - 0.5;
-  col += grain * NOISE_AMOUNT;
+  // Static grain: re-seeding it per frame reads as TV static without a blur on top.
+  col += (grainHash(floor(fragCoord / GRAIN_SIZE)) - 0.5) * NOISE_AMOUNT;
 
   return vec4(col, 1.0);
 }
