@@ -5,7 +5,7 @@
  * This makes the wiring testable and keeps the React provider thin.
  */
 import { dataService } from './DataService';
-import { eventBus } from './EventBus';
+import { EVENTS, eventBus } from './EventBus';
 import { apiService } from './ApiService';
 import {
   appServerServiceFactory,
@@ -192,6 +192,17 @@ export function createServices(overrides: ServiceOverrides = {}): ServiceBag {
   // Register default sync steps — additional steps can be added via sync.register() at any time.
   sync.register('cache', () => dataPipeline.flush().then(() => {}));
   sync.register('schedule', () => schedule.fetchSchedule());
+  // Questionnaire text, not just the schedule: a definition is fetched once and then kept, so
+  // without this a study's correction never reaches a participant who already has the old copy.
+  sync.register('questionnaires', () => questionnaireData.refresh());
+
+  // Any schedule check that reached the server counts as a sync: app open, foreground, the 15-minute
+  // refetch. An offline check falls back to the cache and leaves the time alone.
+  eventBus.on(EVENTS.SCHEDULE_UPDATED, (payload?: { reason?: string; fromServer?: boolean }) => {
+    if (payload?.reason !== 'schedule_fetched' || !payload.fromServer) return;
+    sync.markSynced();
+    eventBus.emit(EVENTS.DATA_SYNCED, { at: sync.getLastSyncedAt() });
+  });
 
   // Wire the API layer's auth token provider so authenticated requests work automatically.
   apiService.setAuthTokenProvider(async () => {
