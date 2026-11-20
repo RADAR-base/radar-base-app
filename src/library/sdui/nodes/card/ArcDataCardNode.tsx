@@ -4,6 +4,9 @@ import Svg, { Circle, ClipPath, Defs, G, Path } from 'react-native-svg';
 import ArrowRightIcon from '../../../../theme/icons/arrowright.svg';
 import { tracking, fontFamily, getColorTokens, layout as layoutTokens, cardShadow } from '../../../../theme/theme';
 import { useDashboardData } from '../../useDashboardData';
+import { useRangedNode } from '../../dataRange';
+import { RisingText } from '../../RisingText';
+import { useAnimatedNumber } from '../../useAnimatedNumber';
 import type { DashboardWidgetConfig } from '../../../../types';
 import type { NodeProps } from '../../types';
 
@@ -63,7 +66,9 @@ function arcState(percent: number, reverse: boolean): ArcState {
  * `GraphDataNode` use — inline `value`/`values`, a `dataSource` API fetch, or synthesized
  * placeholder data), so `metric` selects which data type to show from a blueprint.
  */
-export function ArcDataCardNode({ node, context }: NodeProps) {
+export function ArcDataCardNode({ node: blueprintNode, context }: NodeProps) {
+  // Per-range props (`"values": { "day": …, "week": … }`) resolved for the data page's filter.
+  const node = useRangedNode(blueprintNode);
   const title = typeof node.title === 'string' ? node.title : 'Title';
   const metric = typeof node.metric === 'string' ? node.metric : 'wearable_metric';
   const unit = typeof node.unit === 'string' ? node.unit : undefined;
@@ -91,8 +96,11 @@ export function ArcDataCardNode({ node, context }: NodeProps) {
   const resolvedValues = series[0]?.values ?? [];
   const statValue = resolvedValues.length > 0 ? resolvedValues[resolvedValues.length - 1] : 0;
 
+  // The fill sweeps to a new figure (the filter changing period) while the number rises into place.
+  // The colour state follows the real figure.
+  const sweptValue = useAnimatedNumber(statValue);
   const percent = Math.max(0, Math.min(100, (statValue / target) * 100));
-  const fraction = percent / 100;
+  const fraction = Math.max(0, Math.min(1, sweptValue / target));
 
   const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
   const arcColor = tokens.dataWheel[arcState(percent, reverse)];
@@ -175,7 +183,7 @@ export function ArcDataCardNode({ node, context }: NodeProps) {
           </Svg>
         )}
         <View pointerEvents="none" style={[styles.valueWrap, { top: valueCenterY - NUMBER_LINE_HEIGHT / 2 }]}>
-          <Text style={[styles.value, { color: tokens.text.primary }]}>{Math.round(statValue)}</Text>
+          <RisingText style={[styles.value, { color: tokens.text.primary }]}>{`${Math.round(statValue)}`}</RisingText>
         </View>
       </View>
     </View>
