@@ -106,6 +106,9 @@ export function HeaderBarNode({ node, context }: NodeProps) {
     try {
       const result = await syncService.sync();
       setLastSyncedAt(result.lastSyncedAt);
+      if (result.success || result.partial) {
+        eventBus.emit(EVENTS.USER_SYNCED, { at: result.lastSyncedAt });
+      }
     } finally {
       setSyncing(false);
       // Stopped, then eased to a whole turn so the icon comes to rest upright rather than at

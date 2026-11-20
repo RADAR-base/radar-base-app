@@ -69,7 +69,9 @@ export const EVENTS = {
   // Data Events
   DATA_UPDATED: 'dataUpdated',
   DATA_SYNCED: 'dataSynced',
-  
+  /** The participant pressed the header's Sync and it went through; `{ at: Date }`. */
+  USER_SYNCED: 'userSynced',
+
   // Task Events
   TASK_STARTED: 'taskStarted',
   TASK_COMPLETED: 'taskCompleted',

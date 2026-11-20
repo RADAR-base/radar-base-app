@@ -75,6 +75,8 @@ export interface ServiceBag {
   healthKit: HealthKitService;
   remoteConfig: RemoteConfigService;
   sync: SyncService;
+  /** Small per-device UI state that should outlive a reload. */
+  storage: StorageService;
 }
 
 // ---------------------------------------------------------------------------
@@ -217,6 +219,6 @@ export function createServices(overrides: ServiceOverrides = {}): ServiceBag {
     data: dataService, eventBus, api: apiService, appServer,
     token, analytics, cache, kafka, config, auth, notifications,
     schedule, questionnaireData, dataPipeline, subjectConfig, audioRecord, healthKit,
-    remoteConfig, sync,
+    remoteConfig, sync, storage,
   };
 }
