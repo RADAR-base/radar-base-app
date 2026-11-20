@@ -178,10 +178,14 @@ export interface ColorTokens {
 const palette = {
   white:      '#FFFFFF',
   gray100:    '#E5E5EA',
+  // Dark-mode surfaces, a step lighter than Figma's #111111 page / #1E1E1E cards / #2E2E30 chips.
+  gray775:    '#38383A',
   gray800:    '#2E2E30',
+  gray875:    '#262628',
   gray900:    '#1E1E1E',
   gray900_2:  '#1C1C1E',
   gray900a50: 'rgba(30, 30, 31, 0.5)',
+  gray925:    '#19191B',
   gray950:    '#111111',
   black:      '#000000',
   red400:     '#E84855',
@@ -207,17 +211,17 @@ const palette = {
   slate350:   '#8FA6B8',
   slate50:    '#E8EDF2',
   slate800:   '#252E3A',
-  navy700:    '#2C4F6B',
-  navy700a30: 'rgba(44, 79, 107, 0.3)',
-  navy700a80: 'rgba(44, 79, 107, 0.8)',
+  navy700:    '#3F6F96',
+  navy700a30: 'rgba(63, 111, 150, 0.3)',
+  navy700a80: 'rgba(63, 111, 150, 0.8)',
   navy750:    '#1D3557',
   navy750_2:  '#0E5474',
   navy750a30: 'rgba(29, 53, 87, 0.3)',
   navy750a80: 'rgba(29, 53, 87, 0.8)',
   navy800:    '#1B2E4B',
+  navy825:    '#152C45',
   navy850:    '#0E1E33',
   navy850_2:  '#1A2530',
-  navy900:    '#0A1520',
   navy900_2:  '#051E2E',
   blue450:    '#378ADD',
   blue550:    '#2196C4',
@@ -241,14 +245,14 @@ const palette = {
 
 export const darkTheme: ColorTokens = {
   background: {
-    primary: palette.gray950,
-    secondary: palette.navy900,
+    primary: palette.gray925,
+    secondary: palette.navy825,
     tertiary: palette.pink200,
   },
   card: {
-    background: palette.gray900,
+    background: palette.gray875,
     engagement: {
-      background2: palette.gray900_2,
+      background2: palette.gray875,
       text: palette.white,
       checkinBadge: palette.teal650,
       checkinIcon: palette.teal150,
@@ -260,13 +264,13 @@ export const darkTheme: ColorTokens = {
       activedaysBadge: palette.blue650,
     },
     stats: {
-      background: palette.gray900,
-      openBadge: palette.gray800,
+      background: palette.gray875,
+      openBadge: palette.gray775,
       openIcon: palette.white,
       description: palette.slate200,
     },
     task: {
-      background: palette.gray900,
+      background: palette.gray875,
       border: palette.blue550,
       text: palette.sky50,
       pillBackground: palette.white,
@@ -290,15 +294,15 @@ export const darkTheme: ColorTokens = {
     buttonIcon: palette.white,
     redBubble: palette.red550,
     buttonPressed: palette.navy750,
-    headerBackground: palette.navy900,
+    headerBackground: palette.navy825,
   },
   navbar: {
     dropshadow: palette.gray900a50,
     // Selected tab: a pill in the page background color (the dark bg) so it reads as a "cutout" that
     // matches the dark theme — not a stark white pill. The glyph stays white so the active tab is
     // still legible against the near-black bar.
-    surface: { background: palette.navy900, backgroundInvert: palette.gray950 },
-    border: palette.navy900,
+    surface: { background: palette.navy825, backgroundInvert: palette.gray950 },
+    border: palette.navy825,
     text: { primary: palette.white, invert: palette.white },
   },
   text: {
@@ -310,7 +314,7 @@ export const darkTheme: ColorTokens = {
     background: palette.navy700,
     icon: palette.white,
     redBubble: palette.red550,
-    pressed: palette.blue600,
+    pressed: palette.navy750,
     noBackgroundText: palette.white,
     disabled: palette.navy700a30,
     success: palette.green500,
@@ -483,12 +487,15 @@ export type ThemeMode = 'light' | 'dark';
  */
 export interface ThemeColorOverrides {
   /** 60/30/10 brand trio. `brand` (30%) is the dominant color — navy panels, header, buttons;
-   *  it repaints the `navy750` (light) / `navy900` (dark) slot. `accent` (10%) is the pop —
+   *  it repaints the `navy750` (light) / `navy825` (dark) slot. `accent` (10%) is the pop —
    *  highlights, active states, charts — repainting the `cyan300` slot. `background` (60%) is the
    *  page background, applied directly by the shell (not a palette swap). */
   brand?: string;
   accent?: string;
   background?: string;
+  /** The card surface. White (dark grey in dark mode) when unset; in dark mode a set colour is darkened
+   *  as `background` is. Kept apart from `accent` so a bold accent doesn't tint every card. */
+  card?: string;
   /** @deprecated legacy alias for `brand`. */
   primary?: string;
   /** @deprecated the lighter navy slot (`blue600`/`navy750`); not part of the brand trio. */
@@ -499,17 +506,17 @@ export interface ThemeColorOverrides {
 
 /**
  * The palette entries a brand override repaints, per mode. `brand` (primary) covers *both* navies —
- * the deep `navy900` chrome (header, navbar) and the `navy750` navy (buttons, accents) — so a single
+ * the deep chrome navy (header, navbar; `navy825` in dark) and the `navy750` navy (buttons, accents) — so a single
  * brand color drives the whole 30% navy presence, not just the buttons.
  *
  * Dark mode also repaints `navy700`, which is that mode's `button.background`. Without it a brand
- * override moved the header (`navy900`) but left every primary button on a fixed mid navy, so the two
+ * override moved the header (`navy825`) but left every primary button on a fixed mid navy, so the two
  * visibly disagreed — the questionnaire's brand read lighter than the header above it.
  */
 type BrandSlot = 'primary' | 'secondary' | 'tertiary';
 const BRAND_SLOTS: Record<ThemeMode, Record<BrandSlot, (keyof typeof palette)[]>> = {
-  light: { primary: ['navy750', 'navy900'], secondary: ['blue600'], tertiary: ['cyan300'] },
-  dark: { primary: ['navy900', 'navy700'], secondary: ['navy750'], tertiary: ['cyan300'] },
+  light: { primary: ['navy750'], secondary: ['blue600'], tertiary: ['cyan300'] },
+  dark: { primary: ['navy825', 'navy700'], secondary: ['navy750'], tertiary: ['cyan300'] },
 };
 
 /**
@@ -596,9 +603,9 @@ function withChartContrast(t: ColorTokens): ColorTokens {
   return { ...t, barChart: { ...t.barChart, bar }, graph: { ...t.graph, line } };
 }
 
-/** How far the card fills are blended toward the brand `accent` — a faint "branded surface" wash that
- *  keeps card text and colored card content (pills, charts, badges) readable. Bump for more punch. */
-const CARD_ACCENT_TINT = 0.25;
+/** How far a study's `card` colour is mixed toward black for dark-mode cards: a step lighter than the
+ *  dark page (`DARK_BG_DARKEN`), so cards still lift off it. */
+const DARK_CARD_DARKEN = 0.82;
 
 /** Relative luminance (0–1) above which a `brand` color is too light to paint dark-mode chrome as-is.
  *  A brand brighter than this is darkened (not dropped) so dark mode stays brand-derived. */
@@ -611,20 +618,23 @@ const DARK_BRAND_DARKEN = 0.5;
 const DARK_BG_DARKEN = 0.9;
 
 /**
- * Blend the three card fills (`card.background`, `card.task.background`, `card.stats.background`)
- * toward `accent` by {@link CARD_ACCENT_TINT}. Each keeps its own light/dark base — a white light-mode
- * card just gains a faint accent wash; a dark card a faint accent-violet. Leaves pills, badges, and the
- * hint/tooltip surface untinted so the wash reads as a surface, not as content.
+ * A study's `card` colour on the three card fills (`card.background`, `card.task.background`,
+ * `card.stats.background`). Darkened for dark mode, and nudged toward white or black until the theme's
+ * text colour reads on it at AA, since card content is drawn in that text colour.
  */
-function tintCardSurfaces(t: ColorTokens, accent: string): ColorTokens {
-  const tint = (c: string) => mix(c, accent, CARD_ACCENT_TINT);
+function withCardColor(t: ColorTokens, mode: ThemeMode, card: string): ColorTokens {
+  const target = mode === 'dark' ? '#000000' : '#FFFFFF';
+  let surface = mode === 'dark' ? mix(card, '#000000', DARK_CARD_DARKEN) : card;
+  for (let step = 0.1; contrastRatio(t.text.primary, surface) < 4.5 && step <= 1; step += 0.1) {
+    surface = mix(surface, target, step);
+  }
   return {
     ...t,
     card: {
       ...t.card,
-      background: tint(t.card.background),
-      task: { ...t.card.task, background: tint(t.card.task.background) },
-      stats: { ...t.card.stats, background: tint(t.card.stats.background) },
+      background: surface,
+      task: { ...t.card.task, background: surface },
+      stats: { ...t.card.stats, background: surface },
     },
   };
 }
@@ -662,10 +672,8 @@ export function getColorTokens(mode: ThemeMode, overrides?: ThemeColorOverrides)
   }
   const themed = Object.keys(swaps).length ? deepReplace(base, swaps) : base;
   const readable = withReadableText(themed);
-  // Give card surfaces a faint wash of the brand accent (10% color = the manifest's "pop"), so cards
-  // read as branded without accent overwhelming them. Only when an accent is actually set.
-  const accent = resolved.tertiary;
-  return withChartContrast(accent ? tintCardSurfaces(readable, accent) : readable);
+  // Cards are their own colour now, not a wash of the accent: white / dark grey unless `card` is set.
+  return withChartContrast(overrides.card ? withCardColor(readable, mode, overrides.card) : readable);
 }
 
 /**
@@ -792,7 +800,7 @@ export const calendarRail = {
  * This is simply `header.headerBackground` — the same token the page header and navbar use — so the
  * calendar's chrome is the app's chrome rather than a colour of its own. It follows a manifest brand
  * (carrying the dark-mode guard that darkens a too-light brand) and, with no brand, resolves to
- * `navy750` in light and `navy900` in dark.
+ * `navy750` in light and `navy825` in dark.
  *
  * It deliberately isn't lightened for dark mode. Lifting it made the selector read as a different,
  * bluer navy than the header above it; the navbar sits at this same value on the same page and reads
@@ -909,6 +917,19 @@ export const tracking = {
   semiBold: BASE_TRACKING + androidNudge(0.1),
   bold: BASE_TRACKING + androidNudge(0.2),
 } as const;
+
+/** An Inter text style with its matching tracking and no Android font padding. */
+export const textStyle = (
+  fontSize: number,
+  lineHeight: number,
+  weight: keyof typeof fontFamily,
+) => ({
+  fontSize,
+  lineHeight,
+  fontFamily: fontFamily[weight],
+  letterSpacing: tracking[weight],
+  includeFontPadding: false,
+});
 
 /**
  * Shared layout constants for the header nodes (`HeaderNode` / `HeaderBarNode` /
