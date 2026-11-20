@@ -7,6 +7,7 @@ import {
   getColorTokens,
   layout,
   readableTextColor,
+  resolveBackground,
   tracking,
   withAlpha,
   type ThemeColorOverrides,
@@ -64,7 +65,8 @@ export function StreakModal({
   const tokens = getColorTokens(resolvedMode, brandColors);
 
   const primary = tokens.button.background;
-  const surface = tokens.card.background;
+  // What the dialog is drawn on (`ModalShell`): the page colour.
+  const surface = resolveBackground({ brandColors }, resolvedMode);
   const muted = withAlpha(tokens.text.primary, 0.6);
 
   /**

@@ -19,8 +19,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import {
   cardShadow,
-  getColorTokens,
   layout,
+  resolveBackground,
   type ThemeColorOverrides,
   type ThemeMode,
 } from '../../theme/theme';
@@ -54,7 +54,9 @@ export function ModalShell({
 }: ModalShellProps) {
   const deviceScheme = useColorScheme();
   const mode: ThemeMode = deviceScheme === 'dark' ? 'dark' : 'light';
-  const surface = getColorTokens(mode, brandColors).card.background;
+  // The page colour, not the card's: a dialog is a page laid over the page, and cards inside it
+  // (e.g. the device tiles) then lift off it as they do on a screen.
+  const surface = resolveBackground({ brandColors }, mode);
 
   // Kept mounted past `visible` so the exit can play. Driven by hand: `entering`/`exiting` strand a
   // touch-blocking overlay on Android.

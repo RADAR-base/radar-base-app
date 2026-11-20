@@ -449,7 +449,8 @@ function DayDetailModal({
       <Text
         style={[
           styles.modalTitle,
-          { color: readableTextColor(tokens.card.background, { preferred: primary }) },
+          // Checked against the dialog's surface (`ModalShell`): the page colour.
+          { color: readableTextColor(resolveBackground(context.theme, mode), { preferred: primary }) },
         ]}
       >
         {title}
