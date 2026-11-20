@@ -3,7 +3,19 @@ import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Svg, { Path, Rect } from 'react-native-svg';
 
-import { layout, tracking, fontFamily, getColorTokens, type ThemeColorOverrides, type ThemeMode } from '../../theme/theme';
+import {
+  contrastRatio,
+  fontFamily,
+  getColorTokens,
+  layout,
+  mix,
+  readableTextColor,
+  resolveBackground,
+  tracking,
+  withAlpha,
+  type ThemeColorOverrides,
+  type ThemeMode,
+} from '../../theme/theme';
 import { useTopInset } from './useTopInset';
 
 /**
@@ -37,6 +49,15 @@ export function PageHeader({
   const resolvedMode: ThemeMode = mode ?? (deviceScheme === 'dark' ? 'dark' : 'light');
   const tokens = getColorTokens(resolvedMode, brandColors);
   const progressColor = tokens.header.buttonIcon; // navy in light, white in dark
+  // A study's brand on the title and back chip, moved toward black (or white, in dark mode) until it
+  // reads at AA on the page. Without a brand, the theme's own colours.
+  const pageColor = resolveBackground({ brandColors }, resolvedMode);
+  const brandInk = brandColors?.brand ? readableOn(brandColors.brand, pageColor, resolvedMode) : undefined;
+  const titleColor = brandInk ?? tokens.card.hint.text;
+  const chipColor = brandInk ? withAlpha(brandInk, 0.14) : tokens.card.stats.openBadge;
+  const arrowColor = brandInk ?? tokens.card.stats.openIcon;
+  const pressedChip = brandInk ?? tokens.button.background;
+  const pressedArrow = readableTextColor(pressedChip, { preferred: tokens.navbar.text.primary });
   // The header owns the top safe-area inset for the page, so screens using it don't each add their
   // own paddingTop. Clears the status bar (edge-to-edge) + an Android breathing gutter.
   const topInset = useTopInset();
@@ -59,8 +80,8 @@ export function PageHeader({
             {({ pressed }) => (
               // Press feedback: the chip fills with the brand color and the arrow flips to white.
               <BackIcon
-                circleColor={pressed ? tokens.button.background : tokens.card.stats.openBadge}
-                iconColor={pressed ? tokens.navbar.text.primary : tokens.card.stats.openIcon}
+                circleColor={pressed ? pressedChip : chipColor}
+                iconColor={pressed ? pressedArrow : arrowColor}
               />
             )}
           </Pressable>
@@ -68,7 +89,7 @@ export function PageHeader({
           // Keep the 36px slot so the centered title doesn't shift when the back button is hidden.
           <View style={styles.backSpacer} />
         )}
-        <Text style={[styles.title, { color: tokens.card.hint.text }]}>{title}</Text>
+        <Text style={[styles.title, { color: titleColor }]}>{title}</Text>
       </View>
 
       {progress !== undefined && (
@@ -82,6 +103,16 @@ export function PageHeader({
       )}
     </View>
   );
+}
+
+/** `color`, moved toward black (white in dark mode) until it reaches AA on `background`. */
+function readableOn(color: string, background: string, mode: ThemeMode): string {
+  const target = mode === 'dark' ? '#FFFFFF' : '#000000';
+  let out = color;
+  for (let t = 0.05; contrastRatio(out, background) < 4.5 && t <= 1; t += 0.05) {
+    out = mix(color, target, t);
+  }
+  return out;
 }
 
 /** Back button (circular chip + left arrow) — Figma node 3067:4170, exact vector; colors themed. */
