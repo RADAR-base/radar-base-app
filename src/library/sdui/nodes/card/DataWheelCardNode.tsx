@@ -1,13 +1,28 @@
 import React, { useEffect, useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useSharedValue } from 'react-native-reanimated';
+import Animated, { Easing, useSharedValue, withTiming } from 'react-native-reanimated';
 import ArrowRightIcon from '../../../../theme/icons/arrowright.svg';
-import { tracking, fontFamily, getColorTokens, layout as layoutTokens, cardShadow } from '../../../../theme/theme';
+import {
+  DEFAULT_ACCENT,
+  tracking,
+  fontFamily,
+  getColorTokens,
+  layout as layoutTokens,
+  cardShadow,
+  mix,
+} from '../../../../theme/theme';
 import { ProgressRing, RING_SIZE, RING_STROKE } from '../../ProgressRing';
 import { useDashboardData } from '../../useDashboardData';
+import { useRangedNode } from '../../dataRange';
 import { isLocalMetric, useLocalMetric } from '../../useLocalMetric';
+import { useRiseStyle } from '../../RisingText';
 import type { DashboardWidgetConfig } from '../../../../types';
 import type { NodeProps } from '../../types';
+import { formatDuration } from './chartAxis';
+import { SleepStagesRing, asleepMinutes, describeNight, parseStages } from './SleepStagesRing';
+
+/** The ring's sweep to a new figure, matching the number's count. */
+const RING_TIMING = { duration: 450, easing: Easing.out(Easing.cubic) };
 
 export type DataWheelSize = 'small' | 'large';
 type WheelState = 'bad' | 'neutral' | 'good';
@@ -38,7 +53,9 @@ function stateForPercent(percent: number, reverse: boolean): WheelState {
  * placeholder data), so it can be wired to a real wearable API the same way any other
  * dashboard widget is, instead of only accepting a pre-computed number.
  */
-export function DataWheelCardNode({ node, context }: NodeProps) {
+export function DataWheelCardNode({ node: blueprintNode, context }: NodeProps) {
+  // Per-range props (`"values": { "day": …, "week": … }`) resolved for the data page's filter.
+  const node = useRangedNode(blueprintNode);
   const title = typeof node.title === 'string' ? node.title : 'Title';
   const description = typeof node.description === 'string' ? node.description : '';
   const size: DataWheelSize = node.size === 'large' ? 'large' : 'small';
@@ -73,14 +90,17 @@ export function DataWheelCardNode({ node, context }: NodeProps) {
     : inlineValue != null
       ? [inlineValue]
       : undefined;
+  // `stages` turns the ring into the night's sleep stages, each its share of the circle (Figma 4557:803).
+  const stages = parseStages(node.stages);
+  const sleep = stages.length > 0;
 
   const config: DashboardWidgetConfig = useMemo(
     () => ({
       series: [{ id: metric, label: title, chartType: 'sparkline', unit, values: inlineValues }],
       placeholder:
-        isLocalMetric(metric) || (inlineValues && inlineValues.length > 0) ? 'none' : 'random',
+        sleep || isLocalMetric(metric) || (inlineValues && inlineValues.length > 0) ? 'none' : 'random',
     }),
-    [metric, title, unit, inlineValues],
+    [metric, title, unit, inlineValues, sleep],
   );
   const { series } = useDashboardData(config);
   const resolvedValues = series[0]?.values ?? [];
@@ -92,6 +112,8 @@ export function DataWheelCardNode({ node, context }: NodeProps) {
   const statValue = local ? local.value : dashValue;
   const target = targetProp ?? local?.target ?? 100;
   const valueText = `${Math.round(statValue)}`;
+  // A new figure (e.g. the data filter changing period) rises into place.
+  const valueRise = useRiseStyle(valueText);
   // With `showTotal`, the ring shows the value big with a small "out of N" beneath it (e.g. 3 /
   // "out of 4") instead of a "3/4" fraction.
   const totalText = showTotal ? `out of ${Math.round(target)}` : undefined;
@@ -101,24 +123,47 @@ export function DataWheelCardNode({ node, context }: NodeProps) {
 
   const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
   const ringColor = tokens.dataWheel[wheelState];
-  // The ring takes a shared value so it can be animated; this card's figure is static, so it is
-  // simply assigned. See `TaskCompletionScreen` for the animated case.
+  // Starts at its figure, then sweeps to each new one (the filter changing period).
   const ringProgress = useSharedValue(percent / 100);
   useEffect(() => {
-    ringProgress.value = percent / 100;
+    ringProgress.value = withTiming(percent / 100, RING_TIMING);
   }, [percent, ringProgress]);
 
-  const wheel = (
+  const brandColors = context.theme.brandColors;
+  const accent = brandColors?.accent ?? DEFAULT_ACCENT;
+  const brand = brandColors?.brand ?? tokens.button.background;
+  const sleepValue = formatDuration(inlineValue ?? asleepMinutes(stages));
+
+  const wheel = sleep ? (
+    <View accessible accessibilityLabel={`${title}: ${sleepValue} asleep. ${describeNight(stages)}`}>
+      <SleepStagesRing
+        stages={stages}
+        valueText={sleepValue}
+        text={tokens.text.primary}
+        // The bar card's stage colours, pre-blended onto the card so overlaps don't darken. Each
+        // differs from its neighbours in hue or lightness: dark and pale brand, dark and pale accent.
+        colors={{
+          deep: brand,
+          light: mix(tokens.card.stats.background, brand, 0.4),
+          rem: accent,
+          awake: mix(tokens.card.stats.background, accent, 0.4),
+        }}
+      />
+    </View>
+  ) : (
     <View style={styles.ringWrapper}>
       <ProgressRing progress={ringProgress} color={ringColor} />
       <View style={styles.ringValueWrapper}>
-        <Text
-          style={[styles.ringValue, { color: tokens.text.primary }]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-        >
-          {valueText}
-        </Text>
+        {/* The wrapper rises, so the figure keeps its shrink-to-fit. */}
+        <Animated.View style={valueRise}>
+          <Text
+            style={[styles.ringValue, { color: tokens.text.primary }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {valueText}
+          </Text>
+        </Animated.View>
         {totalText && (
           <Text
             style={[styles.ringSubValue, { color: tokens.card.stats.description }]}

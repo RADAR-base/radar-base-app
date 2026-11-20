@@ -11,6 +11,7 @@ import {
 import type { Node } from '../../../contracts/NodeSchema';
 import type { NodeProps } from '../../types';
 import { SECTION_TITLE_ALPHA } from '../SectionNode';
+import { SQUARE_SMALL_TYPES } from '../card/SmallDataCard';
 import { SeeAllChip } from './SeeAllChip';
 
 function asNodeArray(value: unknown): Node[] | undefined {
@@ -63,7 +64,7 @@ function packGrid(children: Node[]): [Node[], Node[]] {
 
   const columns: [Node[], Node[]] = [[], []];
   for (const child of children) {
-    const span = child.size === 'small' ? 1 : 2;
+    const span = child.size === 'small' && !SQUARE_SMALL_TYPES.has(child.type) ? 1 : 2;
     let row = 0;
     let placedCol = -1;
     while (placedCol === -1) {

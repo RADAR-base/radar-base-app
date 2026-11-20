@@ -91,6 +91,10 @@ export {
   ToDoStatusNode,
   DataWheelCardNode,
   CalendarContributionCardNode,
+  DataRangeNode,
+  GoalProgressCardNode,
+  TrendCardNode,
+  BarCardNode,
   CardSectionNode,
   TaskListSectionNode,
   ConnectDevicesMenuNode,
@@ -181,6 +185,7 @@ export type {
   RegistrationFlowProps,
   CameraScanScreenProps,
 } from './library/sdui';
+export { useDataRange, useRangedNode, setDataRange, getDataRange, type DataRange } from './library/sdui';
 
 // SDUI contracts
 export { ManifestSchema, BlueprintSchema, NodeSchema, EnrolmentStepSchema, EnrolmentSchema } from './library/contracts';

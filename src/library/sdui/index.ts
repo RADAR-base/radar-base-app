@@ -37,6 +37,7 @@ export { NodeRenderer } from './NodeRenderer';
 // Reusable chart primitives + data-resolution hook. Surfaced so consumer-defined nodes
 // can render minimal numeric visualizations without pulling in a charting library.
 export { BarChart, Sparkline } from './Charts';
+export { useDataRange, useRangedNode, setDataRange, getDataRange, type DataRange } from './dataRange';
 export type { ChartProps } from './Charts';
 export { TextInputField } from './TextInputField';
 export type { TextInputFieldProps } from './TextInputField';
@@ -87,6 +88,10 @@ export {
   ToDoStatusNode,
   DataWheelCardNode,
   CalendarContributionCardNode,
+  DataRangeNode,
+  GoalProgressCardNode,
+  TrendCardNode,
+  BarCardNode,
   BarChartCardNode,
   ArcDataCardNode,
   LineGraphCardNode,
