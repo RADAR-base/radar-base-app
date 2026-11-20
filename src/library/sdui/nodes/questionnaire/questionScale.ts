@@ -137,6 +137,26 @@ export function questionScale(
   };
 }
 
+/** Closest two step marks may sit, centre to centre, before they merge into a solid bar. */
+const MIN_TICK_SPACING = 10;
+const TICK_STRIDES = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500];
+
+/**
+ * Which steps get a mark on a track `travel` long: all of them while they fit, otherwise every 2nd,
+ * 5th, 10th… step, landing on round values (every 10 bpm, not 31, 41, 51).
+ */
+export function tickIndices(values: number[], travel: number): number[] {
+  const steps = values.length;
+  const all = Array.from({ length: steps }, (_, i) => i);
+  if (steps < 2 || travel <= 0) return all;
+  const needed = (MIN_TICK_SPACING * (steps - 1)) / travel;
+  const stride = TICK_STRIDES.find((s) => s >= needed) ?? Math.ceil(needed);
+  if (stride === 1) return all;
+  const size = Math.abs(values[1] - values[0]) || 1;
+  const first = all.slice(0, stride).find((i) => Math.round(values[i] / size) % stride === 0) ?? 0;
+  return all.filter((i) => i >= first && (i - first) % stride === 0);
+}
+
 /** The values from `min` to `max`, inclusive. Guards against a step that can't terminate the walk. */
 function buildValues(min: number, max: number, step: number): number[] {
   if (!Number.isFinite(min) || !Number.isFinite(max)) {
