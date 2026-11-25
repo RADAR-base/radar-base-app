@@ -244,10 +244,12 @@ const styles = StyleSheet.create({
   },
   cardSmall: {
     width: 176,
+    minHeight: layoutTokens.cardHeightSmall,
     alignItems: 'center',
   },
   cardLarge: {
     width: '100%',
+    minHeight: layoutTokens.cardHeightLarge,
   },
   headerRow: {
     flexDirection: 'row',

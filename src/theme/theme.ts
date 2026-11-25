@@ -1,7 +1,8 @@
-import { Platform } from 'react-native';
+import { PixelRatio, Platform } from 'react-native';
 
 import type { ThemeManifest } from '../library/contracts/ManifestSchema';
 import { contrastRatio, mix, readableTextColor, relativeLuminance, withAlpha } from './contrast';
+import { MAX_FONT_SCALE } from './fontScaling';
 
 export {
   readableTextColor,
@@ -40,6 +41,9 @@ export interface ColorTokens {
       longstreakBadge: string;
       activedaysIcon: string;
       activedaysBadge: string;
+      dataIcon: string;
+      dataBadge: string;
+      unit: string;
     };
     stats: {
       background: string;
@@ -188,6 +192,7 @@ const palette = {
   white:      '#FFFFFF',
   whitea15:   'rgba(255, 255, 255, 0.15)',
   gray100:    '#E5E5EA',
+  gray550:    '#8E8E93',
   gray600:    '#6C6C6C',
   gray700a20: 'rgba(74, 74, 74, 0.2)',
   // Dark-mode surfaces, a step lighter than Figma's #111111 page / #1E1E1E cards / #2E2E30 chips.
@@ -200,6 +205,7 @@ const palette = {
   gray925:    '#19191B',
   gray950:    '#111111',
   black:      '#000000',
+  red100:     '#F9C0BB',
   red400:     '#E84855',
   red550:     '#C0312D',
   orange450:  '#F9A825',
@@ -274,6 +280,9 @@ export const darkTheme: ColorTokens = {
       longstreakBadge: palette.amber500,
       activedaysIcon: palette.sky100,
       activedaysBadge: palette.blue650,
+      dataIcon: palette.red100,
+      dataBadge: palette.red400,
+      unit: palette.gray550,
     },
     stats: {
       background: palette.gray875,
@@ -399,6 +408,10 @@ export const lightTheme: ColorTokens = {
       longstreakBadge: palette.amber50,
       activedaysIcon: palette.blue650,
       activedaysBadge: palette.sky100,
+      dataIcon: palette.red400,
+      dataBadge: palette.red100,
+      // Fixed in both modes — iOS's own secondary grey, legible on either card.
+      unit: palette.gray550,
     },
     stats: {
       background: palette.white,
@@ -861,6 +874,11 @@ export function calendarRailColor(headerBackground: string, accent: string): str
  * same magic numbers aren't repeated (and don't drift) across every component that
  * happens to need a 9px gap or a pill-shaped badge.
  */
+/** A small card's fixed chrome: padding top and bottom, plus the gap between title and value. */
+const CARD_SMALL_CHROME = 16 * 2 + 9;
+/** The text it has to fit — a 12/16 title and a 36 value — both of which scale with the text size. */
+const CARD_SMALL_TEXT = 16 + 36;
+
 export const layout = {
   /**
    * Figma's tracking value (SF Pro on iOS). Android uses Inter, which renders a touch wider, so it
@@ -870,6 +888,29 @@ export const layout = {
   letterSpacing: Platform.select({ android: -0.25, default: -0.5 }) as number,
   /** The 9px gap Figma uses between rows/items — headers, navbar, card grids, sections. */
   gap: 9,
+  /**
+   * The two card heights the grid is built on, as a relationship rather than two numbers.
+   *
+   * A large card is exactly two small ones plus the gap between them, so a column holding two smalls
+   * ends level with a column holding one large.
+   *
+   * Both track the reader's text size. A small card's content fills its height exactly — 16 padding
+   * twice, a 16 title, the 9 below it and a 36 value — so it grows the moment text scales, while a
+   * large card has ~19pt of slack and would sit on a fixed floor until the scale reached about 1.2.
+   * That asymmetry is what pulled the two columns apart; scaling the floors together holds the rule
+   * at any text size.
+   *
+   * Applied as `minHeight`, never `height`, so a card that still needs more room grows rather than
+   * clipping. Read once at module load, like the rest of this file: a text-size change mid-session
+   * lands on the next launch.
+   */
+  get cardHeightSmall(): number {
+    const textScale = Math.min(PixelRatio.getFontScale(), MAX_FONT_SCALE);
+    return CARD_SMALL_CHROME + CARD_SMALL_TEXT * textScale;
+  },
+  get cardHeightLarge(): number {
+    return this.cardHeightSmall * 2 + this.gap;
+  },
   /** Caption-sized text (badges, pills, "Keep it up!"/"See All", last-synced label). */
   captionFontSize: 10,
   /** Section/heading-sized text ("My Activity", "My Tasks", back-navigation titles). */
