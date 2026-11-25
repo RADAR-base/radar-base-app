@@ -99,10 +99,9 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 40,
     // Weight must be set on BOTH axes: `fontFamily` picks the Inter file on Android, while
-    // `fontWeight` drives the system font on iOS (where `fontFamily` resolves to undefined). Keep
-    // them in sync — 600/semiBold is a notch thinner than bold (700). Use .medium/'500' for thinner.
-    fontFamily: fontFamily.semiBold,
-    fontWeight: '600',
+    // `fontWeight` drives the system font on iOS (where `fontFamily` resolves to undefined).
+    fontFamily: fontFamily.regular,
+    fontWeight: '400',
     includeFontPadding: false,
     // ~1.2× the font size, not 40: an equal line height clips tall glyphs / cramps wrapped lines
     // on Android (iOS is unaffected).

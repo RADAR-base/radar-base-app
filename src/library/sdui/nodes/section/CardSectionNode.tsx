@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   tracking,
   fontFamily,
   getColorTokens,
   cardShadowBleed,
   layout as layoutTokens,
+  withAlpha,
 } from '../../../../theme/theme';
 import type { Node } from '../../../contracts/NodeSchema';
 import type { NodeProps } from '../../types';
+import { SECTION_TITLE_ALPHA } from '../SectionNode';
+import { SeeAllChip } from './SeeAllChip';
 
 function asNodeArray(value: unknown): Node[] | undefined {
   return Array.isArray(value) ? (value as Node[]) : undefined;
@@ -130,16 +133,15 @@ export function CardSectionNode({ node, context, render }: NodeProps) {
     >
       {title && (
         <View style={styles.headerRow}>
-          <Text style={[styles.title, { color: tokens.text.primary }]}>{title}</Text>
+          <Text style={[styles.title, { color: withAlpha(tokens.text.primary, SECTION_TITLE_ALPHA) }]}>
+            {title}
+          </Text>
           {showSeeAll && viewPath && (
-            <TouchableOpacity
-              accessibilityRole="button"
+            <SeeAllChip
               onPress={() => context.dispatch({ type: 'OpenCustomView', viewUrl: viewPath })}
-            >
-              <View style={[styles.seeAllPill, { borderColor: tokens.card.stats.description }]}>
-                <Text style={[styles.seeAllText, { color: tokens.text.primary }]}>See All</Text>
-              </View>
-            </TouchableOpacity>
+              mode={context.colorScheme ?? 'light'}
+              brandColors={context.theme.brandColors}
+            />
           )}
         </View>
       )}
@@ -177,26 +179,10 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: layoutTokens.headingFontSize,
-    fontFamily: fontFamily.bold,
-    includeFontPadding: false,
-    lineHeight: layoutTokens.headingLineHeight,
-    fontWeight: '700',
-    letterSpacing: tracking.bold,
-  },
-  seeAllPill: {
-    height: 18,
-    borderWidth: 1,
-    borderRadius: layoutTokens.radiusPill,
-    paddingHorizontal: layoutTokens.pillPaddingHorizontal,
-    paddingVertical: layoutTokens.pillPaddingVertical,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  seeAllText: {
-    fontSize: layoutTokens.captionFontSize,
     fontFamily: fontFamily.regular,
     includeFontPadding: false,
-    lineHeight: layoutTokens.captionFontSize,
+    lineHeight: layoutTokens.headingLineHeight,
+    fontWeight: '400',
     letterSpacing: tracking.regular,
   },
   /**
@@ -229,7 +215,10 @@ const styles = StyleSheet.create({
   },
   grid: {
     flexDirection: 'row',
-    alignItems: 'stretch',
+    // Each column ends where its own content ends. `stretch` made both as tall as the taller one,
+    // and whichever card was flexible then absorbed the whole difference — a lone large card beside
+    // a two-card column grew by ~100pt and pulled its own contents apart to fill it.
+    alignItems: 'flex-start',
     gap: layoutTokens.gap,
     width: '100%',
   },
