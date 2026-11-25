@@ -303,14 +303,10 @@ function ArrowButton({
 }
 
 const styles = StyleSheet.create({
+  // The gap under the page title is set once, for every flat-header tab, in `ViewNode`.
   container: {
     width: '100%',
     gap: 16,
-    // Pull the date header up under the shell's "Calendar" title. `ViewNode` gives every tab a
-    // header→body gap (headerTitle paddingBottom 16 + body paddingTop 15 + the 40px title's line
-    // leading), which reads as dead space between that title and this date header. This negative
-    // margin is scoped to the calendar page, so home/profile keep their normal spacing.
-    marginTop: -20,
   },
   selectorBlock: {
     width: '100%',
