@@ -26,6 +26,10 @@ export interface SyncService {
   sync(): Promise<SyncResult>;
   /** Last successful (full or partial) sync time, restored from storage on boot. */
   getLastSyncedAt(): Date | null;
+  /** The same, once the saved value has been read back; `getLastSyncedAt` can be too early. */
+  loadLastSyncedAt(): Promise<Date | null>;
+  /** Record that the app has just refreshed from the server outside a manual sync. */
+  markSynced(at?: Date): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -35,14 +39,15 @@ export interface SyncService {
 export class DefaultSyncService implements SyncService {
   private steps = new Map<string, () => Promise<void>>();
   private lastSyncedAt: Date | null = null;
+  private restored: Promise<void>;
 
   constructor(
     private readonly storage: StorageService,
     private readonly logger: LoggerService,
   ) {
-    // Restore persisted timestamp on construction (fire-and-forget).
-    this.storage.get<string>(LAST_SYNCED_KEY).then((iso) => {
-      if (iso) this.lastSyncedAt = new Date(iso);
+    // Restore the persisted timestamp. A sync that finishes first keeps its newer time.
+    this.restored = this.storage.get<string>(LAST_SYNCED_KEY).then((iso) => {
+      if (iso && !this.lastSyncedAt) this.lastSyncedAt = new Date(iso);
     }).catch(() => {});
   }
 
@@ -91,6 +96,16 @@ export class DefaultSyncService implements SyncService {
   }
 
   getLastSyncedAt(): Date | null {
+    return this.lastSyncedAt;
+  }
+
+  markSynced(at: Date = new Date()): void {
+    this.lastSyncedAt = at;
+    this.storage.set(LAST_SYNCED_KEY, at.toISOString()).catch(() => {});
+  }
+
+  async loadLastSyncedAt(): Promise<Date | null> {
+    await this.restored;
     return this.lastSyncedAt;
   }
 }
