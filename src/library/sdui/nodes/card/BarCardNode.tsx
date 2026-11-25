@@ -282,6 +282,9 @@ function BarCard({ node: blueprintNode, context }: NodeProps) {
   const drawn = smoothStages(stages);
   const starts = stageStarts(drawn);
   const count = timeline ? drawn.length : bars.length;
+  // Bars after the last one with data are periods still to come, so the scrub stops before them.
+  const lastFilled = totals.reduce((last, total, i) => (total > 0 ? i : last), -1);
+  const lastPickable = timeline ? count - 1 : lastFilled;
 
   const [plotWidth, setPlotWidth] = useState(0);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -341,6 +344,7 @@ function BarCard({ node: blueprintNode, context }: NodeProps) {
   const live = useRef({
     width: 0,
     count: 0,
+    lastPickable: -1,
     index: null as number | null,
     setLocked,
     tick,
@@ -350,6 +354,7 @@ function BarCard({ node: blueprintNode, context }: NodeProps) {
     ...live.current,
     width: plotWidth,
     count,
+    lastPickable,
     setLocked,
     tick,
     // Bars share the width evenly; a stage is as wide as it was long.
@@ -357,9 +362,9 @@ function BarCard({ node: blueprintNode, context }: NodeProps) {
   };
   const scrubResponder = useMemo(() => {
     const pick = (x: number) => {
-      const { width, count, index, indexAt } = live.current;
-      if (width <= 0 || count < 1) return;
-      const next = Math.min(count - 1, Math.max(0, indexAt(x / width, count)));
+      const { width, count, lastPickable, index, indexAt } = live.current;
+      if (width <= 0 || lastPickable < 0) return;
+      const next = Math.min(lastPickable, Math.max(0, indexAt(x / width, count)));
       if (next === index) return;
       live.current.index = next;
       live.current.tick();
@@ -476,6 +481,8 @@ function BarCard({ node: blueprintNode, context }: NodeProps) {
           <Animated.View style={[styles.plotColumn, enterStyle]}>
             <View
               style={styles.plot}
+              // The plot, not a bar under the finger, takes the touch, so `locationX` is across the plot.
+              pointerEvents="box-only"
               onLayout={(e) => setPlotWidth(e.nativeEvent.layout.width)}
               {...scrubResponder.panHandlers}
             >

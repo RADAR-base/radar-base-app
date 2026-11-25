@@ -211,6 +211,8 @@ export function SleepTimeline({
       <View style={styles.middle}>
         <View
           style={{ gap }}
+          // Takes the touch itself rather than the stage under the finger, so `locationX` is across the night.
+          pointerEvents="box-only"
           onLayout={(e) => {
             setWidth(e.nativeEvent.layout.width);
             onPlotWidth?.(e.nativeEvent.layout.width);

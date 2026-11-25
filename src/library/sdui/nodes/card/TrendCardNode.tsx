@@ -375,6 +375,8 @@ function TrendCard({ node: blueprintNode, context }: NodeProps) {
           <Animated.View style={[styles.plotColumn, plotEnter]}>
             <View
               style={styles.plot}
+              // The plot, not the line or a dot under the finger, takes the touch, so `locationX` is across the plot.
+              pointerEvents="box-only"
               onLayout={(e) => setPlotWidth(e.nativeEvent.layout.width)}
               {...scrubResponder.panHandlers}
             >
