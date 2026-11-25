@@ -1,8 +1,12 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { fontFamily, layout as layoutTokens, getColorTokens } from '../../../theme/theme';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { fontFamily, layout as layoutTokens, getColorTokens, withAlpha } from '../../../theme/theme';
 import type { Node } from '../../contracts/NodeSchema';
 import type { NodeProps } from '../types';
+import { SeeAllChip } from './section/SeeAllChip';
+
+/** Section titles recede so the cards under them lead. */
+export const SECTION_TITLE_ALPHA = 0.6;
 
 /**
  * Logical grouping with an optional header and optional "See All" link.
@@ -22,10 +26,13 @@ export function SectionNode({ node, context, render }: NodeProps) {
     <View style={styles.container}>
       {title && (
         <View style={styles.headerRow}>
-          <Text style={[styles.title, { color: tokens.text.primary }]}>{title}</Text>
+          <Text style={[styles.title, { color: withAlpha(tokens.text.primary, SECTION_TITLE_ALPHA) }]}>
+            {title}
+          </Text>
           {showSeeAll && (
-            <TouchableOpacity
-              accessibilityRole="button"
+            <SeeAllChip
+              mode={context.colorScheme ?? 'light'}
+              brandColors={context.theme.brandColors}
               onPress={() => {
                 // `seeAllTab` switches to a primary tab (same result as tapping that tab in
                 // the navbar — full header, tab highlighted). `seeAllAction` instead opens a
@@ -39,13 +46,7 @@ export function SectionNode({ node, context, render }: NodeProps) {
                   });
                 }
               }}
-            >
-              <View style={styles.seeAllPill}>
-                <Text style={[styles.seeAllText, { color: tokens.card.stats.description }]}>
-                  See All
-                </Text>
-              </View>
-            </TouchableOpacity>
+            />
           )}
         </View>
       )}
@@ -83,22 +84,9 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 16,
-    fontFamily: fontFamily.bold,
+    fontFamily: fontFamily.regular,
     includeFontPadding: false,
-    fontWeight: '700',
-  },
-  seeAllPill: {
-    borderWidth: 1,
-    borderColor: '#C8CDD3',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  },
-  seeAllText: {
-    fontSize: 12,
-    fontFamily: fontFamily.semiBold,
-    includeFontPadding: false,
-    fontWeight: '600',
+    fontWeight: '400',
   },
   horizontalContent: {
     gap: layoutTokens.gap,
