@@ -21,7 +21,6 @@ import Animated, {
 import { useCoreServices } from '../../../../core/CoreServicesContext';
 import { EVENTS, eventBus } from '../../../../core/EventBus';
 import BatteryIcon from '../../../../theme/icons/battery.svg';
-import ConnectedDotIcon from '../../../../theme/icons/connecteddot.svg';
 import MoreIcon from '../../../../theme/icons/more.svg';
 import PlusIcon from '../../../../theme/icons/plus.svg';
 import PlusSmallIcon from '../../../../theme/icons/plussmall.svg';
@@ -171,17 +170,17 @@ function DeviceMenu({
   );
 }
 
-/** "Today at 14:00", "Yesterday at 09:30" or "3 Nov at 14:00", in the device's locale. */
+/** "today, 2:00 PM", "yesterday, 9:30 AM" or "3 Nov, 2:00 PM", in the device's locale. */
 function formatLastSync(iso: string): string | null {
   const at = new Date(iso);
   if (Number.isNaN(at.getTime())) return null;
-  const time = at.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  const time = at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   const days = Math.round(
     (new Date().setHours(0, 0, 0, 0) - new Date(at).setHours(0, 0, 0, 0)) / 86_400_000,
   );
-  if (days === 0) return `Today at ${time}`;
-  if (days === 1) return `Yesterday at ${time}`;
-  return `${at.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} at ${time}`;
+  if (days === 0) return `today, ${time}`;
+  if (days === 1) return `yesterday, ${time}`;
+  return `${at.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}, ${time}`;
 }
 
 /**
@@ -197,7 +196,7 @@ export function DevicesCardNode({ node, context }: NodeProps) {
   const tokens = getColorTokens(mode, brandColors);
   const brand = brandColors?.brand ?? tokens.button.background;
   const text = tokens.text.primary;
-  const muted = withAlpha(text, 0.55);
+  const muted = withAlpha(text, 0.62);
   const chip = tokens.card.stats.openBadge;
 
   const title = typeof node.title === 'string' ? node.title : 'Connected devices';
@@ -371,28 +370,28 @@ export function DevicesCardNode({ node, context }: NodeProps) {
             const expanded = menuOpen && menu?.device.name === device.name;
             return (
               <View key={device.name} style={[styles.row, { backgroundColor: tokens.card.background }, cardShadow]}>
-                <DeviceDisc kind={device.kind} size={64} background={brand} color={tokens.button.icon} />
+                <DeviceDisc kind={device.kind} size={44} background={brand} color={tokens.button.icon} />
                 <View style={styles.rowText}>
-                  <View>
-                    <Text style={[styles.name, { color: text }]} numberOfLines={1}>
-                      {device.name}
-                    </Text>
+                  <Text style={[styles.name, { color: text }]} numberOfLines={1}>
+                    {device.name}
+                  </Text>
+                  {/* Status only when it needs saying: a connected device just shows when it last synced. */}
+                  <View style={styles.meta}>
                     {syncingDevice === device.name ? (
-                      <Text style={[styles.small, { color: muted }]}>Syncing…</Text>
+                      <Text style={[styles.metaText, { color: muted }]}>Syncing…</Text>
                     ) : (
-                      lastSync && <Text style={[styles.small, { color: muted }]}>Last sync: {lastSync}</Text>
+                      lastSync && <Text style={[styles.metaText, { color: muted }]}>Synced {lastSync}</Text>
                     )}
-                  </View>
-                  <View style={styles.pills}>
-                    <View style={[styles.pill, { backgroundColor: chip }]}>
-                      <ConnectedDotIcon width={4} height={4} />
-                      <Text style={[styles.small, { color: muted }]}>Connected</Text>
-                    </View>
                     {device.battery != null && (
-                      <View style={[styles.pill, { backgroundColor: chip }]}>
-                        <BatteryIcon width={7} height={5} />
-                        <Text style={[styles.small, { color: muted }]}>{Math.round(device.battery)}%</Text>
-                      </View>
+                      <>
+                        {(lastSync || syncingDevice === device.name) && (
+                          <Text style={[styles.metaText, { color: muted }]}>·</Text>
+                        )}
+                        <View style={styles.battery}>
+                          <BatteryIcon width={12} height={8.5} />
+                          <Text style={[styles.metaText, { color: muted }]}>{Math.round(device.battery)}%</Text>
+                        </View>
+                      </>
                     )}
                   </View>
                 </View>
@@ -540,30 +539,28 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 9,
-    padding: 9,
-    borderRadius: 26,
+    gap: 12,
+    padding: 12,
+    borderRadius: layoutTokens.radiusCard,
   },
   rowText: {
     flex: 1,
-    gap: 5,
+    gap: 3,
   },
-  name: { ...textStyle(16, 20, 'semiBold'), fontWeight: '600' },
-  small: textStyle(10, 12, 'regular'),
-  pills: {
+  name: { ...textStyle(17, 21, 'semiBold'), fontWeight: '600' },
+  meta: {
     flexDirection: 'row',
-    gap: 5,
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
   },
-  pill: {
+  metaText: { ...textStyle(13, 17, 'regular'), fontVariant: ['tabular-nums'] },
+  battery: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 12,
   },
   corner: {
-    alignSelf: 'flex-start',
     width: 28,
     height: 28,
     borderRadius: 14,

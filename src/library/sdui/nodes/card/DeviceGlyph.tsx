@@ -25,7 +25,7 @@ export function DeviceDisc({
   color,
 }: {
   kind: DeviceKind;
-  size: 46 | 64;
+  size: 44 | 46 | 64;
   background: string;
   color: string;
 }) {
