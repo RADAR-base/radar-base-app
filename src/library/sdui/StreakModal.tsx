@@ -1,13 +1,12 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import FireIcon from '../../theme/icons/fire.svg';
-import { ModalShell } from './ModalShell';
+import { ModalHeader, ModalShell } from './ModalShell';
 import {
   fontFamily,
   getColorTokens,
   layout,
   readableTextColor,
-  resolveBackground,
   tracking,
   withAlpha,
   type ThemeColorOverrides,
@@ -65,25 +64,11 @@ export function StreakModal({
   const tokens = getColorTokens(resolvedMode, brandColors);
 
   const primary = tokens.button.background;
-  // What the dialog is drawn on (`ModalShell`): the page colour.
-  const surface = resolveBackground({ brandColors }, resolvedMode);
   const muted = withAlpha(tokens.text.primary, 0.6);
 
-  /**
-   * Both of these are checked against what they actually sit on, rather than trusted.
-   *
-   * `button.text` is not a label colour for a filled button — in the light theme it is `gray800`
-   * against a `navy750` fill, which is 1.10:1 and simply cannot be read. And the title takes the
-   * brand, which is fine on a white card and 1.94:1 on the dark theme's near-black one. Neither is a
-   * wrong token; they are tokens being asked a question they don't answer.
-   *
-   * `readableTextColor` keeps the designer's colour wherever it clears AA and flips to a readable
-   * light or dark only where it doesn't — the same correction `withReadableText` already applies to
-   * the header and navbar, for the same reason. It also covers a manifest brand this file has never
-   * seen, which is the case that can't be checked by eye.
-   */
+  // `button.text` is gray800 on a navy750 fill in light mode (1.10:1), so the label is checked
+  // against the fill rather than trusted. `ModalHeader` checks the title the same way.
   const onPrimary = readableTextColor(primary, { preferred: tokens.button.text });
-  const titleColor = readableTextColor(surface, { preferred: primary });
   // The badge's two colours travel together and swap between themes — see `card.engagement` in the
   // theme. Taking both from there is what keeps the flame legible on its circle in dark mode.
   const badgeFill = tokens.card.engagement.streakBadge;
@@ -91,12 +76,17 @@ export function StreakModal({
 
   return (
     <ModalShell visible={visible} onClose={onClose} brandColors={brandColors}>
-        <View style={[styles.badge, { backgroundColor: badgeFill }]}>
-          <FireIcon width={BADGE_ICON.width} height={BADGE_ICON.height} color={badgeInk} />
-        </View>
-
-        <Text style={[styles.title, { color: titleColor }]}>{title}</Text>
-        <Text style={[styles.description, { color: muted }]}>{description}</Text>
+        <ModalHeader
+          title={title}
+          subtitle={description}
+          onClose={onClose}
+          brandColors={brandColors}
+          icon={
+            <View style={[styles.badge, { backgroundColor: badgeFill }]}>
+              <FireIcon width={BADGE_ICON.width} height={BADGE_ICON.height} color={badgeInk} />
+            </View>
+          }
+        />
 
         <Pressable
           accessibilityRole="button"
@@ -126,26 +116,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: {
-    fontSize: 22,
-    lineHeight: 28,
-    textAlign: 'center',
-    fontFamily: fontFamily.bold,
-    fontWeight: '700',
-    letterSpacing: tracking.bold,
-    includeFontPadding: false,
-  },
-  description: {
-    fontSize: 15,
-    lineHeight: 22,
-    textAlign: 'center',
-    fontFamily: fontFamily.regular,
-    includeFontPadding: false,
-  },
   cta: {
-    // Its own breathing room above the buttons — the card's gap is for text rows, and an action sits
-    // apart from what it is answering.
-    marginTop: layout.gap,
     minHeight: 52,
     alignSelf: 'stretch',
     borderRadius: 100,

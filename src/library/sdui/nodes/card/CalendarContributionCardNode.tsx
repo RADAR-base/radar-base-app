@@ -10,13 +10,11 @@ import {
   fontFamily,
   getColorTokens,
   layout as layoutTokens,
-  readableTextColor,
-  resolveBackground,
   tracking,
   withAlpha,
 } from '../../../../theme/theme';
-import { CloseIcon } from '../../ConfirmModal';
-import { ModalShell } from '../../ModalShell';
+import { ModalHeader, ModalShell, modalMuted } from '../../ModalShell';
+import { ModalInfoRows } from '../../ModalInfoRow';
 import type { NodeProps } from '../../types';
 import { inferTaskType } from '../section/TaskDayList';
 import { deviceColor, parseDevices, type StudyDevice } from './deviceTypes';
@@ -39,8 +37,6 @@ const DETAIL_WHEEL = 132;
 const SLICE_GAP_DEG = 4;
 /** The device ring's segments (Figma 4393:2963): slots around the ring, shared out between devices. */
 const DEVICE_SEGMENTS = 18;
-/** The info dialog's example wheels: as tall as their text, up to this width. */
-const INFO_WHEEL_MAX = 88;
 /** Share of a slot left empty between neighbouring segments. */
 const SEGMENT_GAP = 0.12;
 /** A segment's corner radius, as a share of its width. */
@@ -51,8 +47,6 @@ const EXAMPLE_DEVICES: StudyDevice[] = [
   { name: 'Watch', kind: 'watch' },
 ];
 const EXAMPLE_FILLS = [1, 0.55, 0.8, 0.4];
-/** The dialog's description grey (Figma); dark mode softens the text colour instead. */
-const INFO_MUTED_LIGHT = '#686868';
 
 /** One slice of a ring: its colour and how much of the slice it fills (0..1). */
 interface Slice {
@@ -162,7 +156,7 @@ export function CalendarContributionCardNode({ node, context }: NodeProps) {
           hitSlop={8}
           onPress={() => setInfoOpen(true)}
         >
-          <InfoIcon width={22} height={22} color={tokens.info} />
+          <InfoIcon width={22} height={22} color={withAlpha(allTokens.text.primary, 0.55)} />
         </Pressable>
       </View>
 
@@ -427,7 +421,6 @@ function DayDetailModal({
   const mode = context.colorScheme ?? 'light';
   const tokens = getColorTokens(mode, context.theme.brandColors);
   const ring = tokens.card.contribution;
-  const primary = tokens.button.background;
   const text = tokens.text.primary;
   const muted = withAlpha(text, 0.6);
   const title = date.toLocaleDateString(undefined, {
@@ -438,23 +431,21 @@ function DayDetailModal({
 
   return (
     <ModalShell visible={visible} onClose={onClose} brandColors={context.theme.brandColors}>
-      <ContributionWheel
-        size={DETAIL_WHEEL}
-        day={date.getDate()}
-        tasks={contribution.tasks}
-        devices={contribution.devices}
-        track={ring.track}
-        textColor={text}
+      <ModalHeader
+        title={title}
+        onClose={onClose}
+        brandColors={context.theme.brandColors}
+        icon={
+          <ContributionWheel
+            size={DETAIL_WHEEL}
+            day={date.getDate()}
+            tasks={contribution.tasks}
+            devices={contribution.devices}
+            track={ring.track}
+            textColor={text}
+          />
+        }
       />
-      <Text
-        style={[
-          styles.modalTitle,
-          // Checked against the dialog's surface (`ModalShell`): the page colour.
-          { color: readableTextColor(resolveBackground(context.theme, mode), { preferred: primary }) },
-        ]}
-      >
-        {title}
-      </Text>
 
       <ScrollView style={styles.detailScroll} contentContainerStyle={styles.detailBody}>
         <View style={styles.detailSection}>
@@ -497,24 +488,6 @@ function DayDetailModal({
           </View>
         )}
       </ScrollView>
-
-      <Pressable
-        accessibilityRole="button"
-        onPress={onClose}
-        style={({ pressed }) => [
-          styles.modalCta,
-          { backgroundColor: primary, opacity: pressed ? 0.85 : 1 },
-        ]}
-      >
-        <Text
-          style={[
-            styles.modalCtaText,
-            { color: readableTextColor(primary, { preferred: tokens.button.text }) },
-          ]}
-        >
-          Done
-        </Text>
-      </Pressable>
     </ModalShell>
   );
 }
@@ -558,9 +531,7 @@ function ContributionInfoModal({
   const mode = context.colorScheme ?? 'light';
   const tokens = getColorTokens(mode, context.theme.brandColors);
   const ring = tokens.card.contribution;
-  const surface = resolveBackground(context.theme, mode);
-  const brand = tokens.button.background;
-  const muted = mode === 'dark' ? withAlpha(tokens.text.primary, 0.65) : INFO_MUTED_LIGHT;
+  const muted = modalMuted(mode, context.theme.brandColors);
 
   // The real task-type colours, so the example matches the wheels on the calendar.
   const exampleTasks: Slice[] = (['questionnaire', 'speech', 'physical', 'cognitive'] as const).map(
@@ -574,47 +545,22 @@ function ContributionInfoModal({
   }));
 
   return (
-    <ModalShell
-      visible={visible}
-      onClose={onClose}
-      brandColors={context.theme.brandColors}
-      surfaceStyle={[styles.infoCard, { backgroundColor: surface }]}
-    >
-      <View style={styles.infoCloseRow}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Close"
-          onPress={onClose}
-          hitSlop={8}
-        >
-          {({ pressed }) => (
-            <CloseIcon
-              circleColor={pressed ? brand : tokens.card.stats.openBadge}
-              iconColor={pressed ? tokens.navbar.text.primary : tokens.card.stats.openIcon}
-            />
-          )}
-        </Pressable>
-      </View>
+    <ModalShell visible={visible} onClose={onClose} brandColors={context.theme.brandColors}>
+      <ModalHeader
+        title="Your Contribution"
+        subtitle="Each circle is one day in the study. The fuller it is, the more you took part that day."
+        onClose={onClose}
+        brandColors={context.theme.brandColors}
+      />
 
-      <View style={styles.infoBody}>
-        <View style={styles.infoHeading}>
-          <Text
-            style={[styles.infoTitle, { color: readableTextColor(surface, { preferred: brand }) }]}
-          >
-            Your Contribution
-          </Text>
-          <Text style={[styles.infoSubtitle, { color: muted }]}>
-            Each circle is one day in the study. The fuller it is, the more you took part that day.
-          </Text>
-        </View>
-
-        <View style={styles.infoRows}>
-          <InfoRow
-            title="Tasks you completed"
-            body="The outer ring fills in as you finish that day’s tasks. Each colour is a different kind of task."
-            text={tokens.text.primary}
-            muted={muted}
-            renderWheel={size => (
+      <ModalInfoRows
+        text={tokens.text.primary}
+        muted={muted}
+        rows={[
+          {
+            title: 'Tasks you completed',
+            body: 'The outer ring fills in as you finish that day’s tasks. Each colour is a different kind of task.',
+            renderVisual: size => (
               <ContributionWheel
                 size={size}
                 tasks={exampleTasks}
@@ -622,14 +568,12 @@ function ContributionInfoModal({
                 track={ring.track}
                 textColor={tokens.text.primary}
               />
-            )}
-          />
-          <InfoRow
-            title="Data from your devices"
-            body="The inner ring shows the data your connected devices sent that day. Each device has its own colour, and more of its segments light up the more data it sends."
-            text={tokens.text.primary}
-            muted={muted}
-            renderWheel={size => (
+            ),
+          },
+          {
+            title: 'Data from your devices',
+            body: 'The inner ring shows the data your connected devices sent that day. Each device has its own colour, and more of its segments light up the more data it sends.',
+            renderVisual: size => (
               <ContributionWheel
                 size={size}
                 tasks={[]}
@@ -637,50 +581,11 @@ function ContributionInfoModal({
                 track={ring.track}
                 textColor={tokens.text.primary}
               />
-            )}
-          />
-        </View>
-      </View>
+            ),
+          },
+        ]}
+      />
     </ModalShell>
-  );
-}
-
-/**
- * One explanation with its example wheel, sized to the height of the text beside it (the Figma wheel
- * stretches to its row). The wheel's column is a fixed width, so the text never rewraps around it:
- * sizing the column to the wheel made the text taller, which grew the wheel again, without end.
- */
-function InfoRow({
-  title,
-  body,
-  text,
-  muted,
-  renderWheel,
-}: {
-  title: string;
-  body: string;
-  text: string;
-  muted: string;
-  renderWheel: (size: number) => React.ReactNode;
-}) {
-  const [textHeight, setTextHeight] = useState(0);
-  const size = Math.min(textHeight, INFO_WHEEL_MAX);
-  return (
-    <View style={styles.infoRow}>
-      <View style={styles.infoWheelSlot}>{size > 0 && renderWheel(size)}</View>
-      <View style={styles.infoRowText}>
-        <View
-          style={styles.infoRowHeading}
-          onLayout={e => {
-            const height = Math.round(e.nativeEvent.layout.height);
-            setTextHeight(current => (Math.abs(current - height) > 1 ? height : current));
-          }}
-        >
-          <Text style={[styles.infoRowTitle, { color: text }]}>{title}</Text>
-          <Text style={[styles.infoRowBody, { color: muted }]}>{body}</Text>
-        </View>
-      </View>
-    </View>
   );
 }
 
@@ -763,99 +668,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontFamily: fontFamily.regular,
     letterSpacing: tracking.regular,
-    includeFontPadding: false,
-  },
-  modalTitle: {
-    fontSize: 22,
-    lineHeight: 28,
-    textAlign: 'center',
-    fontFamily: fontFamily.bold,
-    fontWeight: '700',
-    letterSpacing: tracking.bold,
-    includeFontPadding: false,
-  },
-  /** Figma 4388:2809: 32pt padding, 16pt between the close row and the body. */
-  infoCard: {
-    padding: 32,
-    gap: 16,
-  },
-  infoCloseRow: {
-    width: '100%',
-    flexDirection: 'row',
-  },
-  infoBody: {
-    width: '100%',
-    gap: 32,
-  },
-  infoHeading: {
-    gap: 16,
-  },
-  infoTitle: {
-    fontSize: 24,
-    lineHeight: 28,
-    textAlign: 'center',
-    fontFamily: fontFamily.bold,
-    fontWeight: '700',
-    letterSpacing: tracking.bold,
-    includeFontPadding: false,
-  },
-  infoSubtitle: {
-    fontSize: 14,
-    lineHeight: 18,
-    textAlign: 'center',
-    fontFamily: fontFamily.regular,
-    letterSpacing: tracking.regular,
-    includeFontPadding: false,
-  },
-  infoRows: {
-    gap: 16,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 32,
-  },
-  infoWheelSlot: {
-    width: INFO_WHEEL_MAX,
-    alignSelf: 'stretch',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  infoRowText: {
-    flex: 1,
-    gap: 9,
-  },
-  infoRowHeading: {
-    gap: 9,
-  },
-  infoRowTitle: {
-    fontSize: 14,
-    lineHeight: 18,
-    fontFamily: fontFamily.bold,
-    fontWeight: '700',
-    letterSpacing: tracking.bold,
-    includeFontPadding: false,
-  },
-  infoRowBody: {
-    fontSize: 12,
-    lineHeight: 16,
-    fontFamily: fontFamily.regular,
-    letterSpacing: tracking.regular,
-    includeFontPadding: false,
-  },
-  modalCta: {
-    marginTop: layoutTokens.gap,
-    minHeight: 52,
-    alignSelf: 'stretch',
-    borderRadius: 100,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalCtaText: {
-    fontSize: 16,
-    fontFamily: fontFamily.semiBold,
-    fontWeight: '600',
-    letterSpacing: tracking.semiBold,
     includeFontPadding: false,
   },
 });
