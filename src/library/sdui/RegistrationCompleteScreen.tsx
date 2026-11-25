@@ -1,7 +1,6 @@
 import React from 'react';
 import { StyleSheet, useColorScheme, View } from 'react-native';
 import {
-  getColorTokens,
   resolveBackground,
   type ThemeColorOverrides,
   type ThemeMode,
@@ -34,7 +33,6 @@ export function RegistrationCompleteScreen({
 }: RegistrationCompleteScreenProps) {
   const deviceScheme = useColorScheme();
   const resolvedMode: ThemeMode = mode ?? (deviceScheme === 'dark' ? 'dark' : 'light');
-  const tokens = getColorTokens(resolvedMode, brandColors);
 
   return (
     <View style={[styles.root, { backgroundColor: resolveBackground({ brandColors }, resolvedMode) }]}>

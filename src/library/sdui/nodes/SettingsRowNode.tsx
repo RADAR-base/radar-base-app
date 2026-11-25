@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { tracking, fontFamily, getColorTokens, withAlpha, layout } from '../../../theme/theme';
+import { tracking, fontFamily, getColorTokens, withAlpha } from '../../../theme/theme';
 import type { NodeProps } from '../types';
 
 /**
