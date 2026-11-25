@@ -1,6 +1,12 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { getColorTokens, type NodeProps } from '@radarbase/app-kit';
+import {
+  tracking,
+  fontFamily,
+  getColorTokens,
+  layout as layoutTokens,
+} from '@radarbase/app-kit';
+import type { NodeProps } from '@radarbase/app-kit';
 
 /**
  * Example custom SDUI node. Registered against the manifest's `widgetsRegistry` entry
@@ -11,9 +17,9 @@ import { getColorTokens, type NodeProps } from '@radarbase/app-kit';
  */
 export default function CustomDemoNode({ node, context }: NodeProps) {
   const title = typeof node.title === 'string' ? node.title : 'Custom Demo Node';
-  const message =
-    typeof node.message === 'string'
-      ? node.message
+  const description =
+    typeof node.description === 'string'
+      ? node.description
       : 'This node was registered at runtime via the manifest widgetsRegistry.';
 
   // Tokens, not manifest fields: this tracks dark mode and the study's brandColors for free.
@@ -24,25 +30,32 @@ export default function CustomDemoNode({ node, context }: NodeProps) {
   const textSecondary = tokens.card.stats.description;
 
   return (
-    <View style={[styles.container, { backgroundColor: surface, borderColor: accent }]}>
-      <Text style={[styles.title, { color: text }]}>{title}</Text>
-      <Text style={[styles.text, { color: textSecondary }]}>{message}</Text>
+    <View style={[styles.card, { backgroundColor: tokens.card.stats.background }]}>
+      <Text style={[styles.title, { color: tokens.text.primary }]}>{title}</Text>
+      <Text style={[styles.description, { color: tokens.card.stats.description }]}>
+        {description}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
+  card: {
+    borderRadius: layoutTokens.radiusCard,
+    padding: layoutTokens.cardPadding,
+    gap: layoutTokens.gap,
   },
   title: {
+    fontSize: 14,
     fontWeight: '700',
-    marginBottom: 6,
+    fontFamily: fontFamily.bold,
+    letterSpacing: tracking.bold,
+    includeFontPadding: false,
   },
-  text: {
-    fontSize: 13,
+  description: {
+    fontSize: 12,
+    fontFamily: fontFamily.regular,
+    letterSpacing: tracking.regular,
+    includeFontPadding: false,
   },
 });
