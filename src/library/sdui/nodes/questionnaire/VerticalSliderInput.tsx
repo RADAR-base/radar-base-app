@@ -12,7 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import type { QuestionRange, SelectChoice } from '../../../../types';
-import { questionScale } from './questionScale';
+import { questionScale, tickIndices } from './questionScale';
 import { useStepHaptics } from '../../useStepHaptics';
 import { DragHint } from './DragHint';
 import { useBottomInset } from '../../useBottomInset';
@@ -847,7 +847,7 @@ export function VerticalSliderInput({
                   handle's centre at that step. */}
                   <Animated.View style={[styles.ticksLayer, ticksStyle]} pointerEvents="none">
                     {trackLength > 0
-                      ? Array.from({ length: steps }, (_, i) => (
+                      ? tickIndices(values, travel).map((i) => (
                           <View
                             key={i}
                             style={[

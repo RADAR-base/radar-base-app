@@ -11,7 +11,8 @@ import Animated, {
 import Svg, { Line, Path } from 'react-native-svg';
 
 import type { QuestionRange, SelectChoice } from '../../../../types';
-import { questionScale } from './questionScale';
+import { questionScale, tickIndices } from './questionScale';
+import { richLabel } from './richLabel';
 import { useStepHaptics } from '../../useStepHaptics';
 import { DragHint } from './DragHint';
 import SliderHandleIcon from '../../../../theme/icons/sliderhandle.svg';
@@ -459,7 +460,7 @@ export function ArcSliderInput({
         {radius > 0 ? (
           <Animated.View style={[styles.ticksLayer, ticksStyle]} pointerEvents="none">
             <Svg width={width} height={height}>
-              {Array.from({ length: steps }, (_, i) => {
+              {tickIndices(values, radius * ARC_SWEEP * DEG).map((i) => {
                 const t = steps > 1 ? i / (steps - 1) : 0;
                 const angle = (ARC_START - t * ARC_SWEEP) * DEG;
                 // Round caps hang half a stroke width past each end, so the line is drawn one stroke
@@ -490,7 +491,7 @@ export function ArcSliderInput({
             {current}
           </Animated.Text>
           <Text style={[styles.currentLabel, { color: stepLabelColor }]} numberOfLines={1}>
-            {scale.stepLabels?.[index] ?? ' '}
+            {richLabel(scale.stepLabels?.[index]) ?? ' '}
           </Text>
 
           {/* The arc reads the angle from its centre, so the whole area is draggable — not just the
@@ -522,10 +523,10 @@ export function ArcSliderInput({
 
       <View style={styles.endLabels}>
         <Text style={[styles.endLabel, { color: endLabelColor }]}>
-          {scale.minLabel ?? values[0]}
+          {richLabel(scale.minLabel) ?? values[0]}
         </Text>
         <Text style={[styles.endLabel, { color: endLabelColor }]}>
-          {scale.maxLabel ?? values[steps - 1]}
+          {richLabel(scale.maxLabel) ?? values[steps - 1]}
         </Text>
       </View>
     </View>

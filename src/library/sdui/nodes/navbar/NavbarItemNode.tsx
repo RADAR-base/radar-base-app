@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ComponentType } from 'react';
 import type { SvgProps } from 'react-native-svg';
 import { fontFamily, navbarLayout, layout as layoutTokens } from '../../../../theme/theme';
@@ -31,12 +31,18 @@ export function NavbarItemNode({
 }) {
   const color = selected ? selectedColor : unselectedColor;
   return (
-    <TouchableOpacity
+    // Pressable, not TouchableOpacity: a tap re-styles the tab mid-press (it becomes selected), and on
+    // the new architecture that re-render could strand TouchableOpacity's native fade at its dim value.
+    <Pressable
       accessibilityRole="tab"
       accessibilityState={{ selected }}
       accessibilityLabel={label}
       onPress={onPress}
-      style={[styles.item, selected && { backgroundColor: selectedBg, borderRadius: layoutTokens.radiusPill }]}
+      style={({ pressed }) => [
+        styles.item,
+        selected && { backgroundColor: selectedBg, borderRadius: layoutTokens.radiusPill },
+        pressed && styles.pressed,
+      ]}
     >
       <Icon width={24} height={24} color={color} />
       {showLabel && (
@@ -49,7 +55,7 @@ export function NavbarItemNode({
           <Text style={[styles.label, { color }]}>{label}</Text>
         </View>
       )}
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
@@ -60,6 +66,9 @@ const styles = StyleSheet.create({
     borderRadius: layoutTokens.radiusControl,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  pressed: {
+    opacity: 0.6,
   },
   labelWrapper: {
     height: 12,

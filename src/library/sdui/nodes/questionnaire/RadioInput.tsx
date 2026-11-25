@@ -8,10 +8,11 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import type { SelectChoice } from '../../../../types';
+import { richLabel } from './richLabel';
 import {
   INDICATOR_BORDER,
   INDICATOR_SIZE,
-  ON_ACCENT,
+  onAccentColor,
   OPTION_RADIUS,
   PRESSED_OPACITY,
   RING_ALPHA,
@@ -120,6 +121,7 @@ function RadioOption({
   // throws. Plain strings close over into the worklet fine.
   const ringClear = withAlpha(accentColor, 0);
   const ringVisible = withAlpha(accentColor, RING_ALPHA);
+  const onAccent = onAccentColor(accentColor);
   const ringStyle = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(progress.value, [0, 1], [ringClear, ringVisible]),
   }));
@@ -127,16 +129,16 @@ function RadioOption({
     backgroundColor: interpolateColor(progress.value, [0, 1], [surfaceColor, accentColor]),
   }));
   const labelStyle = useAnimatedStyle(() => ({
-    color: interpolateColor(progress.value, [0, 1], [textColor, ON_ACCENT]),
+    color: interpolateColor(progress.value, [0, 1], [textColor, onAccent]),
   }));
   const indicatorStyle = useAnimatedStyle(() => ({
-    borderColor: interpolateColor(progress.value, [0, 1], [textColor, ON_ACCENT]),
+    borderColor: interpolateColor(progress.value, [0, 1], [textColor, onAccent]),
   }));
   // Kept mounted and scaled from nothing, so it grows into place instead of appearing whole.
   const dotStyle = useAnimatedStyle(() => ({
     opacity: progress.value,
     transform: [{ scale: progress.value }],
-    backgroundColor: ON_ACCENT,
+    backgroundColor: onAccent,
   }));
 
   return (
@@ -150,7 +152,7 @@ function RadioOption({
           grow the row and shunt the list. */}
       <Animated.View style={[styles.optionRing, ringStyle]}>
         <Animated.View style={[styles.option, optionShadow, fillStyle]}>
-          <Animated.Text style={[styles.label, labelStyle]}>{label}</Animated.Text>
+          <Animated.Text style={[styles.label, labelStyle]}>{richLabel(label)}</Animated.Text>
 
           <Animated.View style={[styles.indicator, indicatorStyle]}>
             <Animated.View style={[styles.indicatorDot, dotStyle]} />

@@ -1,5 +1,5 @@
 import { type ViewStyle } from 'react-native';
-import { cardShadow } from '../../../../theme/theme';
+import { cardShadow, readableTextColor } from '../../../../theme/theme';
 
 /**
  * The look of a choice drawn as a pill card, shared by `RadioInput` and `CheckboxInput`.
@@ -41,12 +41,12 @@ export const PRESSED_OPACITY = 0.85;
  */
 export const optionShadow = cardShadow as ViewStyle;
 
-/**
- * What is drawn on the accent fill once an option is chosen: its label, and its indicator.
- *
- * White, per the design, and a deliberate contrast trade — against the default sky accent it measures
- * 1.86:1, under WCAG AA's 4.5:1. `readableTextColor(accentColor, { preferred: ON_ACCENT })` is the fix
- * if a study's brand makes that a problem, and it would need applying to both inputs at once, which is
- * why it lives here rather than in either.
- */
+/** The preferred ink on the accent fill, kept where it reads (a dark study accent). */
 export const ON_ACCENT = '#FFFFFF';
+/** The fallback ink: navy, as white on the default sky is only 1.86:1. */
+export const ON_ACCENT_DARK = '#1D3557';
+
+/** What a chosen option draws on the accent fill (label, indicator): white if it meets AA, else navy. */
+export function onAccentColor(accent: string): string {
+  return readableTextColor(accent, { preferred: ON_ACCENT, dark: ON_ACCENT_DARK });
+}

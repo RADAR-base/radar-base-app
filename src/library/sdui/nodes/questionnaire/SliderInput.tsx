@@ -9,7 +9,8 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import type { QuestionRange, SelectChoice } from '../../../../types';
-import { questionScale } from './questionScale';
+import { questionScale, tickIndices } from './questionScale';
+import { richLabel } from './richLabel';
 import { useStepHaptics } from '../../useStepHaptics';
 import { DragHint } from './DragHint';
 import SliderHandleIcon from '../../../../theme/icons/sliderhandle.svg';
@@ -441,7 +442,7 @@ export function SliderInput({
           {current}
         </Animated.Text>
         <Text style={[styles.currentLabel, { color: stepLabelColor }]} numberOfLines={1}>
-          {scale.stepLabels?.[index] ?? ' '}
+          {richLabel(scale.stepLabels?.[index]) ?? ' '}
         </Text>
       </View>
 
@@ -460,7 +461,7 @@ export function SliderInput({
             {/* One mark per step, inset from the ends so the first and last sit inside the pill. */}
             <Animated.View style={[styles.ticksLayer, ticksStyle]} pointerEvents="none">
               {trackWidth > 0
-                ? Array.from({ length: steps }, (_, i) => {
+                ? tickIndices(values, travel).map((i) => {
                     // Laid out on the travel the handle actually gets, so every mark sits under the
                     // handle's centre at that step. The handle's own radius is what insets the first
                     // and last from the ends, which keeps the row symmetric at any track width.
@@ -500,9 +501,9 @@ export function SliderInput({
         </View>
 
         <View style={styles.endLabels}>
-          <Text style={[styles.endLabel, { color: endLabelColor }]}>{minLabel ?? values[0]}</Text>
+          <Text style={[styles.endLabel, { color: endLabelColor }]}>{richLabel(minLabel) ?? values[0]}</Text>
           <Text style={[styles.endLabel, { color: endLabelColor }]}>
-            {maxLabel ?? values[steps - 1]}
+            {richLabel(maxLabel) ?? values[steps - 1]}
           </Text>
         </View>
 

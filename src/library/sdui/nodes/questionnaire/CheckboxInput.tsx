@@ -8,11 +8,12 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import type { SelectChoice } from '../../../../types';
+import { richLabel } from './richLabel';
 import CheckIcon from '../../../../theme/icons/check.svg';
 import {
   INDICATOR_BORDER,
   INDICATOR_SIZE,
-  ON_ACCENT,
+  onAccentColor,
   OPTION_RADIUS,
   PRESSED_OPACITY,
   RING_ALPHA,
@@ -164,6 +165,7 @@ function Chip({
   // throws. Plain strings close over into the worklet fine.
   const ringClear = withAlpha(accentColor, 0);
   const ringVisible = withAlpha(accentColor, RING_ALPHA);
+  const onAccent = onAccentColor(accentColor);
   const ringStyle = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(progress.value, [0, 1], [ringClear, ringVisible]),
   }));
@@ -171,10 +173,10 @@ function Chip({
     backgroundColor: interpolateColor(progress.value, [0, 1], [surfaceColor, accentColor]),
   }));
   const labelStyle = useAnimatedStyle(() => ({
-    color: interpolateColor(progress.value, [0, 1], [textColor, ON_ACCENT]),
+    color: interpolateColor(progress.value, [0, 1], [textColor, onAccent]),
   }));
   const indicatorStyle = useAnimatedStyle(() => ({
-    borderColor: interpolateColor(progress.value, [0, 1], [textColor, ON_ACCENT]),
+    borderColor: interpolateColor(progress.value, [0, 1], [textColor, onAccent]),
   }));
   /**
    * The tick, kept mounted and scaled from nothing so it grows into place instead of appearing whole.
@@ -208,12 +210,12 @@ function Chip({
                 width={TICK_GLYPH}
                 height={TICK_GLYPH}
                 strokeWidth={TICK_STROKE}
-                color={ON_ACCENT}
+                color={onAccent}
               />
             </Animated.View>
           </Animated.View>
 
-          <Animated.Text style={[styles.label, labelStyle]}>{label}</Animated.Text>
+          <Animated.Text style={[styles.label, labelStyle]}>{richLabel(label)}</Animated.Text>
         </Animated.View>
       </Animated.View>
     </Pressable>
