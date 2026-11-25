@@ -1,0 +1,218 @@
+{
+  "blueprintVersion": "1",
+  "root": {
+    "id": "root_data",
+    "type": "ViewNode",
+    "isCanvas": true,
+    "title": "Data",
+    "children": [
+      {
+        "id": "data_range",
+        "type": "DataRangeNode",
+        "defaultRange": "day"
+      },
+      {
+        "id": "data_small_cards",
+        "type": "CardSectionNode",
+        "layout": "grid",
+        "children": [
+          {
+            "id": "goal_steps_small",
+            "type": "GoalProgressCardNode",
+            "showOpenButton": false,
+            "title": "Steps",
+            "unit": "steps",
+            "info": "The steps your phone and your watch or ring counted. A step counted by both is only counted once. The bar shows how close you are to your goal.",
+            "target": {
+              "day": 10000,
+              "week": 70000,
+              "month": 300000
+            },
+            "size": "small",
+            "value": {
+              "day": 6240,
+              "week": 52300,
+              "month": 214000
+            }
+          },
+          {
+            "id": "trend_resting_hr_small",
+            "type": "TrendCardNode",
+            "showOpenButton": false,
+            "title": "Heart rate",
+            "unit": "bpm",
+            "info": "Day shows your heart rate through today, hour by hour. Week and Month show your resting heart rate, measured by your watch or ring while you are still.",
+            "size": "small",
+            "values": {
+              "day": [61, 59, 58, 60, 62, 58, 5, 7, 59, 61, 56, 58, 58],
+              "week": [60, 57, 59, 61, 56, 58, 58],
+              "month": [59, 60, 58, 58]
+            }
+          },
+          {
+            "id": "bars_sleep_small",
+            "type": "BarCardNode",
+            "showOpenButton": false,
+            "title": "Sleep",
+            "valueFormat": "duration",
+            "info": "Day shows last night, stage by stage, as it happened. Week shows how long you slept each night, and Month each week's average, split into the stages your watch or ring records.",
+            "size": "small",
+            "values": {
+              "day": [
+                [65, 262, 93, 20]
+              ],
+              "week": [
+                [62, 250, 88, 22],
+                [66, 268, 95, 28],
+                [58, 245, 86, 20],
+                [64, 262, 92, 26],
+                [70, 280, 100, 28],
+                [56, 255, 90, 22],
+                [65, 262, 93, 20]
+              ],
+              "month": [
+                [60, 255, 90, 22],
+                [63, 260, 92, 24],
+                [61, 250, 88, 21],
+                [64, 262, 93, 22]
+              ]
+            },
+            "periodLabel": {
+              "day": "Last night",
+              "week": "Last night",
+              "month": "Last week, nightly average"
+            },
+            "segments": [
+              {
+                "label": "Deep",
+                "color": "deep"
+              },
+              {
+                "label": "Light",
+                "color": "light"
+              },
+              {
+                "label": "REM",
+                "color": "rem"
+              },
+              {
+                "label": "Awake",
+                "color": "awake"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "goal_steps",
+        "type": "GoalProgressCardNode",
+        "showOpenButton": true,
+        "title": "Steps",
+        "unit": "steps",
+        "info": "The steps your phone and your watch or ring counted. A step counted by both is only counted once. The bar shows how close you are to your goal.",
+        "target": {
+          "day": 10000,
+          "week": 70000,
+          "month": 300000
+        },
+        "value": {
+          "day": 10000,
+          "week": 52300,
+          "month": 214000
+        }
+      },
+      {
+        "id": "trend_resting_hr",
+        "type": "TrendCardNode",
+        "showOpenButton": true,
+        "title": "Heart rate",
+        "unit": "bpm",
+        "info": "Day shows your heart rate through today, hour by hour. Week and Month show your resting heart rate, measured by your watch or ring while you are still. The shaded band is your usual range.",
+        "values": {
+          "day": [61, 59, 58, 60, 62, 58, 5, 7, 59, 61, 56, 58, 58],
+          "week": [60, 57, 59, 61, 56, 58, 58],
+          "month": [59, 60, 58, 58]
+        },
+        "usualRange": [55, 62]
+      },
+      {
+        "id": "bars_sleep",
+        "type": "BarCardNode",
+        "showOpenButton": true,
+        "title": "Sleep",
+        "valueFormat": "duration",
+        "info": "Day shows last night, stage by stage, as it happened. Week shows how long you slept each night, and Month each week's average, split into the stages your watch or ring records.",
+        "values": {
+          "day": [
+            [65, 262, 93, 20]
+          ],
+          "week": [
+            [62, 250, 88, 22],
+            [66, 268, 95, 28],
+            [58, 245, 86, 20],
+            [64, 262, 92, 26],
+            [70, 280, 100, 28],
+            [56, 255, 90, 22],
+            [65, 262, 93, 20]
+          ],
+          "month": [
+            [60, 255, 90, 22],
+            [63, 260, 92, 24],
+            [61, 250, 88, 21],
+            [64, 262, 93, 22]
+          ]
+        },
+        "periodLabel": {
+          "day": "Last night",
+          "week": "Last night",
+          "month": "Last week, nightly average"
+        },
+        "reference": {
+          "week": 426,
+          "month": 424
+        },
+        "summary": {
+          "day": "26 min more than your weekly average",
+          "week": "Dashed line: your weekly average",
+          "month": "Each bar is a week’s nightly average"
+        },
+        "segments": [
+          {
+            "label": "Deep",
+            "color": "deep"
+          },
+          {
+            "label": "Light",
+            "color": "light"
+          },
+          {
+            "label": "REM",
+            "color": "rem"
+          },
+          {
+            "label": "Awake",
+            "color": "awake"
+          }
+        ]
+      },
+      {
+        "id": "bars_phone_use",
+        "type": "BarCardNode",
+        "showOpenButton": true,
+        "title": "Phone use",
+        "valueFormat": "duration",
+        "info": "How long your phone's screen was in use. Day shows today hour by hour, Week each day and Month each week."
+      },
+      {
+        "id": "devices_card",
+        "type": "DevicesCardNode",
+        "available": [
+          "Fitbit",
+          "Oura",
+          "Garmin",
+          "Empatica"
+        ]
+      }
+    ]
+  }
+}

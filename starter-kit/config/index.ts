@@ -3,6 +3,7 @@ import home from './views/home.json';
 import profile from './views/profile.json';
 import comingSoon from './views/coming-soon.json';
 import calendar from './views/calendar.json';
+import data from './views/data.json';
 import inboxHistory from './views/secondary/inbox-history.json';
 import settings from './views/secondary/settings.json';
 import notifications from './views/secondary/notifications.json';
@@ -14,6 +15,7 @@ export default {
     'views/profile.json': profile,
     'views/coming-soon.json': comingSoon,
     'views/calendar.json': calendar,
+    'views/data.json': data,
     'views/secondary/inbox-history.json': inboxHistory,
     'views/secondary/settings.json': settings,
     'views/secondary/notifications.json': notifications,

@@ -37,6 +37,12 @@
       "label": "Profile",
       "icon": "person",
       "viewPath": "views/profile.json"
+    },
+    {
+      "id": "tab_data",
+      "label": "Data",
+      "icon": "data",
+      "viewPath": "views/data.json"
     }
   ],
   "secondaryViews": {
