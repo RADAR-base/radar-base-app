@@ -17,15 +17,20 @@ import type { NodeProps } from '../../types';
 import { RisingText } from '../../RisingText';
 import { useLocalMetric } from '../../useLocalMetric';
 import { SmallDataCard, smallText, isSmall } from './SmallDataCard';
-import { compactNumber, pillText } from './chartAxis';
+import { CardInfo, headerIcons } from './CardInfo';
+import { openDataDetail } from './DataDetail';
+import { CardEmpty, emptyCopy } from './CardEmpty';
+import { PERIOD_LABELS, compactNumber, pillText, valueLabel } from './chartAxis';
 
 const FILL_MS = 450;
+/** The figure, bar and line the empty state stands in for, so the card keeps its height. */
+const BODY_HEIGHT = 40 + layoutTokens.gap + 16 + layoutTokens.gap + 16;
 
-/** The period line, and how the copy names the goal, for each Day / Week / Month filter setting. */
-const PERIODS: Record<DataRange, { label: string; goal: string; met: string }> = {
-  day: { label: 'Today', goal: 'today’s goal', met: 'today' },
-  week: { label: 'This week', goal: 'this week’s goal', met: 'this week' },
-  month: { label: 'This month', goal: 'this month’s goal', met: 'this month' },
+/** How the copy names the goal, for each Day / Week / Month filter setting. */
+const PERIODS: Record<DataRange, { goal: string; met: string }> = {
+  day: { goal: 'today’s goal', met: 'today' },
+  week: { goal: 'this week’s goal', met: 'this week' },
+  month: { goal: 'this month’s goal', met: 'this month' },
 };
 
 /**
@@ -45,9 +50,9 @@ function GoalProgressCard({ node: blueprintNode, context }: NodeProps) {
   const {
     title,
     unit,
-    periodLabel,
     viewPath,
     showOpenButton,
+    info,
     value,
     target,
     progress,
@@ -57,29 +62,33 @@ function GoalProgressCard({ node: blueprintNode, context }: NodeProps) {
     ink,
     trackColor,
     barColor,
-    pillColor,
+    a11yPeriod,
     barStyle,
     tokens,
+    empty,
   } = useGoal(blueprintNode, context, false);
+  const { showInfo, showOpen } = headerIcons(info, viewPath, showOpenButton);
 
   const summary = `${value.toLocaleString()} of ${target.toLocaleString()}${unit ? ` ${unit}` : ''}`;
 
   return (
     <View
       accessible
-      accessibilityLabel={`${title}, ${periodLabel}. ${summary}. ${message}`}
+      accessibilityLabel={`${title}, ${a11yPeriod}. ${empty ? `${empty.headline}. ${empty.message}` : `${summary}. ${message}`}`}
       style={[styles.card, { backgroundColor: surface }, cardShadow]}
     >
       <View style={styles.header}>
-        <Text style={[styles.title, { color: ink }]} numberOfLines={1}>
-          {title}
-        </Text>
-        {showOpenButton && (
+        <View style={styles.titleRow}>
+          <Text style={[styles.title, { color: ink }]} numberOfLines={1}>
+            {title}
+          </Text>
+          {showInfo && info && <CardInfo title={title} info={info} color={withAlpha(ink, 0.55)} context={context} />}
+        </View>
+        {showOpen && (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Open ${title}`}
-            disabled={!viewPath}
-            onPress={() => viewPath && context.dispatch({ type: 'OpenCustomView', viewUrl: viewPath })}
+            onPress={() => openDataDetail(context, title, viewPath)}
             hitSlop={8}
             style={({ pressed }) => [
               styles.open,
@@ -92,28 +101,31 @@ function GoalProgressCard({ node: blueprintNode, context }: NodeProps) {
         )}
       </View>
 
-      <View style={styles.summary}>
-        <Text style={[styles.small, { color: ink }]}>{periodLabel}</Text>
-        <View style={styles.valueRow}>
-          {/* New figures (the filter changing period) rise into place; the bar eases. */}
-          <RisingText style={[styles.value, { color: valueInk }]}>{value.toLocaleString()}</RisingText>
-          <Text style={[styles.small, { color: ink }]}>
-            / {target.toLocaleString()}
-            {unit ? ` ${unit}` : ''}
-          </Text>
-        </View>
-      </View>
+      {empty ? (
+        <CardEmpty headline={empty.headline} message={empty.message} color={ink} minHeight={BODY_HEIGHT} />
+      ) : (
+        <>
+          <View style={styles.summary}>
+            <View style={styles.valueRow}>
+              {/* New figures (the filter changing period) rise into place; the bar eases. */}
+              <RisingText style={[styles.value, { color: valueInk }]}>{value.toLocaleString()}</RisingText>
+              <Text style={[styles.small, { color: ink }]}>
+                / {target.toLocaleString()}
+                {unit ? ` ${unit}` : ''}
+              </Text>
+            </View>
+          </View>
 
-      <View style={styles.progress}>
-        <View style={[styles.track, { backgroundColor: trackColor }]}>
-          <Animated.View style={[styles.bar, { backgroundColor: barColor }, barStyle]} />
-        </View>
-        <RisingText style={[styles.percent, { color: ink }]}>{`${Math.round(progress * 100)}%`}</RisingText>
-      </View>
+          <View style={styles.progress}>
+            <View style={[styles.track, { backgroundColor: trackColor }]}>
+              <Animated.View style={[styles.bar, { backgroundColor: barColor }, barStyle]} />
+            </View>
+            <RisingText style={[styles.percent, { color: ink }]}>{`${Math.round(progress * 100)}%`}</RisingText>
+          </View>
 
-      <View style={[styles.pill, { backgroundColor: pillColor }]}>
-        <Text style={[styles.small, { color: ink }]}>{pillText(message)}</Text>
-      </View>
+          <Text style={[styles.small, { color: ink }]}>{pillText(message)}</Text>
+        </>
+      )}
     </View>
   );
 }
@@ -121,49 +133,57 @@ function GoalProgressCard({ node: blueprintNode, context }: NodeProps) {
 /** The figure, "out of" the goal, the bar and what's left: no pill, so it fits one column. */
 function SmallGoalCard({ node: blueprintNode, context }: NodeProps) {
   const goal = useGoal(blueprintNode, context, true);
-  const { title, unit, periodLabel, value, target, progress, message, valueInk, ink } = goal;
+  const { title, unit, a11yPeriod, value, target, progress, message, valueInk, ink, empty } = goal;
   const targetText = `out of ${compactNumber(target)}`;
 
   return (
     <SmallDataCard
       context={context}
       title={title}
-      periodLabel={periodLabel}
       viewPath={goal.viewPath}
       showOpenButton={goal.showOpenButton}
+      info={goal.info}
       surface={goal.surface}
       ink={ink}
-      accessibilityLabel={`${title}, ${periodLabel}. ${value.toLocaleString()} of ${target.toLocaleString()}${unit ? ` ${unit}` : ''}. ${message}`}
+      accessibilityLabel={`${title}, ${a11yPeriod}. ${empty ? `${empty.headline}. ${empty.message}` : `${value.toLocaleString()} of ${target.toLocaleString()}${unit ? ` ${unit}` : ''}. ${message}`}`}
       value={
-        <View>
-          <RisingText style={[smallText.value, { color: valueInk }]} numberOfLines={1}>
-            {value.toLocaleString()}
-          </RisingText>
-          <Text style={[smallText.small, { color: ink }]} numberOfLines={1}>
-            {targetText}
-          </Text>
-        </View>
+        empty ? (
+          <Text style={[smallText.small, { color: ink }]}>{goal.periodName}</Text>
+        ) : (
+          <View>
+            <RisingText style={[smallText.value, { color: valueInk }]} numberOfLines={1}>
+              {value.toLocaleString()}
+            </RisingText>
+            <Text style={[smallText.small, { color: ink }]} numberOfLines={1}>
+              {targetText}
+            </Text>
+          </View>
+        )
       }
     >
-      <View style={styles.smallVisual}>
-        <View style={[styles.progress, styles.smallProgress]}>
-          <View style={[styles.track, { backgroundColor: goal.trackColor }]}>
-            <Animated.View style={[styles.bar, { backgroundColor: goal.barColor }, goal.barStyle]} />
+      {empty ? (
+        <CardEmpty headline={empty.headline} color={ink} small />
+      ) : (
+        <View style={styles.smallVisual}>
+          <View style={[styles.progress, styles.smallProgress]}>
+            <View style={[styles.track, { backgroundColor: goal.trackColor }]}>
+              <Animated.View style={[styles.bar, { backgroundColor: goal.barColor }, goal.barStyle]} />
+            </View>
+            <RisingText style={[styles.percent, { color: ink }]}>{`${Math.round(progress * 100)}%`}</RisingText>
           </View>
-          <RisingText style={[styles.percent, { color: ink }]}>{`${Math.round(progress * 100)}%`}</RisingText>
+          <Text style={[smallText.small, { color: withAlpha(ink, 0.6) }]} numberOfLines={1}>
+            {pillText(message)}
+          </Text>
         </View>
-        <Text style={[smallText.small, { color: withAlpha(ink, 0.6) }]} numberOfLines={1}>
-          {pillText(message)}
-        </Text>
-      </View>
+      )}
     </SmallDataCard>
   );
 }
 
 /** The goal's figures and colours, shared by both sizes. `small` picks the shorter copy. */
 function useGoal(blueprintNode: NodeProps['node'], context: NodeProps['context'], small: boolean) {
-  const node = useRangedNode(blueprintNode);
   const range = useDataRange();
+  const node = useRangedNode(blueprintNode);
   const period = PERIODS[range];
 
   const mode: ThemeMode = context.colorScheme ?? 'light';
@@ -174,10 +194,10 @@ function useGoal(blueprintNode: NodeProps['node'], context: NodeProps['context']
 
   const title = typeof node.title === 'string' ? node.title : 'Goal';
   const unit = typeof node.unit === 'string' ? node.unit : '';
-  const periodLabel = typeof node.periodLabel === 'string' ? node.periodLabel : period.label;
+  const periodLabel = valueLabel(node.periodLabel, 'total', range);
   const viewPath = typeof node.viewPath === 'string' && node.viewPath ? node.viewPath : undefined;
-  // Shown by default like the other data cards' open buttons, and inert without a `viewPath`.
-  const showOpenButton = node.showOpenButton !== false;
+  const info = typeof node.info === 'string' && node.info ? node.info : undefined;
+  const showOpenButton = node.showOpenButton;
 
   const local = useLocalMetric(typeof node.metric === 'string' ? node.metric : '');
   const value = local?.value ?? (typeof node.value === 'number' ? node.value : 0);
@@ -212,8 +232,8 @@ function useGoal(blueprintNode: NodeProps['node'], context: NodeProps['context']
   const ink = goalMet ? readableTextColor(accent, { preferred: brand }) : text;
   const trackColor = withAlpha(valueInk, goalMet ? 0.55 : 0.08);
   const barColor = brand;
-  // Grey on the white card; once met, a paler wash of the accent, so the pill stays part of the card.
-  const pillColor = goalMet ? withAlpha('#FFFFFF', 0.4) : tokens.card.stats.openBadge;
+  const a11yPeriod = `${PERIOD_LABELS[range]}${periodLabel ? `, ${periodLabel}` : ''}`;
+  const empty = node.noData === true ? emptyCopy(node, title, range, { small }) : null;
 
   // Eases to the new length when the figures change, e.g. switching Day / Week / Month.
   const shown = useSharedValue(0);
@@ -228,9 +248,9 @@ function useGoal(blueprintNode: NodeProps['node'], context: NodeProps['context']
   return {
     title,
     unit,
-    periodLabel,
     viewPath,
     showOpenButton,
+    info,
     value,
     target,
     progress,
@@ -240,9 +260,11 @@ function useGoal(blueprintNode: NodeProps['node'], context: NodeProps['context']
     ink,
     trackColor,
     barColor,
-    pillColor,
+    a11yPeriod,
     barStyle,
     tokens,
+    empty,
+    periodName: PERIOD_LABELS[range],
   };
 }
 
@@ -259,9 +281,15 @@ const styles = StyleSheet.create({
     gap: 6,
     minHeight: 28,
   },
+  titleRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   title: {
     ...textStyle(12, 16, 'regular'),
-    flex: 1,
+    flexShrink: 1,
   },
   open: {
     width: 28,
@@ -285,13 +313,6 @@ const styles = StyleSheet.create({
   value: { ...textStyle(36, 40, 'bold'), fontWeight: '700' },
   small: textStyle(12, 16, 'regular'),
   /** A neutral chip for the card's one-line summary, sized to its text. */
-  pill: {
-    alignSelf: 'flex-start',
-    maxWidth: '100%',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
   progress: {
     flexDirection: 'row',
     alignItems: 'center',

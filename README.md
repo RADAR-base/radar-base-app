@@ -214,8 +214,12 @@ The full task lifecycle, from schedule to completion:
 | `SurveyTaskListNode` | ePRO task list (`singleCard` / `multiCard` variants) |
 | `QuestionnaireNode` | Full-page questionnaire form with branching logic |
 | **Data & Charts** | |
+| `DataRangeNode` | Day / Week / Month filter that the data cards on the page follow |
+| `GoalProgressCardNode` | A figure against its goal, with a progress bar (e.g. steps) — see [Data cards](#data-cards) |
+| `TrendCardNode` | A reading across the period as a line, with an optional usual range (e.g. heart rate) |
+| `BarCardNode` | Bars across the period, single or stacked; a sleep timeline under Day (e.g. sleep, phone use) |
 | `StatCardNode` | Engagement stat card (check-in / streak / active days) |
-| `DataWheelCardNode` | Circular progress ring for a wearable metric |
+| `DataWheelCardNode` | Circular progress ring for a wearable metric, or a night's sleep stages |
 | `ArcDataCardNode` | 180° gauge that fills by value |
 | `BarChartCardNode` | Seven-day bar chart with a dashed average line |
 | `LineGraphCardNode` | Time-series line with drag-to-scrub tooltip |
@@ -232,6 +236,63 @@ The full task lifecycle, from schedule to completion:
 | `InboxItemListNode` | Filtered inbox list |
 | `RelativeActivityTodayNode` | Activity progress ring |
 | `NotificationListNode` | AppServer notification list (past/expired only) |
+
+## Data cards
+
+`GoalProgressCardNode`, `TrendCardNode`, `BarCardNode` and `DataWheelCardNode` make up the data page. They share these settings:
+
+| Setting | Description |
+|---------|-------------|
+| `title` | The card's title. The empty state is worded from it ("No steps yet today"). |
+| `size` | `"small"` for the square, one-column version, laid out by a `CardSectionNode` with `layout: "grid"`. Large by default. |
+| `info` | Adds an ⓘ beside the title that opens a dialog with this text. Sleep cards also explain each sleep stage. |
+| `showOpenButton` | `true` shows an arrow, in place of the ⓘ, that opens the card's [detail page](#detail-page). Off by default. |
+| `viewPath` | A blueprint for the arrow to open instead of the standard detail page. |
+
+```json
+{
+  "id": "trend_heart_rate",
+  "type": "TrendCardNode",
+  "title": "Heart rate",
+  "unit": "bpm",
+  "info": "Your resting heart rate, measured by your watch or ring while you are still.",
+  "showOpenButton": false,
+  "values": { "day": [62, 64, null, 61], "week": [58, 60, 57, 59, 61, 58, 60] },
+  "usualRange": [55, 62]
+}
+```
+
+### Day / Week / Month
+
+A `DataRangeNode` on the page adds the filter, and every data card on the page follows it. `defaultRange` (`"day"`, `"week"` or `"month"`) sets where it starts. These settings can be written once for every range or per range, as `{ "day": …, "week": …, "month": … }`: `values`, `value`, `target`, `title`, `description`, `labels`, `summary`, `periodLabel`, `highlight`, `reference`, `usualRange`, `stages` and `barColor`. A range that's left out falls back to `week`.
+
+Day runs 00–24 by the hour, Week Monday to Sunday, and Month by week (W1, W2, …).
+
+### Per card
+
+| Card | Settings |
+|------|----------|
+| `GoalProgressCardNode` | `value`, `target`, `unit`; `metric` for an app-computed figure (e.g. `task_completed`); `remainingText` / `goalMetText` replace the line under the bar, with `{remaining}` and `{unit}` filled in |
+| `TrendCardNode` | `values` (`null` leaves that hour, day or week empty); `value` for the headline, otherwise the last reading under Day and the average under Week and Month (`aggregate: "total"` for a total); `usualRange` (`[low, high]`) shades the participant's usual range; `summary`; `axisPadding` |
+| `BarCardNode` | `values`, one number per bar or a list per bar, stacked bottom up and named by `segments` (`[{ "label", "color" }]`); `valueFormat: "duration"` reads figures as minutes ("7h 20m"); `highlight`, `reference` (a dashed line), `barColor`, `aggregate`, `summary`; `stages` and `bedtime` under Day draw the night as a sleep timeline |
+| `DataWheelCardNode` | `value` / `values`, `target`, `metric`, `showTotal`, `reverse`; `stages` turns the ring into the night's sleep stages |
+
+Dragging across a large card's chart shows each point's figure and label in the headline; letting go returns to the period's figure. On the sleep timeline it shows the stage, how long it lasted and when.
+
+### Empty state
+
+When a trend or bar card has no `values` for the period, it says so in place of its figure and chart, and keeps its height:
+
+- **Large:** "No heart rate yet today" (or "this week", "this month"), with "It shows here once the app has recorded some" under it.
+- **Small:** just the headline, "No heart rate yet".
+
+### Detail page
+
+With `showOpenButton: true`, the arrow opens the built-in `dataDetail` page, titled with the card's title. The page is a placeholder for now. A study can supply its own for every card by mapping it in the manifest, or for one card with `viewPath`:
+
+```json
+"secondaryViews": { "dataDetail": "views/secondary/data-detail.json" }
+```
 
 ## Screens (built-in)
 

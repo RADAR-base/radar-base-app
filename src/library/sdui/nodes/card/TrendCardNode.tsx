@@ -12,7 +12,6 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle, ClipPath, Defs, Line, Path, Rect } from 'react-native-svg';
 import ArrowRightIcon from '../../../../theme/icons/arrowright.svg';
-import InfoIcon from '../../../../theme/icons/infofilled.svg';
 import {
   DEFAULT_ACCENT,
   cardShadow,
@@ -24,22 +23,38 @@ import {
   type ThemeMode,
 } from '../../../../theme/theme';
 import { useDataRange, useRangedNode } from '../../dataRange';
-import { ModalShell } from '../../ModalShell';
-import { PillButton } from '../../PillButton';
 import { useScrollLock } from '../../ScrollLockContext';
 import { RisingText, useRiseStyle } from '../../RisingText';
 import { useStepHaptics } from '../../useStepHaptics';
 import type { NodeProps } from '../../types';
 import { SmallDataCard, isSmall, smallText } from './SmallDataCard';
-import { PERIOD_LABELS, formatNumber, niceTicks, pillText, pointLabel, smoothPath, xLabels } from './chartAxis';
+import { CardInfo, headerIcons } from './CardInfo';
+import { openDataDetail } from './DataDetail';
+import { CardEmpty, emptyCopy } from './CardEmpty';
+import {
+  PERIOD_LABELS,
+  aggregateOf,
+  formatNumber,
+  headlineValue,
+  niceTicks,
+  pillText,
+  pointLabel,
+  smoothPath,
+  valueLabel,
+  xLabels,
+} from './chartAxis';
 
 // Figma 4517:75's chart: a 24pt axis column, 6pt gap, an 80pt plot and a 12pt label row.
 const AXIS_WIDTH = 24;
 const AXIS_GAP = 6;
 const PLOT_HEIGHT = 80;
+/** The figure and chart the empty state stands in for, so the card keeps its height. */
+const BODY_HEIGHT = 40 + layoutTokens.gap + PLOT_HEIGHT + 6 + 12;
 /** Where the top and bottom gridlines sit inside the plot. */
 const PLOT_TOP = 5;
 const PLOT_BOTTOM = 79;
+/** Room for an x label ("W4", "18"), centred under its column. */
+const LABEL_WIDTH = 28;
 /** Room left above and below the data on the y-axis, in the measure's own unit. */
 const DEFAULT_AXIS_PADDING = 10;
 const DOT_RADIUS = 4.5;
@@ -56,11 +71,12 @@ const HATCH_GAP = 8;
 const SPARK_DOT_RADIUS = 4;
 
 /**
- * A reading and its recent trend (Figma 4570:1017): the latest value, a line across the period, and
+ * A reading and its recent trend (Figma 4570:1017): the headline value, a line across the period, and
  * the participant's usual range as a band behind it.
  *
  * Not tied to heart rate: `title`, `unit`, the figures and the copy are the blueprint's. `values` (the
- * line), `value` (the headline; defaults to the last point), `labels` and `usualRange` ([low, high])
+ * line), `value` (the headline; defaults to the last point under Day, else the period's average, or
+ * total with `aggregate: "total"`), `labels` and `usualRange` ([low, high])
  * can be written per Day / Week / Month to follow the data filter. `info` adds an ⓘ that explains the
  * measure; `summary` replaces the usual-range sentence. `size: "small"` is the 1×1 version (Figma
  * 4664:1110): the reading and a bare line.
@@ -70,19 +86,21 @@ export function TrendCardNode(props: NodeProps) {
 }
 
 function SmallTrendCard({ node: blueprintNode, context }: NodeProps) {
-  const node = useRangedNode(blueprintNode);
   const range = useDataRange();
+  const node = useRangedNode(blueprintNode);
   const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
   const text = tokens.text.primary;
   const line = context.theme.brandColors?.brand ?? tokens.button.background;
 
   const title = typeof node.title === 'string' ? node.title : 'Trend';
   const unit = typeof node.unit === 'string' ? node.unit : '';
-  const periodLabel = typeof node.periodLabel === 'string' ? node.periodLabel : PERIOD_LABELS[range];
+  const aggregate = aggregateOf(node.aggregate, 'average');
+  const periodLabel = valueLabel(node.periodLabel, aggregate, range);
   const values = Array.isArray(node.values)
     ? (node.values as unknown[]).filter((v): v is number => typeof v === 'number')
     : [];
-  const latest = typeof node.value === 'number' ? node.value : values[values.length - 1];
+  const headline = typeof node.value === 'number' ? node.value : headlineValue(values, range, aggregate);
+  const empty = isEmpty(values) ? emptyCopy(node, title, range, { small: true }) : null;
 
   const [size, setSize] = useState({ width: 0, height: 0 });
   const enterStyle = useRiseStyle(range);
@@ -101,53 +119,60 @@ function SmallTrendCard({ node: blueprintNode, context }: NodeProps) {
     <SmallDataCard
       context={context}
       title={title}
-      periodLabel={periodLabel}
       viewPath={typeof node.viewPath === 'string' && node.viewPath ? node.viewPath : undefined}
-      showOpenButton={node.showOpenButton !== false}
-      accessibilityLabel={`${title}, ${periodLabel}: ${latest != null ? formatNumber(latest) : 'no reading'}${unit ? ` ${unit}` : ''}`}
+      showOpenButton={node.showOpenButton}
+      info={typeof node.info === 'string' && node.info ? node.info : undefined}
+      accessibilityLabel={`${title}, ${PERIOD_LABELS[range]}${periodLabel ? `, ${periodLabel}` : ''}: ${empty ? `${empty.headline}. ${empty.message}` : `${headline != null ? formatNumber(headline) : 'no reading'}${unit ? ` ${unit}` : ''}`}`}
       value={
-        latest != null && (
+        empty ? (
+          <Text style={[smallText.small, { color: text }]}>{PERIOD_LABELS[range]}</Text>
+        ) : headline != null && (
           <View style={smallText.valueRow}>
             <RisingText style={[smallText.value, { color: text }]} numberOfLines={1}>
-              {formatNumber(latest)}
+              {formatNumber(headline)}
             </RisingText>
             {!!unit && <Text style={[smallText.small, { color: text }]}>{unit}</Text>}
           </View>
         )
       }
     >
-      <Animated.View
-        style={[styles.spark, enterStyle]}
-        onLayout={(e) => setSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
-      >
-        {values.length > 1 && size.width > 0 && (
-          <Svg width={size.width} height={size.height}>
-            <Path
-              d={smoothPath(points)}
-              stroke={line}
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              fill="none"
-            />
-            <Circle
-              cx={last.x}
-              cy={last.y}
-              r={SPARK_DOT_RADIUS}
-              fill={tokens.card.stats.background}
-              stroke={line}
-              strokeWidth={2}
-            />
-          </Svg>
-        )}
-      </Animated.View>
+      {empty ? (
+        <CardEmpty headline={empty.headline} color={text} small />
+      ) : (
+        <Animated.View
+          style={[styles.spark, enterStyle]}
+          onLayout={(e) => setSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
+        >
+          {values.length > 1 && size.width > 0 && (
+            // Out of flow, so the drawing sized from this view's layout can't push that layout taller.
+            <Svg width={size.width} height={size.height} style={StyleSheet.absoluteFill}>
+              <Path
+                d={smoothPath(points)}
+                stroke={line}
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+              <Circle
+                cx={last.x}
+                cy={last.y}
+                r={SPARK_DOT_RADIUS}
+                fill={tokens.card.stats.background}
+                stroke={line}
+                strokeWidth={2}
+              />
+            </Svg>
+          )}
+        </Animated.View>
+      )}
     </SmallDataCard>
   );
 }
 
 function TrendCard({ node: blueprintNode, context }: NodeProps) {
-  const node = useRangedNode(blueprintNode);
   const range = useDataRange();
+  const node = useRangedNode(blueprintNode);
 
   const mode: ThemeMode = context.colorScheme ?? 'light';
   const brandColors = context.theme.brandColors;
@@ -166,27 +191,33 @@ function TrendCard({ node: blueprintNode, context }: NodeProps) {
 
   const title = typeof node.title === 'string' ? node.title : 'Trend';
   const unit = typeof node.unit === 'string' ? node.unit : '';
-  const periodLabel = typeof node.periodLabel === 'string' ? node.periodLabel : PERIOD_LABELS[range];
+  const aggregate = aggregateOf(node.aggregate, 'average');
   const info = typeof node.info === 'string' && node.info ? node.info : undefined;
   const viewPath = typeof node.viewPath === 'string' && node.viewPath ? node.viewPath : undefined;
-  const showOpenButton = node.showOpenButton !== false;
+  const showOpenButton = node.showOpenButton;
 
-  const values = Array.isArray(node.values)
-    ? (node.values as unknown[]).filter((v): v is number => typeof v === 'number')
+  const { showInfo, showOpen } = headerIcons(info, viewPath, showOpenButton);
+
+  // A column per hour, day or week; `null` (or any non-number) leaves its column empty.
+  const slots = Array.isArray(node.values)
+    ? (node.values as unknown[]).map((v) => (typeof v === 'number' ? v : null))
     : [];
-  const latest = typeof node.value === 'number' ? node.value : values[values.length - 1];
+  const filled = slots.flatMap((v, i) => (v != null ? [i] : []));
+  const values = filled.map((i) => slots[i] as number);
+  const lastFilled = filled[filled.length - 1];
+  const headline = typeof node.value === 'number' ? node.value : headlineValue(values, range, aggregate);
   const usual = usualRangeOf(node.usualRange);
-  const labels = xLabels(range, values.length, node.labels);
+  const labels = xLabels(range, slots.length, node.labels);
+  const empty = isEmpty(values) ? emptyCopy(node, title, range) : null;
 
   const [plotWidth, setPlotWidth] = useState(0);
-  const [infoOpen, setInfoOpen] = useState(false);
 
   // Dragging across the plot picks a point: the headline, its label and the sentence follow it, and
-  // letting go returns them to the latest reading.
+  // letting go returns them to the headline figure.
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const scrubbing = activeIndex != null && activeIndex < values.length;
-  const value = scrubbing ? values[activeIndex] : latest;
-  const headlineLabel = scrubbing ? pointLabel(range, activeIndex, values.length, node.labels) : periodLabel;
+  const scrubbing = activeIndex != null && slots[activeIndex] != null;
+  const value = scrubbing ? (slots[activeIndex] as number) : headline;
+  const pointName = scrubbing ? pointLabel(range, activeIndex, slots.length, node.labels) : null;
   const summary =
     typeof node.summary === 'string'
       ? node.summary
@@ -222,14 +253,15 @@ function TrendCard({ node: blueprintNode, context }: NodeProps) {
   const { setLocked } = useScrollLock();
   const tick = useStepHaptics();
   // The responder is made once, so it reads the live layout and callbacks through a ref.
-  const live = useRef({ width: 0, count: 0, index: null as number | null, setLocked, tick });
-  live.current = { ...live.current, width: plotWidth, count: values.length, setLocked, tick };
+  const live = useRef({ width: 0, count: 0, filled: [] as number[], index: null as number | null, setLocked, tick });
+  live.current = { ...live.current, width: plotWidth, count: slots.length, filled, setLocked, tick };
   const scrubResponder = useMemo(() => {
     const pick = (x: number) => {
-      const { width, count, index } = live.current;
-      if (width <= 0 || count < 2) return;
-      // Each point owns the column it sits in the middle of.
-      const next = Math.min(count - 1, Math.max(0, Math.floor((x / width) * count)));
+      const { width, count, filled: withReading, index } = live.current;
+      if (width <= 0 || withReading.length < 2) return;
+      // Each point owns the column it sits in the middle of; an empty column gives the nearest reading.
+      const column = Math.min(count - 1, Math.max(0, Math.floor((x / width) * count)));
+      const next = withReading.reduce((best, i) => (Math.abs(i - column) < Math.abs(best - column) ? i : best));
       if (next === index) return;
       live.current.index = next;
       live.current.tick();
@@ -270,10 +302,10 @@ function TrendCard({ node: blueprintNode, context }: NodeProps) {
     return PLOT_BOTTOM - ((v - lo) / (hi - lo || 1)) * (PLOT_BOTTOM - PLOT_TOP);
   };
   // Each point sits over the centre of its label, so the line and the days line up.
-  const xFor = (i: number) => ((i + 0.5) * plotWidth) / Math.max(1, values.length);
-  const points = values.map((v, i) => ({ x: xFor(i), y: yFor(v) }));
+  const xFor = (i: number) => ((i + 0.5) * plotWidth) / Math.max(1, slots.length);
+  const points = filled.map((i) => ({ x: xFor(i), y: yFor(slots[i] as number) }));
   // The dot marks the latest reading, or the point being dragged over.
-  const marked = points[scrubbing ? activeIndex : points.length - 1];
+  const marked = points[scrubbing ? filled.indexOf(activeIndex) : points.length - 1];
 
   return (
     <View style={[styles.card, { backgroundColor: surface }, cardShadow]}>
@@ -282,23 +314,13 @@ function TrendCard({ node: blueprintNode, context }: NodeProps) {
           <Text style={[styles.small, styles.title, { color: text }]} numberOfLines={1}>
             {title}
           </Text>
-          {info && (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`About ${title}`}
-              onPress={() => setInfoOpen(true)}
-              hitSlop={10}
-            >
-              <InfoIcon width={18} height={18} color={muted} />
-            </Pressable>
-          )}
+          {showInfo && info && <CardInfo title={title} info={info} color={muted} context={context} />}
         </View>
-        {showOpenButton && (
+        {showOpen && (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Open ${title}`}
-            disabled={!viewPath}
-            onPress={() => viewPath && context.dispatch({ type: 'OpenCustomView', viewUrl: viewPath })}
+            onPress={() => openDataDetail(context, title, viewPath)}
             hitSlop={8}
             style={({ pressed }) => [
               styles.open,
@@ -311,23 +333,28 @@ function TrendCard({ node: blueprintNode, context }: NodeProps) {
         )}
       </View>
 
-      <View style={styles.summary}>
-        <Text style={[styles.small, { color: text }]}>{headlineLabel}</Text>
-        {value != null && (
-          <View style={styles.valueRow}>
-            {/* A new period's reading rises into place; a dragged-over point shows at once, keeping up
-                with the finger. */}
-            <RisingText style={[styles.value, { color: text }]} still={scrubbing}>
-              {formatNumber(value)}
-            </RisingText>
-            {!!unit && <Text style={[styles.small, { color: text }]}>{unit}</Text>}
-          </View>
-        )}
-      </View>
-      {!!summary && (
-        <View style={[styles.pill, { backgroundColor: tokens.card.stats.openBadge }]}>
-          <Text style={[styles.small, { color: text }]}>{pillText(summary)}</Text>
+      {empty ? (
+        <CardEmpty headline={empty.headline} message={empty.message} color={text} minHeight={BODY_HEIGHT} />
+      ) : (
+        <View style={styles.summary}>
+          {value != null && (
+            <View style={styles.valueRow}>
+              {/* A new period's reading rises into place; a dragged-over point shows at once, keeping up
+                  with the finger. */}
+              <RisingText style={[styles.value, { color: text }]} still={scrubbing}>
+                {formatNumber(value)}
+              </RisingText>
+              {!!unit && <Text style={[styles.small, { color: text }]}>{unit}</Text>}
+              {/* A dragged-over point's label sits beside the figure, so nothing above it moves. */}
+              {pointName && (
+                <Text style={[styles.small, { color: muted }]}>· {pointName}</Text>
+              )}
+            </View>
+          )}
         </View>
+      )}
+      {!!summary && !empty && (
+        <Text style={[styles.small, { color: text }]}>{pillText(summary)}</Text>
       )}
 
       {values.length > 1 && (
@@ -425,37 +452,38 @@ function TrendCard({ node: blueprintNode, context }: NodeProps) {
                 </Svg>
               )}
             </View>
+            {/* Each label centred under its column, so 24 hours don't squeeze their text. */}
             <View style={styles.labels}>
-              {labels.map((label, i) => (
-                <Text
-                  key={i}
-                  style={[
-                    styles.label,
-                    // The marked point's label stands out: today's, or the one being dragged over.
-                    i === (scrubbing ? activeIndex : labels.length - 1)
-                      ? [styles.labelNow, { color: text }]
-                      : { color: muted },
-                  ]}
-                >
-                  {label}
-                </Text>
-              ))}
+              {plotWidth > 0 &&
+                labels.map((label, i) =>
+                  label ? (
+                    <Text
+                      key={i}
+                      style={[
+                        styles.label,
+                        { left: xFor(i) - LABEL_WIDTH / 2 },
+                        // The marked point's label stands out: the latest, or the one being dragged over.
+                        i === (scrubbing ? activeIndex : lastFilled)
+                          ? [styles.labelNow, { color: text }]
+                          : { color: muted },
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                  ) : null,
+                )}
             </View>
           </Animated.View>
         </View>
       )}
 
-      {info && (
-        <ModalShell visible={infoOpen} onClose={() => setInfoOpen(false)} brandColors={brandColors}>
-          <Text style={[styles.infoTitle, { color: line }]}>{title}</Text>
-          <Text style={[styles.infoBody, { color: withAlpha(text, 0.8) }]}>{info}</Text>
-          <View style={styles.infoAction}>
-            <PillButton label="Done" variant="primary" onPress={() => setInfoOpen(false)} brandColors={brandColors} />
-          </View>
-        </ModalShell>
-      )}
     </View>
   );
+}
+
+/** Nothing to draw: the blueprint gave no readings for the period. */
+function isEmpty(values: number[]): boolean {
+  return values.length === 0;
 }
 
 function usualRangeOf(raw: unknown): [number, number] | null {
@@ -525,13 +553,6 @@ const styles = StyleSheet.create({
   value: { ...textStyle(36, 40, 'bold'), fontWeight: '700' },
   small: textStyle(12, 16, 'regular'),
   /** A neutral chip for the card's one-line summary, sized to its text. */
-  pill: {
-    alignSelf: 'flex-start',
-    maxWidth: '100%',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
   chart: {
     flexDirection: 'row',
     gap: AXIS_GAP,
@@ -560,22 +581,17 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth * 2,
   },
   labels: {
-    flexDirection: 'row',
+    height: 12,
   },
   label: {
     ...textStyle(10, 12, 'regular'),
-    flex: 1,
+    position: 'absolute',
+    width: LABEL_WIDTH,
     textAlign: 'center',
   },
   labelNow: { ...textStyle(10, 12, 'bold'), fontWeight: '700' },
   spark: {
     flex: 1,
     minHeight: 32,
-  },
-  infoTitle: { ...textStyle(22, 28, 'bold'), fontWeight: '700', textAlign: 'center' },
-  infoBody: { ...textStyle(15, 22, 'regular'), textAlign: 'center' },
-  infoAction: {
-    width: '100%',
-    marginTop: layoutTokens.gap,
   },
 });

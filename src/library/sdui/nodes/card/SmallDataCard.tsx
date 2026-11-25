@@ -1,8 +1,19 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { PixelRatio, Pressable, StyleSheet, Text, View } from 'react-native';
 import ArrowRightIcon from '../../../../theme/icons/arrowright.svg';
-import { cardShadow, getColorTokens, layout as layoutTokens, textStyle, type ThemeMode } from '../../../../theme/theme';
+import {
+  cardShadow,
+  getColorTokens,
+  layout as layoutTokens,
+  textStyle,
+  withAlpha,
+  type ThemeMode,
+} from '../../../../theme/theme';
+import { MAX_FONT_SCALE } from '../../../../theme/fontScaling';
 import type { NodeProps } from '../../types';
+import type { InfoRowSpec } from '../../ModalInfoRow';
+import { CardInfo, headerIcons } from './CardInfo';
+import { openDataDetail } from './DataDetail';
 
 /** `size: "small"` on a data card: one grid column wide, as tall as a large stat card. */
 export function isSmall(node: NodeProps['node']): boolean {
@@ -17,17 +28,38 @@ export const SQUARE_SMALL_TYPES = new Set([
   'DataWheelCardNode',
 ]);
 
+/** A square card's header row: the title, and the ⓘ or the 28pt arrow. */
+export const CARD_HEADER_HEIGHT = 28;
+/** The square data wheel's ring, sized so header, gap and ring fill the card as the others do. */
+export const WHEEL_RING_SIZE = 126;
+export const WHEEL_RING_STROKE = 16;
+
+/**
+ * The height every square card shares, the data wheel included. The larger of the stat-card height
+ * (which follows the text size) and the wheel's (whose ring doesn't), so they stay level at any size.
+ */
+export function squareCardHeight(): number {
+  const textScale = Math.min(PixelRatio.getFontScale(), MAX_FONT_SCALE);
+  const header = Math.max(CARD_HEADER_HEIGHT, 16 * textScale);
+  const wheel = layoutTokens.cardPadding * 2 + header + layoutTokens.gap + WHEEL_RING_SIZE;
+  return Math.max(layoutTokens.cardHeightLarge, wheel);
+}
+
 interface SmallDataCardProps {
   context: NodeProps['context'];
   title: string;
-  periodLabel: string;
   viewPath?: string;
-  showOpenButton?: boolean;
+  /** `true` shows the arrow to the card's detail page (see `headerIcons`). */
+  showOpenButton?: unknown;
+  /** Opens from the ⓘ beside the title, when there's no page to open. */
+  info?: string;
+  /** Explanation rows under the info, e.g. the sleep stages. */
+  infoRows?: InfoRowSpec[];
   /** The goal card's met state takes the accent; otherwise the card colour. */
   surface?: string;
   ink?: string;
   accessibilityLabel: string;
-  /** The headline figure, under the period label. */
+  /** The headline figure, under the title. */
   value: React.ReactNode;
   /** The chart or bar, resting on the card's bottom edge. */
   children: React.ReactNode;
@@ -37,9 +69,10 @@ interface SmallDataCardProps {
 export function SmallDataCard({
   context,
   title,
-  periodLabel,
   viewPath,
-  showOpenButton = true,
+  showOpenButton,
+  info,
+  infoRows,
   surface,
   ink,
   accessibilityLabel,
@@ -49,25 +82,28 @@ export function SmallDataCard({
   const mode: ThemeMode = context.colorScheme ?? 'light';
   const tokens = getColorTokens(mode, context.theme.brandColors);
   const color = ink ?? tokens.text.primary;
+  const { showInfo, showOpen } = headerIcons(info, viewPath, showOpenButton);
 
   return (
     <View
       style={[
         styles.card,
-        { backgroundColor: surface ?? tokens.card.stats.background, minHeight: layoutTokens.cardHeightLarge },
+        { backgroundColor: surface ?? tokens.card.stats.background, minHeight: squareCardHeight() },
         cardShadow,
       ]}
     >
       <View style={styles.header}>
-        <Text style={[smallText.small, styles.title, { color }]} numberOfLines={1}>
-          {title}
-        </Text>
-        {showOpenButton && (
+        <View style={styles.titleRow}>
+          <Text style={[smallText.small, styles.title, { color }]} numberOfLines={1}>
+            {title}
+          </Text>
+          {showInfo && info && <CardInfo title={title} info={info} color={withAlpha(color, 0.55)} context={context} rows={infoRows} />}
+        </View>
+        {showOpen && (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Open ${title}`}
-            disabled={!viewPath}
-            onPress={() => viewPath && context.dispatch({ type: 'OpenCustomView', viewUrl: viewPath })}
+            onPress={() => openDataDetail(context, title, viewPath)}
             hitSlop={8}
             style={({ pressed }) => [
               styles.open,
@@ -81,9 +117,6 @@ export function SmallDataCard({
       </View>
 
       <View accessible accessibilityLabel={accessibilityLabel} style={styles.summary}>
-        <Text style={[smallText.small, { color }]} numberOfLines={1}>
-          {periodLabel}
-        </Text>
         {value}
       </View>
 
@@ -113,10 +146,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    minHeight: 28,
+    minHeight: CARD_HEADER_HEIGHT,
+  },
+  titleRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   title: {
-    flex: 1,
+    flexShrink: 1,
   },
   open: {
     width: 28,

@@ -9,6 +9,7 @@ import MedalIcon from '../../../../theme/icons/medal.svg';
 import HeartRateIcon from '../../../../theme/icons/heartrate.svg';
 import { tracking, fontFamily, getColorTokens, layout as layoutTokens, cardShadow } from '../../../../theme/theme';
 import { useLocalMetric, type LocalMetricName } from '../../useLocalMetric';
+import { squareCardHeight } from './SmallDataCard';
 import type { NodeProps } from '../../types';
 
 type EngagementTokenKey =
@@ -236,9 +237,10 @@ const styles = StyleSheet.create({
     borderRadius: layoutTokens.radiusCard,
     ...cardShadow,
   },
-  // Both heights, and the relationship between them, live in `layout` — see `cardHeightLarge`.
+  // Both heights, and the relationship between them, live in `layout` — see `cardHeightLarge`. The
+  // large one is the square cards' shared height, so it stays level with a data wheel beside it.
   cardLarge: {
-    minHeight: layoutTokens.cardHeightLarge,
+    minHeight: squareCardHeight(),
     justifyContent: 'flex-start',
   },
   cardSmall: {

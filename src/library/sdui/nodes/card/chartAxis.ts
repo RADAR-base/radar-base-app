@@ -163,8 +163,6 @@ export function formatNumber(value: number): string {
 }
 
 
-/** Between a figure and its unit: a thin space, so "7 h" reads as one item and "7 h 20 m" as two. */
-export const UNIT_SPACE = ' ';
 /** Minutes as "7h 20m", "1h 05m", "45m" or "2h". */
 export function formatDuration(minutes: number): string {
   const total = Math.round(minutes);

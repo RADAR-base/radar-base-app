@@ -3,13 +3,13 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { Easing, useSharedValue, withTiming } from 'react-native-reanimated';
 import ArrowRightIcon from '../../../../theme/icons/arrowright.svg';
 import {
-  DEFAULT_ACCENT,
   tracking,
   fontFamily,
   getColorTokens,
   layout as layoutTokens,
   cardShadow,
-  mix,
+  sleepStageColors,
+  withAlpha,
 } from '../../../../theme/theme';
 import { ProgressRing, RING_SIZE, RING_STROKE } from '../../ProgressRing';
 import { useDashboardData } from '../../useDashboardData';
@@ -20,6 +20,10 @@ import type { DashboardWidgetConfig } from '../../../../types';
 import type { NodeProps } from '../../types';
 import { formatDuration } from './chartAxis';
 import { SleepStagesRing, asleepMinutes, describeNight, parseStages } from './SleepStagesRing';
+import { CARD_HEADER_HEIGHT, WHEEL_RING_SIZE, WHEEL_RING_STROKE, squareCardHeight } from './SmallDataCard';
+import { CardInfo, headerIcons } from './CardInfo';
+import { openDataDetail } from './DataDetail';
+import { sleepStageInfoRows } from './SleepTimeline';
 
 /** The ring's sweep to a new figure, matching the number's count. */
 const RING_TIMING = { duration: 450, easing: Easing.out(Easing.cubic) };
@@ -71,9 +75,9 @@ export function DataWheelCardNode({ node: blueprintNode, context }: NodeProps) {
   // just the value — natural for count metrics like `task_completed` (X of Y tasks done).
   const showTotal = node.showTotal === true;
   const viewPath = typeof node.viewPath === 'string' ? node.viewPath : undefined;
-  // The open button (arrow → `viewPath`) shows by default; set `showOpenButton: false` in the config
-  // to hide it. Navigation still requires `viewPath` — a shown button with no target stays disabled.
-  const showOpenButton = node.showOpenButton !== false;
+  const info = typeof node.info === 'string' && node.info ? node.info : undefined;
+  // As the data cards: the arrow with `showOpenButton: true` (or a `viewPath`), else the ⓘ.
+  const { showInfo, showOpen: showOpenButton } = headerIcons(info, viewPath, node.showOpenButton);
   const inlineValue = typeof node.value === 'number' ? node.value : undefined;
   /**
    * Whether the ring sits *above* its text rather than beside it.
@@ -130,9 +134,14 @@ export function DataWheelCardNode({ node: blueprintNode, context }: NodeProps) {
   }, [percent, ringProgress]);
 
   const brandColors = context.theme.brandColors;
-  const accent = brandColors?.accent ?? DEFAULT_ACCENT;
   const brand = brandColors?.brand ?? tokens.button.background;
-  const sleepValue = formatDuration(inlineValue ?? asleepMinutes(stages));
+  const sleepValue = stages.length > 0 ? formatDuration(inlineValue ?? asleepMinutes(stages)) : '–';
+
+  // In a square card the ring shrinks to fit the same header and gap as the small data cards.
+  const ringSize = stacked ? WHEEL_RING_SIZE : RING_SIZE;
+  const ringStroke = stacked ? WHEEL_RING_STROKE : RING_STROKE;
+  const ringBox = { width: ringSize, height: ringSize };
+  const valueWidth = { maxWidth: ringSize - ringStroke * 2 - 8 };
 
   const wheel = sleep ? (
     <View accessible accessibilityLabel={`${title}: ${sleepValue} asleep. ${describeNight(stages)}`}>
@@ -140,24 +149,20 @@ export function DataWheelCardNode({ node: blueprintNode, context }: NodeProps) {
         stages={stages}
         valueText={sleepValue}
         text={tokens.text.primary}
-        // The bar card's stage colours, pre-blended onto the card so overlaps don't darken. Each
-        // differs from its neighbours in hue or lightness: dark and pale brand, dark and pale accent.
-        colors={{
-          deep: brand,
-          light: mix(tokens.card.stats.background, brand, 0.4),
-          rem: accent,
-          awake: mix(tokens.card.stats.background, accent, 0.4),
-        }}
+        // The same stage colours as every other sleep chart.
+        colors={sleepStageColors(context.colorScheme ?? 'light', brand)}
+        size={ringSize}
+        stroke={ringStroke}
       />
     </View>
   ) : (
-    <View style={styles.ringWrapper}>
-      <ProgressRing progress={ringProgress} color={ringColor} />
-      <View style={styles.ringValueWrapper}>
+    <View style={[styles.ringWrapper, ringBox]}>
+      <ProgressRing progress={ringProgress} color={ringColor} size={ringSize} stroke={ringStroke} />
+      <View style={[styles.ringValueWrapper, ringBox]}>
         {/* The wrapper rises, so the figure keeps its shrink-to-fit. */}
         <Animated.View style={valueRise}>
           <Text
-            style={[styles.ringValue, { color: tokens.text.primary }]}
+            style={[styles.ringValue, valueWidth, { color: tokens.text.primary }]}
             numberOfLines={1}
             adjustsFontSizeToFit
           >
@@ -166,7 +171,7 @@ export function DataWheelCardNode({ node: blueprintNode, context }: NodeProps) {
         </Animated.View>
         {totalText && (
           <Text
-            style={[styles.ringSubValue, { color: tokens.card.stats.description }]}
+            style={[styles.ringSubValue, valueWidth, { color: tokens.card.stats.description }]}
             numberOfLines={1}
           >
             {totalText}
@@ -179,23 +184,39 @@ export function DataWheelCardNode({ node: blueprintNode, context }: NodeProps) {
   const openButton = (
     <TouchableOpacity
       accessibilityRole="button"
-      disabled={!viewPath}
-      onPress={() => viewPath && context.dispatch({ type: 'OpenCustomView', viewUrl: viewPath })}
+      accessibilityLabel={`Open ${title}`}
+      onPress={() => openDataDetail(context, title, viewPath)}
       style={[styles.openBadge, { backgroundColor: tokens.card.stats.openBadge }]}
     >
-      <ArrowRightIcon width={12} height={12} color={tokens.card.stats.openIcon} />
+      <ArrowRightIcon width={13} height={12} color={tokens.card.stats.openIcon} />
     </TouchableOpacity>
+  );
+
+  // The same header as the small data cards: the title and its ⓘ, and the arrow, in a 28pt row.
+  const header = (
+    <View style={styles.headerRow}>
+      <View style={styles.titleRow}>
+        <Text style={[styles.titleSmall, { color: tokens.text.primary }]} numberOfLines={1}>
+          {title}
+        </Text>
+        {showInfo && info && (
+          <CardInfo
+            title={title}
+            info={info}
+            color={withAlpha(tokens.text.primary, 0.55)}
+            context={context}
+            rows={sleep ? sleepStageInfoRows() : undefined}
+          />
+        )}
+      </View>
+      {showOpenButton && openButton}
+    </View>
   );
 
   if (!stacked) {
     return (
       <View style={[styles.card, styles.cardLarge, { backgroundColor: tokens.card.stats.background }]}>
-        <View style={styles.headerRow}>
-          <Text style={[styles.titleSmall, { color: tokens.text.primary }]} numberOfLines={1}>
-            {title}
-          </Text>
-          {showOpenButton && openButton}
-        </View>
+        {header}
         <View style={styles.largeContentRow}>
           {wheel}
           <View style={styles.largeTextBlock}>
@@ -217,13 +238,10 @@ export function DataWheelCardNode({ node: blueprintNode, context }: NodeProps) {
         // In a grid (fillWidth), fill the column's stretched height so the wheel always lines up with
         // the two stacked StatCards opposite it — even when their content grows past the base 93 (e.g.
         // under font scaling). Standalone (no flex parent) this is a harmless no-op. See CardSectionNode.
-        { backgroundColor: tokens.card.stats.background, width: fillWidth ? '100%' : 176 },
+        { backgroundColor: tokens.card.stats.background, width: fillWidth ? '100%' : 176, minHeight: squareCardHeight() },
       ]}
     >
-      <Text style={[styles.titleSmall, styles.titleTop, { color: tokens.text.primary }]} numberOfLines={1}>
-        {title}
-      </Text>
-      {showOpenButton && <View style={styles.openButtonCorner}>{openButton}</View>}
+      {header}
       <View style={styles.ringCenter}>{wheel}</View>
     </View>
   );
@@ -236,20 +254,11 @@ const styles = StyleSheet.create({
     gap: layoutTokens.gap,
     ...cardShadow,
   },
-  // The ring above its value, which is how the card looks in a grid column whatever its `size` —
-  // see `stacked`.
-  //
-  // Lines up with the stat cards opposite it, by fitting their height rather than by stretching them
-  // to meet it: padding 16*2 + title 16 + gap 5 + ring 142 is exactly `cardHeightLarge`.
+  // The ring under the header, as a grid column shows it whatever its `size` (see `stacked`). Padding
+  // 16*2 + header 28 + gap 9 + ring 126 is the small data cards' 195; its minHeight is the
+  // `squareCardHeight()` they share.
   cardStacked: {
-    // minHeight, not height, so accessibility font scaling grows the card instead of clipping the
-    // title/center value (the ring stays a fixed `RING_SIZE`). See fontScaling.ts.
-    minHeight: layoutTokens.cardHeightLarge,
     alignItems: 'center',
-    // 5, not 12: the ring is a fixed 142, so this gap is the only slack between the title and the
-    // card's bottom — and 12 pushed the card to 202, seven points past the height it has to match.
-    // `ringCenter` (flex: 1) still centers the ring in whatever space is left.
-    gap: 5,
   },
   // Grid-only: stretch to the column's full (row-matched) height so the wheel matches the two
   // stacked StatCards opposite it, whatever their combined height. `ringCenter` (flex:1) re-centers
@@ -261,28 +270,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 6,
+    minHeight: CARD_HEADER_HEIGHT,
     width: '100%',
   },
-  // Stacked card: the ring sits in its own flex box below the title, centred within the space that's
-  // left after the title text (not the whole card), so the title→ring and ring→bottom gaps come out equal.
+  // Stacked card: the ring is centred in whatever room the header leaves.
   ringCenter: {
     flex: 1,
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // The title is a plain top row; the open button is pinned to the top-right corner (absolute) so it
-  // doesn't inflate the row height. That bounds the ring's centring by the *title text*, not the taller
-  // button — otherwise the extra button height above the ring makes it read as pushed down / off-centre.
-  titleTop: {
-    width: '100%',
-    paddingRight: 32, // leave room for the corner open button
-  },
-  openButtonCorner: {
-    position: 'absolute',
-    top: layoutTokens.cardPadding,
-    right: layoutTokens.cardPadding,
-    zIndex: 1,
+  titleRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   largeContentRow: {
     flexDirection: 'row',
@@ -296,15 +299,11 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   ringWrapper: {
-    width: RING_SIZE,
-    height: RING_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
   },
   ringValueWrapper: {
     position: 'absolute',
-    width: RING_SIZE,
-    height: RING_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -315,9 +314,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: tracking.bold,
     textAlign: 'center',
-    // Keep the number inside the ring's inner circle — `adjustsFontSizeToFit` then shrinks longer
+    // Kept inside the ring by a maxWidth from its size; `adjustsFontSizeToFit` then shrinks longer
     // values (e.g. "142") to fit rather than overrunning the stroke.
-    maxWidth: RING_SIZE - RING_STROKE * 2 - 8,
   },
   // Small "out of N" caption beneath the big value when `showTotal` is set.
   ringSubValue: {
@@ -328,11 +326,11 @@ const styles = StyleSheet.create({
     letterSpacing: tracking.regular,
     textAlign: 'center',
     marginTop: -2,
-    maxWidth: RING_SIZE - RING_STROKE * 2 - 8,
   },
   titleSmall: {
     flexShrink: 1,
     fontSize: 12,
+    lineHeight: 16,
     fontFamily: fontFamily.regular,
     includeFontPadding: false,
     letterSpacing: tracking.regular,
@@ -349,10 +347,11 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     width: 128,
   },
+  // As the data cards' arrow.
   openBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: layoutTokens.radiusPill,
+    width: CARD_HEADER_HEIGHT,
+    height: CARD_HEADER_HEIGHT,
+    borderRadius: CARD_HEADER_HEIGHT / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -38,6 +38,7 @@ import { PageHeader } from './PageHeader';
 import { NotificationsProvider } from './useNotifications';
 import { TaskInstructionsScreen } from './TaskInstructionsScreen';
 import type { TaskCardType } from './nodes/card/TaskCardNode';
+import { DATA_DETAIL_VIEW, dataDetailBlueprint } from './nodes/card/DataDetail';
 import {
   fontFamily,
   navbarLayout,
@@ -187,7 +188,12 @@ export function SDUIShell(props: SDUIShellProps) {
   }, [manifest, manifestError, activeTabId, activeViewPath, blueprintLoader]);
 
   const openSecondaryView = useCallback(
-    async (viewUrl: string) => {
+    async (viewUrl: string, params?: Record<string, unknown>) => {
+      if (viewUrl === DATA_DETAIL_VIEW && !manifest?.secondaryViews?.[viewUrl]) {
+        const title = typeof params?.title === 'string' ? params.title : '';
+        setSecondaryStack((stack) => [...stack, { viewUrl, blueprint: dataDetailBlueprint(title) }]);
+        return;
+      }
       try {
         // Resolve logical names (e.g. "daily_questionnaire") to file paths via
         // the manifest's secondaryViews map; fall back to the raw viewUrl for direct paths.
@@ -208,8 +214,8 @@ export function SDUIShell(props: SDUIShellProps) {
   const dispatch = useMemo(
     () =>
       createActionDispatcher({
-        onOpenCustomView: (viewUrl) => {
-          void openSecondaryView(viewUrl);
+        onOpenCustomView: (viewUrl, params) => {
+          void openSecondaryView(viewUrl, params);
         },
         onNavigate: (tabId) => {
           setSecondaryStack([]);
