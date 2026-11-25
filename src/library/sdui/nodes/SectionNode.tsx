@@ -1,5 +1,6 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { fontFamily, layout as layoutTokens, getColorTokens } from '../../../theme/theme';
 import type { Node } from '../../contracts/NodeSchema';
 import type { NodeProps } from '../types';
 
@@ -12,6 +13,8 @@ export function SectionNode({ node, context, render }: NodeProps) {
   const showSeeAll = node.showSeeAll === true;
   const layout = node.layout === 'horizontal' ? 'horizontal' : 'vertical';
   const theme = context.theme;
+  const tokens = getColorTokens(context.colorScheme ?? 'light', theme.brandColors);
+  const customGap = typeof node.gap === 'number' ? node.gap : undefined;
 
   const children = asNodeArray(node.children);
 
@@ -19,12 +22,17 @@ export function SectionNode({ node, context, render }: NodeProps) {
     <View style={styles.container}>
       {title && (
         <View style={styles.headerRow}>
-          <Text style={[styles.title, { color: theme.textColor ?? '#1C3549' }]}>{title}</Text>
+          <Text style={[styles.title, { color: tokens.text.primary }]}>{title}</Text>
           {showSeeAll && (
             <TouchableOpacity
               accessibilityRole="button"
               onPress={() => {
-                if (typeof node.seeAllAction === 'string') {
+                // `seeAllTab` switches to a primary tab (same result as tapping that tab in
+                // the navbar — full header, tab highlighted). `seeAllAction` instead opens a
+                // blueprint as a pushed secondary/detail view (Back button, current tab kept).
+                if (typeof node.seeAllTab === 'string') {
+                  context.dispatch({ type: 'Navigate', tabId: node.seeAllTab as string });
+                } else if (typeof node.seeAllAction === 'string') {
                   context.dispatch({
                     type: 'OpenCustomView',
                     viewUrl: node.seeAllAction as string,
@@ -33,7 +41,7 @@ export function SectionNode({ node, context, render }: NodeProps) {
               }}
             >
               <View style={styles.seeAllPill}>
-                <Text style={[styles.seeAllText, { color: theme.textSecondaryColor ?? '#8E8E93' }]}>
+                <Text style={[styles.seeAllText, { color: tokens.card.stats.description }]}>
                   See All
                 </Text>
               </View>
@@ -50,7 +58,9 @@ export function SectionNode({ node, context, render }: NodeProps) {
           {render(children)}
         </ScrollView>
       ) : (
-        <View>{render(children)}</View>
+        <View style={[styles.verticalContent, customGap != null && { gap: customGap }]}>
+          {render(children)}
+        </View>
       )}
     </View>
   );
@@ -61,9 +71,10 @@ function asNodeArray(value: unknown): Node[] | undefined {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    marginBottom: 20,
-  },
+  // No marginBottom here — spacing between top-level sections comes from the parent
+  // `ViewNode`'s `childrenList` gap, so it's consistent across every section-like node
+  // (this, `CardSectionNode`, etc.) regardless of which one a blueprint uses.
+  container: {},
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -72,6 +83,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 16,
+    fontFamily: fontFamily.bold,
+    includeFontPadding: false,
     fontWeight: '700',
   },
   seeAllPill: {
@@ -83,9 +96,15 @@ const styles = StyleSheet.create({
   },
   seeAllText: {
     fontSize: 12,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
     fontWeight: '600',
   },
   horizontalContent: {
+    gap: layoutTokens.gap,
     paddingRight: 16,
+  },
+  verticalContent: {
+    gap: layoutTokens.gap,
   },
 });

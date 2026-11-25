@@ -35,7 +35,11 @@ export class ManifestLoader {
 /**
  * Validate an already-fetched manifest object. Useful for tests and for hosts that
  * already have the manifest in hand (bundled JSON imports).
+ *
+ * Nothing is filled in first: every field of `theme` is optional now, and what a study doesn't say
+ * is answered by the design system at the point of use rather than copied into the manifest here.
  */
 export function parseManifest(raw: unknown): AppManifest {
   return ManifestSchema.parse(raw);
 }
+

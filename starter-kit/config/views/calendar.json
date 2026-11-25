@@ -1,0 +1,15 @@
+{
+  "blueprintVersion": "1",
+  "root": {
+    "id": "root_calendar",
+    "type": "ViewNode",
+    "isCanvas": true,
+    "title": "Calendar",
+    "children": [
+      {
+        "id": "calendar_selector",
+        "type": "CalendarNode"
+      }
+    ]
+  }
+}

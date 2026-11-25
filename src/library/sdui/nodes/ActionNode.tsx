@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 import type { ActionPayload, NodeProps } from '../types';
+import { fontFamily, getColorTokens } from '../../../theme/theme';
 
 /**
  * Tappable button. Supports two visual variants:
@@ -12,6 +13,7 @@ export function ActionNode({ node, context }: NodeProps) {
   const action = typeof node.action === 'string' ? node.action : 'TriggerEvent';
   const variant = node.variant === 'outline' ? 'outline' : 'filled';
   const theme = context.theme;
+  const tokens = getColorTokens(context.colorScheme ?? 'light', theme.brandColors);
 
   const onPress = () => {
     context.dispatch(buildAction(action, node));
@@ -27,10 +29,10 @@ export function ActionNode({ node, context }: NodeProps) {
         style={[
           styles.button,
           styles.outlineButton,
-          { borderColor: theme.primaryColor, borderRadius: radius },
+          { borderColor: tokens.button.background, borderRadius: radius },
         ]}
       >
-        <Text style={[styles.label, { color: theme.primaryColor }]}>{title}</Text>
+        <Text style={[styles.label, { color: tokens.button.background }]}>{title}</Text>
       </TouchableOpacity>
     );
   }
@@ -41,7 +43,7 @@ export function ActionNode({ node, context }: NodeProps) {
       onPress={onPress}
       style={[
         styles.button,
-        { backgroundColor: theme.primaryColor, borderRadius: radius },
+        { backgroundColor: tokens.button.background, borderRadius: radius },
       ]}
     >
       <Text style={[styles.label, { color: '#FFFFFF' }]}>{title}</Text>
@@ -88,6 +90,8 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 15,
+    fontFamily: fontFamily.semiBold,
+    includeFontPadding: false,
     fontWeight: '600',
   },
 });

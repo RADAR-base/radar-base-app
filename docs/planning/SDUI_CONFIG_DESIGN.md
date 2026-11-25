@@ -344,7 +344,7 @@ Each node type maps to a registered React Native component in the `WidgetRegistr
 | Type | Description | Key Props |
 |---|---|---|
 | `SurveyTaskListNode` | List of ePRO / questionnaire tasks | `variant` (`singleCard`/`multiCard`), `filter`, `title` |
-| `VitalsChartNode` | Vitals trend chart | `vitalType`, `variant` (`mini`/`detailed`) |
+| `GraphDataNode` | Vitals trend chart | `graphType`, `variant` (`mini`/`detailed`) |
 | `SymptomTrackerNode` | Symptom logging with severity levels | `symptoms[]`, `variant` (`card`/`detailed`) |
 | `MedicationAdherenceNode` | Dose schedule + adherence tracking | `medicationId`, `showStreak` |
 | `RelativeActivityTodayNode` | Today's activity progress ring | — |
@@ -511,7 +511,7 @@ The previous single-file YAML approach is superseded by this design. Migration s
 3. Convert each `screens.<name>.blocks[]` into a `ViewNode` tree in its own `views/<name>.json`
 4. Map old block `type` values to new node types:
    - `QuestionnaireWidget` → `SurveyTaskListNode`
-   - `VitalsWidget` → `VitalsChartNode`
+   - `VitalsWidget` → `GraphDataNode`
    - `DeviceStatusWidget` → `ConnectDevicesMenuNode`
    - `CalendarWidget` → `CalendarNode`
 5. Replace the `ConfigLoader` YAML strategy with a JSON fetch + Zod validation pipeline
@@ -524,10 +524,10 @@ Pre-built manifest + blueprint sets for common therapeutic areas. Setting `clini
 
 | Template ID | Condition | Pre-loaded Node Types |
 |---|---|---|
-| `hypertension` | Hypertension | `VitalsChartNode` (BP), `MedicationAdherenceNode`, `AlertBannerNode` |
+| `hypertension` | Hypertension | `GraphDataNode` (BP), `MedicationAdherenceNode`, `AlertBannerNode` |
 | `oncology` | Cancer / Oncology | `SymptomTrackerNode`, `SurveyTaskListNode` (ePRO), `FeaturedArticleNode` |
-| `copd` | COPD / Asthma | `VitalsChartNode` (SpO2), `AirQualityNode`, `MedicationAdherenceNode` |
-| `diabetes` | Diabetes | `VitalsChartNode` (glucose), `MedicationAdherenceNode`, `RelativeActivityTodayNode` |
+| `copd` | COPD / Asthma | `GraphDataNode` (SpO2), `AirQualityNode`, `MedicationAdherenceNode` |
+| `diabetes` | Diabetes | `GraphDataNode` (glucose), `MedicationAdherenceNode`, `RelativeActivityTodayNode` |
 | `post_surgery` | Post-surgical recovery | `SurveyTaskListNode`, `AppointmentBookingNode`, `HealthCoachNode` |
 
 Templates ship as bundled blueprints in the library so a study can go live with zero custom blueprint authoring.

@@ -5,6 +5,7 @@
   "protocols": [
     {
       "name": "Daily Mood Check",
+      "icon": "https://cdn-icons-png.flaticon.com/512/4634/4634993.png",
       "showIntroduction": false,
       "questionnaire": {
         "name": "daily_mood",
@@ -73,7 +74,7 @@
         },
         "completionWindow": {
           "unit": "hour",
-          "amount": 2
+          "amount": 4
         }
       }
     },

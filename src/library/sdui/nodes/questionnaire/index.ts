@@ -1,8 +1,17 @@
 export { RadioInput } from './RadioInput';
 export { CheckboxInput } from './CheckboxInput';
+export { MatrixRadioRows } from './MatrixRadioRows';
+export { toQuestionPages, isMatrixQuestion, matrixPageTitle } from './matrixGroups';
+export { panelBehaviour } from './panelBehaviour';
 export { RangeInput } from './RangeInput';
 export { SliderInput } from './SliderInput';
+export { DragHint } from './DragHint';
+export { VerticalSliderInput } from './VerticalSliderInput';
+export { ScaleInput } from './ScaleInput';
 export { TextQuestionInput } from './TextQuestionInput';
 export { InfoScreen } from './InfoScreen';
+export { SpeechInput } from './SpeechInput';
+export type { SpeechRecording } from './SpeechInput';
 export { QuestionRenderer } from './QuestionRenderer';
 export { evaluateBranchingLogic } from './branchingLogic';
+export { blocksProgress, NON_BLOCKING_TYPES } from './questionGate';

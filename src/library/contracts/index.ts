@@ -5,9 +5,8 @@ export {
   HeaderSchema,
   TabConfigSchema,
   WidgetRegistryEntrySchema,
-  AlertRuleSchema,
-  AlertActionSchema,
-  AlertsSchema,
+  EnrolmentStepSchema,
+  EnrolmentSchema,
 } from './ManifestSchema';
 export type {
   AppManifest,
@@ -15,7 +14,8 @@ export type {
   HeaderManifest,
   TabManifest,
   WidgetRegistryEntry,
-  AlertRule,
+  EnrolmentStep,
+  EnrolmentManifest,
 } from './ManifestSchema';
 
 export { BlueprintSchema } from './BlueprintSchema';
@@ -32,6 +32,7 @@ export type {
   Question,
   TaskListConfig,
   Task,
+  TaskView,
   DashboardWidgetConfig,
   DashboardSeriesConfig,
   DashboardRangeConfig,
