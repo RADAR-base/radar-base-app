@@ -10,8 +10,7 @@ import {
   type ThemeColorOverrides,
   type ThemeMode,
 } from '../../theme/theme';
-import { CloseIcon } from './ConfirmModal';
-import { ModalShell } from './ModalShell';
+import { ModalHeader, ModalShell } from './ModalShell';
 import { DeviceDisc } from './nodes/card/DeviceGlyph';
 import type { DeviceKind } from './nodes/card/deviceTypes';
 
@@ -47,36 +46,19 @@ export function AddDeviceModal({
   const tokens = getColorTokens(mode, brandColors);
   const brand = brandColors?.brand ?? tokens.button.background;
   const text = tokens.text.primary;
-  const chip = tokens.card.stats.openBadge;
   const healthApp = Platform.OS === 'android' ? 'Health Connect' : 'Apple Health';
 
   const rows: AvailableDevice[][] = [];
   for (let i = 0; i < devices.length; i += COLUMNS) rows.push(devices.slice(i, i + COLUMNS));
 
   return (
-    <ModalShell
-      visible={visible}
-      onClose={onClose}
-      brandColors={brandColors}
-      surfaceStyle={styles.surface}
-    >
-      <View style={styles.top}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} hitSlop={8}>
-          {({ pressed }) => (
-            <CloseIcon
-              circleColor={pressed ? brand : chip}
-              iconColor={pressed ? tokens.button.icon : tokens.card.stats.openIcon}
-            />
-          )}
-        </Pressable>
-      </View>
-
-      <View style={styles.heading}>
-        <Text style={[styles.title, { color: brand }]}>Connect a device</Text>
-        <Text style={[styles.subtitle, { color: withAlpha(text, 0.6) }]}>
-          Sign in to your device’s app to share its data. You can disconnect at any time.
-        </Text>
-      </View>
+    <ModalShell visible={visible} onClose={onClose} brandColors={brandColors}>
+      <ModalHeader
+        title="Connect a device"
+        subtitle="Sign in to your device’s app to share its data. You can disconnect at any time."
+        onClose={onClose}
+        brandColors={brandColors}
+      />
 
       <View style={styles.grid}>
         {rows.map((row, r) => (
@@ -120,27 +102,6 @@ export function AddDeviceModal({
 }
 
 const styles = StyleSheet.create({
-  surface: {
-    padding: 16,
-    gap: 12,
-  },
-  top: {
-    width: '100%',
-    flexDirection: 'row',
-  },
-  heading: {
-    width: '100%',
-    gap: 4,
-  },
-  title: {
-    ...textStyle(20, 24, 'bold'),
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  subtitle: {
-    ...textStyle(13, 18, 'regular'),
-    textAlign: 'center',
-  },
   grid: {
     width: '100%',
     gap: layout.gap,
