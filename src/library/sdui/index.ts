@@ -86,6 +86,8 @@ export {
   TaskCardNode,
   ToDoStatusNode,
   DataWheelCardNode,
+  CalendarContributionCardNode,
+  DevicesCardNode,
   BarChartCardNode,
   ArcDataCardNode,
   LineGraphCardNode,

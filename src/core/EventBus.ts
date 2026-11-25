@@ -69,13 +69,18 @@ export const EVENTS = {
   // Data Events
   DATA_UPDATED: 'dataUpdated',
   DATA_SYNCED: 'dataSynced',
-  
+  /** The participant pressed the header's Sync and it went through; `{ at: Date }`. */
+  USER_SYNCED: 'userSynced',
+
   // Task Events
   TASK_STARTED: 'taskStarted',
   TASK_COMPLETED: 'taskCompleted',
   TASK_SKIPPED: 'taskSkipped',
   /** Tapping a task on the home screen requests its instructions page (payload: task details). */
   OPEN_TASK_INSTRUCTIONS: 'openTaskInstructions',
+
+  /** A link in study-authored content was tapped; the shell confirms before opening. Payload: `{ url }`. */
+  OPEN_EXTERNAL_LINK: 'openExternalLink',
 
   /** Every loading surface the shell can raise has gone, and the participant is looking at the app. */
   APP_CHROME_READY: 'appChromeReady',

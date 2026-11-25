@@ -27,6 +27,8 @@ export const ThemeSchema = z
       .object({
         brand: z.string().optional(),
         background: z.string().optional(),
+        /** Card surface; white (dark grey in dark mode) when omitted. */
+        card: z.string().optional(),
         accent: z.string().optional(),
       })
       .optional(),
