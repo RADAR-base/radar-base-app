@@ -8,7 +8,7 @@ import type {
 import { BarChart, Sparkline } from '../Charts';
 import { useDashboardData } from '../useDashboardData';
 import type { NodeProps } from '../types';
-import { fontFamily, resolveBackground, cardShadow } from '../../../theme/theme';
+import { fontFamily, resolveBackground, cardShadow, getColorTokens } from '../../../theme/theme';
 
 /**
  * Renders a graph for a single metric. Three visual variants:
@@ -58,10 +58,12 @@ export function GraphDataNode({ node, context }: NodeProps) {
   );
 
   const theme = context.theme;
-  const secondary = theme.secondaryColor ?? '#8FA764';
-  const surface = theme.surfaceColor ?? '#FFFFFF';
-  const text = theme.textColor ?? '#1C3549';
-  const textSecondary = theme.textSecondaryColor ?? '#8E8E93';
+
+  const tokens = getColorTokens(context.colorScheme ?? 'light', theme.brandColors);
+  const secondary = tokens.background.secondary;
+  const surface = tokens.card.background;
+  const text = tokens.text.primary;
+  const textSecondary = tokens.card.stats.description;
   const background = resolveBackground(theme, context.colorScheme ?? 'light');
   const radius = theme.button?.borderRadius ?? 12;
 
