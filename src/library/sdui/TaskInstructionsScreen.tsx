@@ -217,7 +217,7 @@ export function TaskInstructionsScreen({
               pressed && styles.pressed,
             ]}
           >
-            <Text style={[styles.buttonLabel, { color: onBrand }]}>Let's Start</Text>
+            <Text style={[styles.buttonLabel, { color: onBrand }]}>Let&apos;s Start</Text>
           </Pressable>
         </View>
       </View>

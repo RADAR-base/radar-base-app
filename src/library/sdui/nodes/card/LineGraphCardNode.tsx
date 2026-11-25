@@ -37,6 +37,7 @@ export function LineGraphCardNode({ node, context }: NodeProps) {
   const unit = typeof node.unit === 'string' ? node.unit : undefined;
   // `xAxis` is semantic for now (hours-in-a-day vs days-in-a-week); the point count comes
   // from the resolved values. Kept on the API so time-axis labelling can hang off it later.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const xAxis: LineGraphXAxis = node.xAxis === 'week' ? 'week' : 'day';
   const viewPath = typeof node.viewPath === 'string' ? node.viewPath : undefined;
   // The open button (arrow → `viewPath`) shows by default; set `showOpenButton: false` in the config

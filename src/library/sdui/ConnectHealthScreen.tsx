@@ -2,7 +2,7 @@ import React from 'react';
 import { Platform, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { tracking, fontFamily, getColorTokens, layout, resolveBackground, type ThemeColorOverrides, type ThemeMode } from '../../theme/theme';
+import { tracking, fontFamily, getColorTokens, resolveBackground, type ThemeColorOverrides, type ThemeMode } from '../../theme/theme';
 import AppleHealthIcon from '../../theme/icons/applehealth.svg';
 import HealthConnectIcon from '../../theme/icons/healthconnect.svg';
 import { PillButton } from './PillButton';

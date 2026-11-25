@@ -308,7 +308,6 @@ export function SpeechInput({
   onChange,
   primaryColor,
   textColor,
-  textSecondaryColor,
   mode = 'light',
   onContinue,
   onPhaseChange,
