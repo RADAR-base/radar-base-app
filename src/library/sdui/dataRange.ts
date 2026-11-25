@@ -7,7 +7,7 @@ export const DATA_RANGES: DataRange[] = ['day', 'week', 'month'];
 
 // One range for the app: the filter and the cards it drives are siblings, with no shared parent to
 // hold it in context.
-let current: DataRange = 'week';
+let current: DataRange = 'day';
 /** Whether the participant has picked one, after which a blueprint's default no longer applies. */
 let chosen = false;
 const listeners = new Set<(range: DataRange) => void>();

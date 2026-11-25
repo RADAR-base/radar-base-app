@@ -7,6 +7,31 @@ export const PERIOD_LABELS: Record<DataRange, string> = {
   week: 'This week',
   month: 'This month',
 };
+
+/** How a Week or Month figure sums up its period. A blueprint picks with `aggregate`. */
+export type Aggregate = 'total' | 'average';
+
+export function aggregateOf(value: unknown, fallback: Aggregate): Aggregate {
+  return value === 'total' || value === 'average' ? value : fallback;
+}
+
+/** The line above a card's figure: the blueprint's `periodLabel`, else how it sums up. None under Day. */
+export function valueLabel(periodLabel: unknown, aggregate: Aggregate, range: DataRange): string {
+  if (typeof periodLabel === 'string') return periodLabel;
+  if (range === 'day') return '';
+  return aggregate === 'total' ? 'Total' : 'Average';
+}
+
+/** Under Day the latest reading; under Week or Month the period's total or average, never one point. */
+export function headlineValue(values: number[], range: DataRange, aggregate: Aggregate): number | undefined {
+  if (values.length === 0) return undefined;
+  if (range === 'day') return values[values.length - 1];
+  const total = values.reduce((sum, v) => sum + v, 0);
+  if (aggregate === 'total') return total;
+  const mean = total / values.length;
+  // As precise as the readings: whole numbers stay whole.
+  return values.every(Number.isInteger) ? Math.round(mean) : Math.round(mean * 10) / 10;
+}
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const WEEKDAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const MAX_LABELS = 7;
@@ -26,6 +51,13 @@ export function xLabels(range: DataRange, count: number, custom: unknown): strin
     if (range === 'month') return count <= 6 ? `W${i + 1}` : String(i + 1);
     return String(i + 1);
   });
+  // A day past a week's worth of points keeps 00, 06, 12 and 18, so the hours read as a clock.
+  if (range === 'day' && count > MAX_LABELS) {
+    return all.map((label, i) => {
+      const hour = Math.round((i * 24) / count);
+      return hour % 6 === 0 && (i === 0 || Math.round(((i - 1) * 24) / count) !== hour) ? label : '';
+    });
+  }
   const step = Math.ceil(count / MAX_LABELS);
   // Counted back from the end, so the latest point always keeps its label.
   return all.map((label, i) => ((count - 1 - i) % step === 0 ? label : ''));
@@ -130,16 +162,16 @@ export function formatNumber(value: number): string {
   return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
+
 /** Between a figure and its unit: a thin space, so "7 h" reads as one item and "7 h 20 m" as two. */
 export const UNIT_SPACE = ' ';
-
-/** Minutes as "7 h 20 m", "45 m" or "2 h". */
+/** Minutes as "7h 20m", "1h 05m", "45m" or "2h". */
 export function formatDuration(minutes: number): string {
   const total = Math.round(minutes);
   const h = Math.floor(total / 60);
   const m = total % 60;
-  if (h === 0) return `${m}${UNIT_SPACE}m`;
-  return m === 0 ? `${h}${UNIT_SPACE}h` : `${h}${UNIT_SPACE}h ${m}${UNIT_SPACE}m`;
+  if (h === 0) return `${m}m`;
+  return m === 0 ? `${h}h` : `${h}h ${String(m).padStart(2, '0')}m`;
 }
 
 /** "10k", "1.5M": round figures for tight spaces. Under 10,000 it's the full number. */
