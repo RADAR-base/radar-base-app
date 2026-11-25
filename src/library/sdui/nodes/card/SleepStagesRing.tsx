@@ -7,9 +7,6 @@ import { RING_SIZE, RING_STROKE } from '../../ProgressRing';
 import { useRiseStyle } from '../../RisingText';
 import { formatDuration } from './chartAxis';
 
-const CENTER = RING_SIZE / 2;
-const RADIUS = (RING_SIZE - RING_STROKE) / 2;
-
 export type SleepStage = 'awake' | 'rem' | 'light' | 'deep';
 export interface StagePeriod {
   stage: SleepStage;
@@ -45,7 +42,7 @@ function stageTotals(stages: StagePeriod[]): StagePeriod[] {
   })).filter((s) => s.minutes > 0);
 }
 
-/** A spoken summary: "4 h light, 1 h 55 m deep, …". */
+/** A spoken summary: "4h light, 1h 55m deep, …". */
 export function describeNight(stages: StagePeriod[]): string {
   return stageTotals(stages)
     .map((s) => `${formatDuration(s.minutes)} ${STAGE_NAMES[s.stage]}`)
@@ -59,13 +56,24 @@ interface SleepStagesRingProps {
   /** Opaque, as each stage's rounded end overlaps the next. */
   colors: Record<SleepStage, string>;
   text: string;
+  size?: number;
+  stroke?: number;
 }
 
 /**
  * The night's stages as shares of a ring (Figma 4557:803): the whole circle is the night, awake time
  * included, and each stage fills its part of it, with the time asleep in the middle.
  */
-export function SleepStagesRing({ stages, valueText, colors, text }: SleepStagesRingProps) {
+export function SleepStagesRing({
+  stages,
+  valueText,
+  colors,
+  text,
+  size = RING_SIZE,
+  stroke = RING_STROKE,
+}: SleepStagesRingProps) {
+  const center = size / 2;
+  const radius = (size - stroke) / 2;
   const totals = stageTotals(stages);
   const night = totals.reduce((sum, s) => sum + s.minutes, 0);
   const ringRise = useRiseStyle(totals.map((s) => `${s.stage}${s.minutes}`).join(','));
@@ -79,15 +87,15 @@ export function SleepStagesRing({ stages, valueText, colors, text }: SleepStages
   });
 
   return (
-    <View style={styles.box}>
+    <View style={{ width: size, height: size }}>
       <Animated.View style={[StyleSheet.absoluteFill, ringRise]}>
-        <Svg width={RING_SIZE} height={RING_SIZE}>
+        <Svg width={size} height={size}>
           <Circle
-            cx={CENTER}
-            cy={CENTER}
-            r={RADIUS}
+            cx={center}
+            cy={center}
+            r={radius}
             stroke={withAlpha(text, 0.08)}
-            strokeWidth={RING_STROKE}
+            strokeWidth={stroke}
             fill="none"
           />
           {/* Last first, so each stage's rounded end sits over the start of the one after it. */}
@@ -95,19 +103,19 @@ export function SleepStagesRing({ stages, valueText, colors, text }: SleepStages
             arcs.length === 1 ? (
               <Circle
                 key={arc.stage}
-                cx={CENTER}
-                cy={CENTER}
-                r={RADIUS}
+                cx={center}
+                cy={center}
+                r={radius}
                 stroke={colors[arc.stage]}
-                strokeWidth={RING_STROKE}
+                strokeWidth={stroke}
                 fill="none"
               />
             ) : (
               <Path
                 key={arc.stage}
-                d={arcPath(arc.from, arc.to)}
+                d={arcPath(arc.from, arc.to, center, radius)}
                 stroke={colors[arc.stage]}
-                strokeWidth={RING_STROKE}
+                strokeWidth={stroke}
                 strokeLinecap="round"
                 fill="none"
               />
@@ -116,7 +124,7 @@ export function SleepStagesRing({ stages, valueText, colors, text }: SleepStages
         </Svg>
       </Animated.View>
 
-      <View style={styles.center} pointerEvents="none">
+      <View style={[styles.center, { paddingHorizontal: stroke + 12 }]} pointerEvents="none">
         <Animated.Text style={[styles.value, { color: text }, valueRise]} numberOfLines={1} adjustsFontSizeToFit>
           {valueText}
         </Animated.Text>
@@ -125,24 +133,20 @@ export function SleepStagesRing({ stages, valueText, colors, text }: SleepStages
   );
 }
 
-function pointAt(share: number): { x: number; y: number } {
+function pointAt(share: number, center: number, radius: number): { x: number; y: number } {
   const angle = share * 2 * Math.PI;
-  return { x: CENTER + RADIUS * Math.sin(angle), y: CENTER - RADIUS * Math.cos(angle) };
+  return { x: center + radius * Math.sin(angle), y: center - radius * Math.cos(angle) };
 }
 
 /** Clockwise from `from` to `to`, as shares of the ring (0 at the top). */
-function arcPath(from: number, to: number): string {
-  const a = pointAt(from);
-  const b = pointAt(Math.min(to, from + 0.9999));
+function arcPath(from: number, to: number, center: number, radius: number): string {
+  const a = pointAt(from, center, radius);
+  const b = pointAt(Math.min(to, from + 0.9999), center, radius);
   const large = to - from > 0.5 ? 1 : 0;
-  return `M ${a.x} ${a.y} A ${RADIUS} ${RADIUS} 0 ${large} 1 ${b.x} ${b.y}`;
+  return `M ${a.x} ${a.y} A ${radius} ${radius} 0 ${large} 1 ${b.x} ${b.y}`;
 }
 
 const styles = StyleSheet.create({
-  box: {
-    width: RING_SIZE,
-    height: RING_SIZE,
-  },
   center: {
     position: 'absolute',
     top: 0,
@@ -151,7 +155,6 @@ const styles = StyleSheet.create({
     left: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: RING_STROKE + 12,
   },
   value: { ...textStyle(18, 21, 'bold'), fontWeight: '700', textAlign: 'center' },
 });

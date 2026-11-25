@@ -259,6 +259,7 @@ const palette = {
   pink50:     '#F8E5F0',
   pink650:    '#89346D',
   pink750:    '#571E44',
+  purple400:  '#7F77DD',
 } as const;
 
 export const darkTheme: ColorTokens = {
@@ -849,6 +850,22 @@ export function calendarChrome(headerBackground: string): string {
 
 /** The accent when the manifest sets none: sky (cyan/300), the inputs' selected-state blue. */
 export const DEFAULT_ACCENT = palette.cyan300;
+
+/**
+ * Sleep stage colours (Figma "Sleep (Day) – chart options", D2), one per stage in every sleep chart.
+ * Deep follows the study's brand; in dark mode it lightens so it shows on the dark card.
+ */
+export function sleepStageColors(
+  mode: ThemeMode,
+  brand?: string,
+): Record<'deep' | 'light' | 'rem' | 'awake', string> {
+  return {
+    deep: mode === 'dark' ? palette.navy700 : (brand ?? palette.navy750),
+    light: palette.cyan300,
+    rem: palette.purple400,
+    awake: palette.slate350,
+  };
+}
 
 /** Accent the calendar falls back to when the manifest sets none. */
 export const CALENDAR_DEFAULT_ACCENT = DEFAULT_ACCENT;
