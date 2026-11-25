@@ -608,7 +608,12 @@ export interface ScheduleService {
 
 export interface QuestionnaireDataService {
   /** Load questionnaire definitions for all assessments in a protocol. */
-  loadDefinitions(protocol: ProtocolConfig, language?: string): Promise<void>;
+  /** Fetches any definition not yet held; `refetch` re-downloads the ones already held too. */
+  loadDefinitions(
+    protocol: ProtocolConfig,
+    language?: string,
+    options?: { refetch?: boolean },
+  ): Promise<void>;
   /** Register locally bundled questionnaire definitions. */
   registerBundled(assessmentName: string, questions: Question[]): void;
   /** Get questions for a specific assessment by name. */
