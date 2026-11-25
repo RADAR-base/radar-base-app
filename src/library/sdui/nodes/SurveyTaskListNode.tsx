@@ -4,7 +4,8 @@ import { useCoreServices } from '../../../core/CoreServicesContext';
 import { EVENTS } from '../../../core/EventBus';
 import type { TaskView as Task } from '../../../types';
 import type { NodeProps } from '../types';
-import { fontFamily, cardShadow } from '../../../theme/theme';
+import { fontFamily, cardShadow, getColorTokens } from '../../../theme/theme';
+import NoTasksArt from '../../../theme/icons/notasks.svg';
 
 interface FilterShape {
   status?: 'incomplete' | 'complete' | 'all';
@@ -30,6 +31,10 @@ const TASK_ICONS: Record<string, { symbol: string; bg: string }> = {
  *   - Duration pill: estimated completion time
  *   - Repeat pill: derived from task repetition count (if available)
  */
+/** The empty-state illustration's drawn size, and its own aspect (1445 x 1333). */
+const EMPTY_ART_WIDTH = 140;
+const EMPTY_ART_ASPECT = 1445 / 1333;
+
 export function SurveyTaskListNode({ node, context }: NodeProps) {
   const { schedule, eventBus } = useCoreServices();
   const variant = node.variant === 'multiCard' ? 'multiCard' : 'singleCard';
@@ -79,10 +84,15 @@ export function SurveyTaskListNode({ node, context }: NodeProps) {
   };
 
   const theme = context.theme;
-  const surface = theme.surfaceColor ?? '#FFFFFF';
-  const text = theme.textColor ?? '#1C3549';
-  const textSecondary = theme.textSecondaryColor ?? '#8E8E93';
-  const secondary = theme.secondaryColor ?? '#8FA764';
+
+  const tokens = getColorTokens(context.colorScheme ?? 'light', theme.brandColors);
+  const surface = tokens.card.background;
+  const text = tokens.text.primary;
+  const textSecondary = tokens.card.stats.description;
+  const secondary = tokens.background.secondary;
+  /** Every navy shape in the empty-state drawing; its pink and white details stay as authored.
+   *  `CalendarTaskView` colours the same drawing the same way. */
+  const artInk = tokens.background.secondary;
   const radius = theme.button?.borderRadius ?? 12;
   const pillBg = '#E8F0E0';
 
@@ -153,6 +163,15 @@ export function SurveyTaskListNode({ node, context }: NodeProps) {
 
       {tasks.length === 0 && (
         <View style={[styles.emptyState, { backgroundColor: surface, borderRadius: radius }]}>
+          {/* Decorative: the line below already says it, and announcing the drawing too would only
+              say it twice. */}
+          <NoTasksArt
+            width={EMPTY_ART_WIDTH}
+            height={EMPTY_ART_WIDTH / EMPTY_ART_ASPECT}
+            color={artInk}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          />
           <Text style={[styles.emptyText, { color: textSecondary }]}>
             No tasks scheduled for today
           </Text>
@@ -360,6 +379,7 @@ const styles = StyleSheet.create({
   emptyState: {
     padding: 24,
     alignItems: 'center',
+    gap: 12,
     ...cardShadow,
   },
   emptyText: {

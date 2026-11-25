@@ -1,9 +1,11 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
-import { tracking, fontFamily, getColorTokens, layout, type ThemeMode, type ThemeColorOverrides } from '../../theme/theme';
+import { tracking, fontFamily, getColorTokens, layout, withAlpha, type ThemeMode, type ThemeColorOverrides } from '../../theme/theme';
 
 /** Base vertical padding inside the card (Figma py-64). Bottom padding also adds the safe-area inset. */
 const CARD_VERTICAL_PADDING = 32;
+/** Lets the gradient behind show through; much lower and the white text loses contrast. */
+const CARD_OPACITY = 0.85;
 
 /**
  * Welcome / enrolment card — Figma "Welcome" card (node 3122:3603). A study-name title and
@@ -63,7 +65,7 @@ export function WelcomeCard({
 
   // Inverted "on-brand" card: a brand-colored surface with white content. Only this card is
   // inverted — the rest of the app keeps the standard light-on-surface treatment.
-  const cardBg = brandColor;
+  const cardBg = withAlpha(brandColor, CARD_OPACITY);
   const contentColor = white; // title, description, prompts, and the outline button
   const filledButtonBg = white; // the primary CTA is a white pill...
   const filledButtonLabel = brandColor; // ...with a brand-colored label

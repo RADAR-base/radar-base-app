@@ -5,6 +5,7 @@ import { useCoreServices } from '../../../core/CoreServicesContext';
 import { EVENTS } from '../../../core/EventBus';
 import type { Question, QuestionnaireResult, QuestionTimestamp } from '../../../types';
 import {
+  DEFAULT_ACCENT,
   fontFamily,
   tracking,
   getColorTokens,
@@ -95,11 +96,6 @@ const FOOTER_RISE = 12;
 /** Space between the two footer buttons — the page's standard gap. */
 const FOOTER_GAP = 9;
 
-/**
- * Accent used when the manifest sets none — Figma's `color/sky/200`, the fill the radio and
- * scroll-hint designs are drawn with. A study that sets `brandColors.accent` overrides it.
- */
-const DEFAULT_ACCENT = '#7EC8E8';
 
 
 /**
@@ -130,6 +126,9 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   const [timestamps, setTimestamps] = useState<Record<string, QuestionTimestamp>>({});
   // Reported by the speech input; drives whether this screen keeps its footer (see `showFooter`).
   const [speechPhase, setSpeechPhase] = useState<SpeechPhase>('idle');
+  // An input dragging inside the panel holds it still for the length of the gesture.
+  const [scrollLocked, setScrollLocked] = useState(false);
+  const handleScrollLock = useCallback((locked: boolean) => setScrollLocked(locked), []);
   /**
    * Measured height of the review screen's heading, used to centre the controls on the *page* rather
    * than in the space the heading leaves below it.
@@ -335,18 +334,12 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
 
   /** Set by the current input. A ref, not state: `goNext` only reads it when pressed. */
   const answerValid = useRef(true);
-  const handleValidityChange = useCallback((valid: boolean) => {
+  /** Its reason, which the dock does draw — so this half has to be state. Only the text field sets it. */
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const handleValidityChange = useCallback((valid: boolean, reason?: string | null) => {
     answerValid.current = valid;
+    setFieldError(reason ?? null);
   }, []);
-
-  /**
-   * Held still while an input inside the panel is being dragged.
-   *
-   * Claiming the gesture isn't enough on its own: `onShouldBlockNativeResponder` is Android-only, and
-   * on iOS the enclosing `ScrollView` is a native view whose own pan recogniser can cancel the touches
-   * out from under the JS responder. Turning the scroller off for the length of the gesture is the
-   * only thing that reliably stops the page moving under the finger.
-   */
 
   const goNext = useCallback(() => {
     // Hold them here and show why, rather than carrying a bad answer forward.
@@ -358,6 +351,7 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
     }
     setSubmitAttempt(0);
     answerValid.current = true;
+    setFieldError(null);
     // Stamp info/descriptive types (no user input) so every shown question has a timestamp.
     if (currentQuestion?.field_name && timestamps[currentQuestion.field_name] == null) {
       setTimestamps((prev) => ({
@@ -384,6 +378,7 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   const goPrevious = useCallback(() => {
     setSubmitAttempt(0);
     answerValid.current = true;
+    setFieldError(null);
     if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1);
       setSpeechPhase('idle'); // See `goNext` — the phase belongs to the question being left.
@@ -485,6 +480,8 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
   const canProceed = !isRequired || hasAnswer;
   /** Surfaced only once they've tried to leave — see `submitAttempt`. */
   const requiredError = submitAttempt > 0 && !canProceed ? REQUIRED_MESSAGE : null;
+  /** Being empty outranks being malformed: there is nothing to be wrong about yet. */
+  const pageError = requiredError ?? fieldError;
 
   /**
    * What every refused answer does, whatever kind of question it was.
@@ -771,8 +768,10 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                 scrollEventThrottle={16}
                 showsVerticalScrollIndicator={false}
                 // Set even on a View panel, where it is simply ignored — see `panelBehaviour`
-                // for which pages refuse to scroll and why.
-                scrollEnabled={behaviour.scrollEnabled}
+                  // for which pages refuse to scroll and why. `&& !scrollLocked`: an input dragging
+                  // inside this panel holds it still for the length of the gesture — see
+                  // `handleScrollLock`.
+                  scrollEnabled={behaviour.scrollEnabled && !scrollLocked}
               >
                 {!question ? (
                   <Text style={[styles.emptyText, { color: muted }]}>No questions available</Text>
@@ -920,6 +919,7 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
                           onValidityChange={isActive ? handleValidityChange : undefined}
                           // Only the active panel: a parked neighbour has no business freezing the
                           // page the participant is actually looking at.
+                          onScrollLock={isActive ? handleScrollLock : undefined}
                           // Only the text field draws this itself, lined up with its own card. Every
                           // other type gets the screen's pinned row below.
                           errorMessage={isActive ? requiredError : null}
@@ -973,16 +973,12 @@ export function QuestionnaireScreenNode({ node, context }: NodeProps) {
         * looked right only because its container fills the screen, so its message was already pinned;
         * this gives every type that same behaviour instead of one type scrolling to find it.
         *
-        * `text` is the exception and draws its own, lined up with its card.
+        * Every type, text included — it used to draw its own under its card, which left the same
+        * message in two different places depending on the question.
         */}
-      {currentQuestion?.field_type !== 'text' && (
-        <View
-          style={[styles.errorDock, { bottom: FOOTER_RESERVE + bottomInset }]}
-          pointerEvents="none"
-        >
-          <QuestionError message={requiredError} shakeKey={submitAttempt} mode={mode} />
-        </View>
-      )}
+      <View style={[styles.errorDock, { bottom: FOOTER_RESERVE + bottomInset }]} pointerEvents="none">
+        <QuestionError message={pageError} shakeKey={submitAttempt} mode={mode} />
+      </View>
 
       {/* Footer: Exit (first) / Back (thereafter) + Next / Finish (last). The speech question shows only
           the back/exit half while idle, and no footer at all once recording starts. */}

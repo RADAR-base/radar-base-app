@@ -5,7 +5,6 @@ import {
   fontFamily,
   getColorTokens,
   layout as layoutTokens,
-  cardShadow,
 } from '@radarbase/app-kit';
 import type { NodeProps } from '@radarbase/app-kit';
 
@@ -23,7 +22,12 @@ export default function CustomDemoNode({ node, context }: NodeProps) {
       ? node.description
       : 'This node was registered at runtime via the manifest widgetsRegistry.';
 
+  // Tokens, not manifest fields: this tracks dark mode and the study's brandColors for free.
   const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
+  const accent = tokens.button.background;
+  const surface = tokens.card.background;
+  const text = tokens.text.primary;
+  const textSecondary = tokens.card.stats.description;
 
   return (
     <View style={[styles.card, { backgroundColor: tokens.card.stats.background }]}>
@@ -40,7 +44,6 @@ const styles = StyleSheet.create({
     borderRadius: layoutTokens.radiusCard,
     padding: layoutTokens.cardPadding,
     gap: layoutTokens.gap,
-    ...cardShadow,
   },
   title: {
     fontSize: 14,

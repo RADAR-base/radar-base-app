@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { tracking, fontFamily, getColorTokens, layout as layoutTokens } from '../../../../theme/theme';
 import { TaskDayList, type FilterShape } from './TaskDayList';
@@ -13,6 +13,9 @@ import type { NodeProps } from '../../types';
  * and rendering lives in the shared `TaskDayList`, always for *today*. `CalendarNode` reuses that
  * same `TaskDayList` for an arbitrary selected day.
  */
+/** Tasks shown before a `multiCard` list collapses the rest behind "See all tasks". */
+const DEFAULT_MAX_VISIBLE = 5;
+
 export function TaskListSectionNode({ node, context }: NodeProps) {
   const title = typeof node.title === 'string' ? node.title : undefined;
   const showSeeAll = node.showSeeAll === true;
@@ -22,6 +25,25 @@ export function TaskListSectionNode({ node, context }: NodeProps) {
     () => (isRecord(node.filter) ? (node.filter as FilterShape) : {}),
     [node.filter],
   );
+  /**
+   * How many task cards a `multiCard` list draws before the rest collapse into "See all tasks".
+   *
+   * `0` (or a negative) turns the cap off and shows every task. Only takes effect when the blueprint
+   * also says where "See all" leads — see `seeAll` below.
+   */
+  const maxVisible = typeof node.maxVisible === 'number' ? node.maxVisible : DEFAULT_MAX_VISIBLE;
+  /**
+   * Where the overflow row leads, taking the same `seeAllTab`/`seeAllAction` pair `SectionNode` uses
+   * for its own "See All" pill, plus this node's `viewPath`. `undefined` when the blueprint names
+   * none, which leaves the list uncapped rather than hiding tasks behind a dead link.
+   */
+  const seeAllTab = typeof node.seeAllTab === 'string' ? node.seeAllTab : undefined;
+  const seeAllAction =
+    typeof node.seeAllAction === 'string' ? node.seeAllAction : viewPath;
+  const seeAll = useCallback(() => {
+    if (seeAllTab) context.dispatch({ type: 'Navigate', tabId: seeAllTab });
+    else if (seeAllAction) context.dispatch({ type: 'OpenCustomView', viewUrl: seeAllAction });
+  }, [context, seeAllTab, seeAllAction]);
 
   const tokens = getColorTokens(context.colorScheme ?? 'light', context.theme.brandColors);
 
@@ -43,7 +65,16 @@ export function TaskListSectionNode({ node, context }: NodeProps) {
         </View>
       )}
 
-      <TaskDayList context={context} date={new Date()} variant={variant} filter={filter} scope="open" idPrefix={node.id} />
+      <TaskDayList
+        context={context}
+        date={new Date()}
+        variant={variant}
+        filter={filter}
+        scope="open"
+        idPrefix={node.id}
+        maxVisible={maxVisible}
+        onSeeAll={seeAllTab || seeAllAction ? seeAll : undefined}
+      />
     </View>
   );
 }

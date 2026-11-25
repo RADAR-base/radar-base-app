@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { PillButton } from '../../PillButton';
 import { useCoreServices } from '../../../../core/CoreServicesContext';
 import { EVENTS } from '../../../../core/EventBus';
 import type { ScheduleService, Task as ScheduledTask, TaskView as Task } from '../../../../types';
@@ -39,6 +40,17 @@ export interface TaskDayListProps {
   scope?: 'day' | 'open';
   /** Prefix for generated child node ids (React keys / ToDoStatus id). */
   idPrefix: string;
+  /**
+   * Cap on how many task cards a `multiCard` list draws, with the rest behind a "See all tasks" row.
+   *
+   * Only `multiCard` honours it — `singleCard` already shows one — and only when `onSeeAll` is given,
+   * since a list that hides tasks with no way to reach them is worse than a long one. Omitted
+   * entirely (as `CalendarNode` does) the list shows every task: the calendar *is* the all-tasks view,
+   * so there is nowhere for its own link to go.
+   */
+  maxVisible?: number;
+  /** Where the overflow row leads. Without it the cap is ignored — see `maxVisible`. */
+  onSeeAll?: () => void;
 }
 
 /**
@@ -92,6 +104,8 @@ export function TaskDayList({
   filter = NO_FILTER,
   scope = 'day',
   idPrefix,
+  maxVisible,
+  onSeeAll,
 }: TaskDayListProps) {
   const { schedule, eventBus } = useCoreServices();
 
@@ -189,7 +203,17 @@ export function TaskDayList({
     .filter((t) => (variant === 'multiCard' ? isAvailableNow(t) || isUpcoming(t) : isAvailableNow(t)))
     .slice()
     .sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
-  const visibleTasks = variant === 'singleCard' ? openTasks.slice(0, 1) : openTasks;
+  // `multiCard` keeps the section a readable length: past `maxVisible` the remainder collapses into a
+  // single "See all tasks" row beneath the last card, rather than running the home page off-screen.
+  const capped =
+    variant === 'multiCard' && onSeeAll != null && maxVisible != null && maxVisible > 0;
+  const visibleTasks =
+    variant === 'singleCard'
+      ? openTasks.slice(0, 1)
+      : capped
+        ? openTasks.slice(0, maxVisible)
+        : openTasks;
+  const hiddenCount = openTasks.length - visibleTasks.length;
 
   if (visibleTasks.length === 0) {
     return (
@@ -233,7 +257,41 @@ export function TaskDayList({
           </Pressable>
         );
       })}
+      {hiddenCount > 0 && (
+        <SeeAllTasksButton context={context} hidden={hiddenCount} onPress={onSeeAll!} />
+      )}
     </View>
+  );
+}
+
+/**
+ * The "See all tasks" button that closes a capped `multiCard` list.
+ *
+ * The design system's own `PillButton`, in its `outline` variant, rather than a row of its own: it is
+ * the one thing under the list that is an action, so it should look like the app's other actions —
+ * and taking the component means it tracks the theme and any manifest brand override for free.
+ * Outline over filled, and `small` over the full button height, so it reads as a way out of the list
+ * rather than as the page's main call to action, which the tasks themselves are.
+ */
+function SeeAllTasksButton({
+  context,
+  hidden,
+  onPress,
+}: {
+  context: SDUIContext;
+  hidden: number;
+  onPress: () => void;
+}) {
+  return (
+    <PillButton
+      label={`See all tasks (${hidden} more)`}
+      variant="outline"
+      size="small"
+      onPress={onPress}
+      mode={context.colorScheme ?? 'light'}
+      brandColors={context.theme.brandColors}
+      style={styles.seeAllButton}
+    />
   );
 }
 
@@ -344,5 +402,21 @@ const styles = StyleSheet.create({
   // Android. A scale transform is elevation-safe and reads the same on both platforms.
   taskPressed: {
     transform: [{ scale: 0.98 }],
+  },
+  /**
+   * Centred, and only as wide as its label.
+   *
+   * `PillButton` is full width by default — right for a button that ends a screen, wrong for one
+   * closing a list, where a full-width pill reads as another row of the list rather than as the way
+   * out of it. `style` is applied after the component's own, so these win.
+   *
+   * The top margin is a little more than the list's gap, for the same reason: it is a different kind
+   * of thing from the cards above it.
+   */
+  seeAllButton: {
+    alignSelf: 'center',
+    width: 'auto',
+    paddingHorizontal: 18,
+    marginTop: 4,
   },
 });

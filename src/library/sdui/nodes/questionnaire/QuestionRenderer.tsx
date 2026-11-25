@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { Question } from '../../../../types';
 import { RadioInput } from './RadioInput';
+import { LikertSliderInput } from './LikertSliderInput';
 import { CheckboxInput } from './CheckboxInput';
 import { ArcSliderInput } from './ArcSliderInput';
 import { parseChoices } from './questionScale';
@@ -14,7 +15,6 @@ import { TextQuestionInput } from './TextQuestionInput';
 import { InfoScreen } from './InfoScreen';
 import { SpeechInput, type SpeechPhase } from './SpeechInput';
 import { speechContent } from './speechContent';
-import { QuestionError } from './QuestionError';
 import { fontFamily, withAlpha, type ThemeMode } from '../../../../theme/theme';
 
 interface QuestionRendererProps {
@@ -76,11 +76,18 @@ interface QuestionRendererProps {
   /** How many times the participant has tried to move on — text inputs surface their errors, and
    *  shake, from here. */
   submitAttempt?: number;
-  /** Reports whether the current answer would pass, so the screen knows to hold them here. */
-  onValidityChange?: (valid: boolean) => void;
+  /** Reports whether the current answer would pass, and why not — the screen draws the message. */
+  onValidityChange?: (valid: boolean, reason?: string | null) => void;
   /**
-   * Why this question was refused. Rendered under the input for every type except `text`, which draws
-   * its own lined up with its card.
+   * Lets an input hold its panel still while it is being dragged.
+   *
+   * Only a control that takes a drag inside a scrolling page needs it — see `LikertSliderInput`,
+   * where a vertical flick would otherwise scroll the page instead of moving the handle.
+   */
+  onScrollLock?: (locked: boolean) => void;
+  /**
+   * Why this question was refused. Only `text` draws it, lined up with its own card — every other type
+   * gets the screen's pinned row above the footer.
    */
   errorMessage?: string | null;
 }
@@ -136,6 +143,7 @@ export function QuestionRenderer({
   pageInset,
   submitAttempt,
   onValidityChange,
+  onScrollLock,
   errorMessage,
 }: QuestionRendererProps) {
   const isRequired = question.required_field === 'y';
@@ -174,18 +182,6 @@ export function QuestionRenderer({
       ) : null}
 
       {renderInput()}
-
-      {/* Under the input, inside this container — a sibling of the container outside it would sit
-          below its bottom margin as well as the panel's gap, putting the message more than twice as
-          far from a radio group as from a text field. `text` is excluded: it draws its own, lined up
-          with its card. */}
-      {question.field_type !== 'text' ? (
-        <QuestionError
-          message={errorMessage}
-          style={styles.error}
-          shakeKey={submitAttempt}
-        />
-      ) : null}
     </View>
   );
 
@@ -203,7 +199,7 @@ export function QuestionRenderer({
      */
 
     switch (question.field_type) {
-      case 'radio':
+      case 'radio': {
         return (
           <RadioInput
             choices={parseChoices(question.select_choices_or_calculations)}
@@ -214,6 +210,24 @@ export function QuestionRenderer({
             textColor={textColor}
           />
         );
+      }
+
+      case 'likert-emoji': {
+        return (
+          <LikertSliderInput
+            choices={parseChoices(question.select_choices_or_calculations)}
+            value={value != null ? String(value) : undefined}
+            onChange={onChange}
+            primaryColor={primaryColor}
+            textColor={textColor}
+            accentColor={radioAccent}
+            surfaceColor={radioSurface}
+            backgroundColor={backgroundColor}
+            onScrollLock={onScrollLock}
+          />
+        );
+      }
+
 
       case 'checkbox':
         return (
@@ -250,6 +264,7 @@ export function QuestionRenderer({
             backgroundColor={backgroundColor}
             primaryColor={primaryColor}
             textColor={textColor}
+            onScrollLock={onScrollLock}
           />
         );
 
@@ -265,6 +280,7 @@ export function QuestionRenderer({
             backgroundColor={backgroundColor}
             primaryColor={primaryColor}
             textColor={textColor}
+            onScrollLock={onScrollLock}
           />
         );
 
@@ -281,6 +297,7 @@ export function QuestionRenderer({
             primaryColor={primaryColor}
             textColor={textColor}
             bottomReserve={bottomReserve}
+            onScrollLock={onScrollLock}
           />
         );
 
@@ -296,6 +313,7 @@ export function QuestionRenderer({
             backgroundColor={backgroundColor}
             primaryColor={primaryColor}
             textColor={textColor}
+            onScrollLock={onScrollLock}
           />
         );
 
@@ -311,6 +329,7 @@ export function QuestionRenderer({
             backgroundColor={backgroundColor}
             primaryColor={primaryColor}
             textColor={textColor}
+            onScrollLock={onScrollLock}
           />
         );
 
@@ -384,6 +403,7 @@ export function QuestionRenderer({
       }
 
       case 'info':
+      case 'descriptive': 
         return (
           <InfoScreen
             label={question.field_label}
@@ -392,15 +412,6 @@ export function QuestionRenderer({
             textColor={textColor}
             textSecondaryColor={textSecondaryColor}
           />
-        );
-
-      case 'descriptive':
-        return (
-          <View style={styles.descriptive}>
-            <Text style={[styles.descriptiveText, { color: textSecondaryColor }]}>
-              {question.field_label ?? ''}
-            </Text>
-          </View>
         );
 
       default:
@@ -433,10 +444,6 @@ const styles = StyleSheet.create({
     flex: 1,
     marginBottom: 0,
   },
-  /** The gap above the message — matched to the text field's own. */
-  error: {
-    marginTop: 16,
-  },
   /** Hands the scale the height its parent gave us, instead of collapsing to its content. */
   fill: {
     flex: 1,
@@ -454,6 +461,4 @@ const styles = StyleSheet.create({
   label: { fontSize: 15, fontWeight: '500', lineHeight: 21, fontFamily: fontFamily.medium, includeFontPadding: false },
   required: { color: '#dc3545' },
   note: { fontSize: 12, marginTop: 2, fontStyle: 'italic', fontFamily: fontFamily.regular, includeFontPadding: false },
-  descriptive: { marginTop: 8, padding: 12, backgroundColor: '#f8f9fa', borderRadius: 8 },
-  descriptiveText: { fontSize: 14, lineHeight: 20, fontFamily: fontFamily.regular, includeFontPadding: false },
 });

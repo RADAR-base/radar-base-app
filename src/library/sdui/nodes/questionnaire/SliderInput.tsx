@@ -36,6 +36,13 @@ interface SliderInputProps {
    * it. Resolved by the host from the theme and its brand colours; falls back to white.
    */
   backgroundColor?: string;
+  /**
+   * Lets this control hold the page still while it is being dragged.
+   *
+   * The enclosing ScrollView reads a drag as a scroll and takes it, so the page slid away under the
+   * finger instead of the handle moving. Released on finger-up and on a cancelled gesture.
+   */
+  onScrollLock?: (locked: boolean) => void;
 }
 
 /** Figma 3767:5523. Track height, and the radius that makes it a pill. Slightly under the design's
@@ -163,11 +170,33 @@ export function SliderInput({
   textColor,
   accentColor,
   backgroundColor,
+  onScrollLock,
 }: SliderInputProps) {
   const accent = accentColor ?? primaryColor;
 
+  // Read through a ref, as every other live value here is: the handlers below are built once, with an
+  // empty dependency list, so a caller passing an inline arrow must not rebuild them.
+  const onScrollLockRef = useRef(onScrollLock);
+  onScrollLockRef.current = onScrollLock;
+  // A page turn or submit mid-drag unmounts this with no release to fire, which would strand the page
+  // locked. Safe to call when nothing is locked.
+  useEffect(() => () => onScrollLockRef.current?.(false), []);
+
   /** A tick per step crossed, however the value was moved. */
   const tick = useStepHaptics();
+
+  /**
+   * The live `onChange`, read through a ref.
+   *
+   * The gesture handlers below are built once — `PanResponder.create` sits in a `useMemo` with no
+   * dependencies, because everything else they touch is already a ref. `onChange` was the exception:
+   * it closes over the host's current question, so the handlers kept calling the *first* render's
+   * version and a dragged answer was recorded against whichever question was on screen when this
+   * mounted. Tapping worked because that path is an ordinary function in render, which is why the
+   * two disagreed.
+   */
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
   // `range` when the definition bounds the scale, its choices when they enumerate it — see
   // `questionScale` for why the definitions need both readings.
@@ -249,6 +278,7 @@ export function SliderInput({
         onPanResponderTerminationRequest: () => false,
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: e => {
+          onScrollLockRef.current?.(true);
           dragging.current = true;
           setPressed(true);
           setDragged(true);
@@ -264,6 +294,7 @@ export function SliderInput({
           setHandle(dragStart.current + gesture.dx);
         },
         onPanResponderRelease: () => {
+          onScrollLockRef.current?.(false);
           dragging.current = false;
           setPressed(false);
           press.value = withTiming(0, { duration: PRESS_MS });
@@ -280,13 +311,20 @@ export function SliderInput({
           // handle there instantly, cutting this animation short.
           settledFor.current = `${final}:${travelRef.current}`;
           settle(final, true);
-          onChange(valuesRef.current[final]);
+          onChangeRef.current(valuesRef.current[final]);
         },
         onPanResponderTerminate: () => {
+          // Released here too, or a cancelled gesture leaves the page locked for good.
+          onScrollLockRef.current?.(false);
           dragging.current = false;
           setPressed(false);
           press.value = withTiming(0, { duration: PRESS_MS });
           settle(indexRef.current, true);
+          // Record what the handle is showing. A terminated gesture still leaves it settled on a
+          // step — the participant sees an answer — so returning without reporting it is what left
+          // the value on screen and nothing in `answers`, and a required question refusing to move
+          // on from a slider that plainly looked answered.
+          onChangeRef.current(valuesRef.current[indexRef.current]);
         },
       }),
     // Handlers read live values through refs, so they never need rebuilding.
