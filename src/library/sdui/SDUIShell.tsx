@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   InteractionManager,
+  Platform,
   StyleSheet,
   Text,
   useColorScheme,
@@ -26,7 +27,7 @@ import type { Node } from '../contracts/NodeSchema';
 import { BlueprintLoader, type BlueprintSource } from './BlueprintLoader';
 import { ManifestLoader, type ManifestSource } from './ManifestLoader';
 import { NodeRenderer } from './NodeRenderer';
-import { LoadingScreen, LoadingDots } from './LoadingScreen';
+import { LoadingDots } from './LoadingScreen';
 import { createActionDispatcher } from './ActionDispatcher';
 import { registerBuiltInNodes } from './nodes';
 import { NavbarNode } from './nodes/navbar/NavbarNode';
@@ -51,6 +52,9 @@ const noopRender = () => null;
 /** Instructions → first question push. Matches the questionnaire's own page slide. */
 const PUSH_DURATION = 260;
 
+/** How long `onReady` waits on a blueprint before reporting anyway. See the effect that uses it. */
+const READY_TIMEOUT_MS = 8_000;
+
 export interface SDUIShellProps {
   manifestSource: ManifestSource;
   blueprintSource: BlueprintSource;
@@ -59,6 +63,14 @@ export interface SDUIShellProps {
   serviceOverrides?: CoreServiceOverrides;
   templateContext?: TemplateContext;
   eventBus?: { emit: (event: string, data?: unknown) => void };
+  /**
+   * Called once the shell can paint its first tab — manifest parsed, tab chosen, blueprint resolved.
+   *
+   * Lets a host hold its own loading screen up until then, instead of handing over while this shell
+   * still has loaders of its own to show. Fires exactly once, and fires even when the blueprint
+   * fails, so a bad view can't strand the host's loader.
+   */
+  onReady?: () => void;
 }
 
 interface SecondaryEntry {
@@ -99,7 +111,6 @@ export function SDUIShell(props: SDUIShellProps) {
     const loader = new ManifestLoader({
       source: props.manifestSource,
       fallback: props.manifestFallback,
-      mode: colorScheme,
       onValidationError: (err) => console.warn('[SDUI] Manifest validation failed:', err),
     });
     loader
@@ -116,10 +127,8 @@ export function SDUIShell(props: SDUIShellProps) {
     return () => {
       cancelled = true;
     };
-    // Re-parses on colorScheme change so unconfigured theme fields — including the
-    // shell's own background below — track dark/light instead of being stuck with
-    // whatever mode was active on first load.
-  }, [props.manifestSource, props.manifestFallback, colorScheme]);
+    // Not keyed on colorScheme: nothing in the manifest depends on the mode any more.
+  }, [props.manifestSource, props.manifestFallback]);
 
   // Pre-warm the blueprint cache for tabs and secondary views once the manifest loads, so the
   // first switch/open is instant (no loader flash).
@@ -134,6 +143,48 @@ export function SDUIShell(props: SDUIShellProps) {
       }
     }
   }, [manifest, blueprintLoader]);
+
+  // Report first paint to the host — see `onReady`. Held in a ref so a caller passing an inline
+  // arrow can't re-run this, and latched so it reports once.
+  const onReady = props.onReady;
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
+  const reportedReady = useRef(false);
+  const activeViewPath = manifest?.tabs.find((t) => t.id === activeTabId)?.viewPath;
+  useEffect(() => {
+    if (reportedReady.current) return;
+    // A manifest that failed to parse is as settled as one that loaded: the host should stop waiting
+    // and let the error below show.
+    if (manifestError) {
+      reportedReady.current = true;
+      onReadyRef.current?.();
+      return;
+    }
+    if (!manifest || !activeTabId || !activeViewPath) return;
+    const report = () => {
+      if (reportedReady.current) return;
+      reportedReady.current = true;
+      onReadyRef.current?.();
+    };
+    // Already pre-warmed by the effect above — nothing to wait for.
+    if (blueprintLoader.peek(activeViewPath)) {
+      report();
+      return;
+    }
+    let cancelled = false;
+    const done = () => {
+      if (!cancelled) report();
+    };
+    blueprintLoader.load(activeViewPath).then(done, done);
+    // Last resort. The host hides its loader on this signal, so a load that never settles would
+    // leave the participant on a loading screen with no way out — far worse than showing the
+    // shell's own loader for a moment.
+    const bail = setTimeout(report, READY_TIMEOUT_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(bail);
+    };
+  }, [manifest, manifestError, activeTabId, activeViewPath, blueprintLoader]);
 
   const openSecondaryView = useCallback(
     async (viewUrl: string) => {
@@ -180,14 +231,13 @@ export function SDUIShell(props: SDUIShellProps) {
     );
   }
 
-  if (!manifest || !activeTabId) {
-    return <LoadingScreen />;
-  }
+  if (!manifest || !activeTabId) return null;
 
   const context: SDUIContext = {
     template: props.templateContext ?? {},
     dispatch,
-    theme: manifest.theme,
+    // An omitted `theme` block is simply an empty one — every field in it is optional.
+    theme: manifest.theme ?? {},
     colorScheme,
     eventBus: props.eventBus,
   };
@@ -542,6 +592,11 @@ function getUsername(context: SDUIContext): string | undefined {
 
 /* ─── Bottom Tab Bar ──────────────────────────────────────────────────── */
 
+/** How far into the bottom safe area the pill drops on iOS, leaving it just above the home indicator. */
+const IOS_NAVBAR_DROP = 18;
+/** The least gap under the pill, for iPhones with no home indicator. */
+const IOS_NAVBAR_MIN_GAP = 12;
+
 function BottomTabBar({
   manifest,
   activeTabId,
@@ -554,6 +609,12 @@ function BottomTabBar({
   // Edge-to-edge: the shell draws behind the system navigation bar / home indicator. The navbar
   // should sit directly above the device's bottom safe area.
   const insets = useSafeAreaInsets();
+  // iOS: low on the screen, as its apps place their tab bars. Android keeps the full inset, which is
+  // its system navigation bar.
+  const bottomGap =
+    Platform.OS === 'ios'
+      ? Math.max(insets.bottom - IOS_NAVBAR_DROP, IOS_NAVBAR_MIN_GAP)
+      : insets.bottom;
 
   const navbarNode: Node = {
     id: 'shell-navbar',
@@ -571,7 +632,7 @@ function BottomTabBar({
     <View
       style={[
         styles.tabBarOuter,
-        { paddingBottom: insets.bottom },
+        { paddingBottom: bottomGap },
       ]}
     >
       <NavbarNode node={navbarNode} context={context} render={noopRender} />

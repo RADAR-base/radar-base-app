@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -36,6 +36,7 @@ import {
   fontFamily,
   getColorTokens,
   layout,
+  resolveBackground,
   type ThemeColorOverrides,
   type ThemeMode,
 } from '../../theme/theme';
@@ -169,6 +170,10 @@ function AppShellInner({
   const version = manifest.version as string | undefined;
   const themeBlock = manifest.theme as Record<string, unknown> | undefined;
   const theme = (themeBlock?.brandColors as ThemeColorOverrides | undefined) ?? themeBlock as ThemeColorOverrides | undefined;
+  // The study's page colour, for the shell's own root — see the `backgroundColor` on it below.
+  const deviceScheme = useColorScheme();
+  const shellMode: ThemeMode = deviceScheme === 'dark' ? 'dark' : 'light';
+  const pageBackground = resolveBackground({ brandColors: theme }, shellMode);
   const enrolmentBlock = manifest.enrolment as Record<string, unknown> | undefined;
   const loginBlock = manifest.login as Record<string, unknown> | undefined;
   const showSignUp = loginBlock?.showSignUp !== false;
@@ -323,7 +328,25 @@ function AppShellInner({
   // Boot loading overlay
   const [bootLoading, setBootLoading] = useState(true);
 
+  /**
+   * Whether `SDUIShell` can paint its first tab.
+   *
+   * `servicesReady` is not the same thing: services being up says the data is there, not that the
+   * manifest is parsed and the home blueprint resolved. Handing over on `servicesReady` alone is what
+   * put three loaders in a row after enrolment — this screen's, then the shell's own, then the tab's
+   * dots. The entry loader now waits for this instead.
+   */
+  const [shellReady, setShellReady] = useState(false);
+  // Stable, so the shell's ready effect isn't re-run by a fresh arrow on every render.
+  const handleShellReady = useCallback(() => setShellReady(true), []);
+  // A new sign-in gets a fresh shell, so its readiness has to be earned again.
+  useEffect(() => {
+    if (status === 'unauthenticated' || status === 'authenticating') setShellReady(false);
+  }, [status]);
+
   let content: React.ReactNode = null;
+  /** Whether the entry loader covers the shell while it finishes coming up. */
+  let entryLoading = false;
   if (signOutLoading) {
     // Sign-out loading — visible while services tear down, then animates off.
     // ready={!signingOut}: becomes ready once cleanup finishes, then LoadingScreen
@@ -348,28 +371,30 @@ function AppShellInner({
           brandColors={theme}
         />
       );
-    } else if (!servicesReady || postEnrolmentLoading) {
-      // Core services (config, protocol, questionnaires, schedule) are still bootstrapping,
-      // or we just finished onboarding and need to confirm everything is ready.
-      content = (
-        <LoadingScreen
-          brandColors={theme}
-          ready={servicesReady}
-          onHidden={() => setPostEnrolmentLoading(false)}
-        />
-      );
     } else {
-      content = (
-        <View style={styles.shellWrapper}>
-          <SDUIShell
-            manifestSource={async () => manifest}
-            blueprintSource={blueprintSource}
-            serviceOverrides={serviceOverrides}
-            eventBus={{ emit: (event, data) => eventBus.emit(event, data) }}
-            templateContext={templateContext}
-          />
-        </View>
-      );
+      // Once services are up the shell comes up *underneath* the entry loader, rather than after it.
+      // That way the handover is a single fade from one loading screen to a painted home page,
+      // instead of a relay between three — this one, the shell's own, then the tab's dots.
+      //
+      // Still gated on `servicesReady`: the nodes read config, protocol and schedule as they mount,
+      // so a shell built before those are up would render from nothing and not necessarily refresh.
+      if (servicesReady) {
+        content = (
+          <View style={styles.shellWrapper}>
+            <SDUIShell
+              manifestSource={async () => manifest}
+              blueprintSource={blueprintSource}
+              serviceOverrides={serviceOverrides}
+              eventBus={{ emit: (event, data) => eventBus.emit(event, data) }}
+              templateContext={templateContext}
+              onReady={handleShellReady}
+            />
+          </View>
+        );
+      }
+      // One loader across the whole entry — services coming up, then the shell coming up. Kept as a
+      // single element so it is never unmounted and remounted mid-wait, which would flash.
+      entryLoading = !servicesReady || postEnrolmentLoading || !shellReady;
     }
   }
 
@@ -390,8 +415,18 @@ function AppShellInner({
   }, [chromeReady]);
 
   return (
-    <View style={styles.root}>
+    // The page colour, painted on the shell's own root. Every surface here is full-screen, so this
+    // only shows in the frame between one unmounting and the next drawing — which is exactly when it
+    // matters: with nothing behind them, those handovers flashed the bare window, i.e. black.
+    <View style={[styles.root, { backgroundColor: pageBackground }]}>
       {content}
+      {entryLoading && (
+        <LoadingScreen
+          brandColors={theme}
+          ready={servicesReady && shellReady}
+          onHidden={() => setPostEnrolmentLoading(false)}
+        />
+      )}
       {bootLoading && (
         <LoadingScreen
           brandColors={theme}
